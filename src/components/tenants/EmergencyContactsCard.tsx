@@ -54,9 +54,9 @@ export default function EmergencyContactsCard({ tenantId, contacts, onUpdated }:
 
     try {
       if (editId) {
-        const { data, error: err } = await supabase
-          .from('tenant_emergency_contacts')
-          .update({
+        const { data, error: err } = await (supabase as any)
+  .from('tenant_emergency_contacts')
+  .update({
             full_name: form.full_name.trim(),
             phone: form.phone.trim() || null,
             relationship: form.relationship.trim() || null,
