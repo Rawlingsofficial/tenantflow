@@ -457,7 +457,7 @@ export default function BillingPage() {
                     </>
                   )}
                 </button>
-                {!isCurrent && !isEnterprise && plan.priceUSD > 0 && (
+                {!isCurrent && !isEnterprise && (plan.priceUSD ?? 0) > 0 && (
                   <p className="text-xs text-slate-400 text-center mt-2">
                     Cancel anytime · No contracts
                   </p>
