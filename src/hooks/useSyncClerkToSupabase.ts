@@ -70,6 +70,7 @@ export function useSyncClerkToSupabase() {
         .from("users")
         .select("id")
         .eq("clerk_user_id", userId!)
+        .returns<{ id: string }[]>()
         .single();
 
       if (!userData) return;
@@ -100,5 +101,3 @@ function normalizeRole(clerkRole: string): "owner" | "admin" | "manager" | "view
   if (clerkRole === "admin") return "admin";
   return "viewer";
 }
-
-
