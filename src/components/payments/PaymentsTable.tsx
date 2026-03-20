@@ -186,7 +186,7 @@ export default function PaymentsTable({
               className="pl-9"
             />
           </div>
-          <Select value={monthFilter} onValueChange={setMonthFilter}>
+          <Select value={monthFilter} onValueChange={(v) => setMonthFilter(v ?? 'all')}>
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="All months" />
             </SelectTrigger>
@@ -199,7 +199,7 @@ export default function PaymentsTable({
               ))}
             </SelectContent>
           </Select>
-          <Select value={methodFilter} onValueChange={setMethodFilter}>
+          <Select value={methodFilter} onValueChange={(v) => setMethodFilter(v ?? 'all')}>
             <SelectTrigger className="w-full sm:w-44">
               <SelectValue placeholder="All methods" />
             </SelectTrigger>
