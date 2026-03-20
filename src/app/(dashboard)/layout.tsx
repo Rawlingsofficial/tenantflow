@@ -1,11 +1,16 @@
+"use client";
+
 import Sidebar from '@/components/layout/Sidebar'
 import TopNav from '@/components/layout/TopNav'
+import { useSyncClerkToSupabase } from '@/hooks/useSyncClerkToSupabase'
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  useSyncClerkToSupabase()
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
       <Sidebar />
@@ -18,4 +23,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-
