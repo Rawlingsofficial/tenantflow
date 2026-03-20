@@ -35,15 +35,21 @@ export default function DashboardPage() {
         .eq('organization_id', orgId!)
         .eq('status', 'active')
 
+      const buildingIds: string[] = (buildings ?? []).map(
+        (b: { id: string }) => b.id
+      )
+
       // Units
       const { data: units } = await supabase
         .from('units')
         .select('id, status, building_id')
-        .in('building_id', (buildings ?? []).map((b) => b.id))
+        .in('building_id', buildingIds.length > 0 ? buildingIds : ['none'])
 
       const totalUnits = units?.length ?? 0
-      const vacantUnits = units?.filter((u) => u.status === 'vacant').length ?? 0
-      const occupiedUnits = units?.filter((u) => u.status === 'occupied').length ?? 0
+      const vacantUnits =
+        units?.filter((u: { status: string }) => u.status === 'vacant').length ?? 0
+      const occupiedUnits =
+        units?.filter((u: { status: string }) => u.status === 'occupied').length ?? 0
 
       // Tenants
       const { data: tenants } = await supabase
@@ -81,7 +87,7 @@ export default function DashboardPage() {
         .gte('lease_end', today)
         .lte('lease_end', endOfMonth)
 
-      // Revenue stats — active leases with payment history
+      // Revenue stats
       const { data: leasesWithPayments } = await supabase
         .from('leases')
         .select(`
@@ -92,29 +98,34 @@ export default function DashboardPage() {
         .eq('status', 'active')
 
       const expectedMonthly = (leasesWithPayments ?? []).reduce(
-        (sum: number, l: any) => sum + Number(l.rent_amount), 0
+        (sum: number, l: any) => sum + Number(l.rent_amount),
+        0
       )
 
-      const collectedThisMonth = (leasesWithPayments ?? []).reduce((sum: number, l: any) => {
-        const paid = (l.rent_payments ?? [])
-          .filter((p: any) =>
-            p.status === 'completed' &&
-            isSameMonth(new Date(p.payment_date), now)
-          )
-          .reduce((s: number, p: any) => s + Number(p.amount), 0)
-        return sum + paid
-      }, 0)
+      const collectedThisMonth = (leasesWithPayments ?? []).reduce(
+        (sum: number, l: any) => {
+          const paid = (l.rent_payments ?? [])
+            .filter(
+              (p: any) =>
+                p.status === 'completed' &&
+                isSameMonth(new Date(p.payment_date), now)
+            )
+            .reduce((s: number, p: any) => s + Number(p.amount), 0)
+          return sum + paid
+        },
+        0
+      )
 
       const outstandingBalance = Math.max(0, expectedMonthly - collectedThisMonth)
 
       setStats({
-        totalBuildings: buildings?.length ?? 0,
+        totalBuildings: (buildings ?? []).length,
         totalUnits,
         vacantUnits,
         occupiedUnits,
-        activeTenants: tenants?.length ?? 0,
-        activeLeases: activeLeases?.length ?? 0,
-        expiringLeases: expiring?.length ?? 0,
+        activeTenants: (tenants ?? []).length,
+        activeLeases: (activeLeases ?? []).length,
+        expiringLeases: (expiring ?? []).length,
         expectedMonthly,
         collectedThisMonth,
         outstandingBalance,
