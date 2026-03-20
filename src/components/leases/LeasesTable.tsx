@@ -180,7 +180,7 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
