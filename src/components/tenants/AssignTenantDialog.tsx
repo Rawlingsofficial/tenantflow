@@ -180,10 +180,10 @@ export default function AssignTenantDialog({
       if (lErr) throw new Error(lErr.message)
 
       // Mark unit as occupied
-      const { error: uErr } = await supabase
-        .from('units')
-        .update({ status: 'occupied' })
-        .eq('id', unitId)
+      const { error: uErr } = await (supabase as any)
+  .from('units')
+  .update({ status: 'occupied' })
+  .eq('id', unitId)
 
       if (uErr) throw new Error(uErr.message)
 
@@ -413,7 +413,7 @@ export default function AssignTenantDialog({
                       <Label>Marital status</Label>
                       <Select
                         value={tenantForm.marital_status}
-                        onValueChange={(v) => setTenant('marital_status', v)}
+                        onValueChange={(v) => setTenant('marital_status', v ?? '')}
                       >
                         <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                         <SelectContent>
@@ -428,7 +428,7 @@ export default function AssignTenantDialog({
                       <Label>Employment type</Label>
                       <Select
                         value={tenantForm.employment_type}
-                        onValueChange={(v) => setTenant('employment_type', v)}
+                        onValueChange={(v) => setTenant('employment_type', v ?? '')}
                       >
                         <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                         <SelectContent>
@@ -478,7 +478,7 @@ export default function AssignTenantDialog({
                 <Select
                   value={selectedUnitId}
                   onValueChange={(v) => {
-                    setSelectedUnitId(v)
+  setSelectedUnitId(v ?? '')
                     const u = availableUnits.find((u) => u.id === v)
                     if (u?.default_rent) {
                       setLease('rent_amount', u.default_rent.toString())
