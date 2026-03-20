@@ -59,7 +59,7 @@ export default function BuildingsPage() {
 
       if (error) throw error;
 
-      const enriched: BuildingWithStats[] = (buildingsData || []).map((b) => {
+      const enriched: BuildingWithStats[] = ((buildingsData || []) as any[]).map((b) => {
         const units: { id: string; status: string }[] = (b.units as any) || [];
         const total = units.length;
         const occupied = units.filter((u) => u.status === "occupied").length;
@@ -502,5 +502,4 @@ function UnitsMiniTable({ units }: { units: any[] }) {
     </table>
   );
 }
-
 
