@@ -1,78 +1,76 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 
-// GET /api/buildings/[id]/units
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// GET /api/buildings?org_id=xxx
+export async function GET(req: NextRequest) {
   const supabase = createServerClient();
-  const buildingId = (await params).id;
+  const orgId = req.nextUrl.searchParams.get("org_id");
+
+  if (!orgId) {
+    return NextResponse.json({ error: "org_id is required" }, { status: 400 });
+  }
 
   const { data, error } = await supabase
-    .from("units")
+    .from("buildings")
     .select(`
-      id, unit_code, unit_type, bedrooms, bathrooms, default_rent, status, building_id,
-      leases(
-        id, tenant_id, lease_start, lease_end, rent_amount, status,
-        tenants(id, first_name, last_name, primary_phone, photo_url)
-      )
+      id, name, address, status, photo_url, organization_id,
+      units(id, status)
     `)
-    .eq("building_id", buildingId)
-    .order("unit_code");
+    .eq("organization_id", orgId)
+    .order("name");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const enriched = (data || []).map((u: any) => {
-    const activeLease = (u.leases || []).find((l: any) => l.status === "active");
+  const enriched = (data || []).map((b: any) => {
+    const units: { id: string; status: string }[] = b.units || [];
+    const total = units.length;
+    const occupied = units.filter((u) => u.status === "occupied").length;
+    const vacant = units.filter((u) => u.status === "vacant").length;
+    const maintenance = units.filter((u) => u.status === "maintenance").length;
     return {
-      id: u.id,
-      unit_code: u.unit_code,
-      unit_type: u.unit_type,
-      bedrooms: u.bedrooms,
-      bathrooms: u.bathrooms,
-      default_rent: u.default_rent,
-      status: u.status,
-      building_id: u.building_id,
-      activeLease: activeLease || null,
+      id: b.id,
+      name: b.name,
+      address: b.address,
+      status: b.status,
+      photo_url: b.photo_url,
+      organization_id: b.organization_id,
+      total_units: total,
+      occupied_units: occupied,
+      vacant_units: vacant,
+      maintenance_units: maintenance,
+      occupancy_rate: total > 0 ? Math.round((occupied / total) * 100) : 0,
     };
   });
 
-  return NextResponse.json({ units: enriched });
+  return NextResponse.json({ buildings: enriched });
 }
 
-// POST /api/buildings/[id]/units
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+// POST /api/buildings
+export async function POST(req: NextRequest) {
   const supabase = createServerClient();
-  const { id: buildingId } = await params;
   const body = await req.json();
 
-  const { unit_code, unit_type, bedrooms, bathrooms, default_rent, status } = body;
+  const { organization_id, name, address, status, photo_url } = body;
 
-  if (!unit_code) {
+  if (!organization_id || !name) {
     return NextResponse.json(
-      { error: "unit_code is required" },
+      { error: "organization_id and name are required" },
       { status: 400 }
     );
   }
 
   const payload = {
-    building_id: buildingId,
-    unit_code: (unit_code as string).toUpperCase(),
-    unit_type: unit_type ?? null,
-    bedrooms: bedrooms ?? null,
-    bathrooms: bathrooms ?? null,
-    default_rent: default_rent ?? null,
-    status: status ?? "vacant",
+    organization_id,
+    name,
+    address: address ?? null,
+    status: status ?? "active",
+    photo_url: photo_url ?? null,
   };
 
   const { data, error } = await supabase
-    .from("units")
+    .from("buildings")
     .insert(payload as any)
     .select()
     .single();
@@ -81,5 +79,6 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ unit: data }, { status: 201 });
+  return NextResponse.json({ building: data }, { status: 201 });
 }
+
