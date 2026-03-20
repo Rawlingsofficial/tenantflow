@@ -74,15 +74,13 @@ export default function TenantProfilePage() {
   }
 
   async function handleArchive() {
-    if (!tenant) return
-    const { data } = await supabase
-      .from('tenants')
-      .update({ status: 'inactive' })
-      .eq('id', tenant.id)
-      .select()
-      .single() as { data: Tenant | null; error: any }
-    if (data) setTenant(data)
-  }
+  if (!tenant) return
+  await (supabase as any)
+    .from('tenants')
+    .update({ status: 'inactive' })
+    .eq('id', tenant.id)
+  setTenant({ ...tenant, status: 'inactive' })
+}
 
   if (loading) {
     return (
