@@ -3,6 +3,7 @@
 export type OrgStatus = 'active' | 'inactive'
 export type PlanType = 'free' | 'pro' | 'enterprise'
 export type Role = 'owner' | 'admin' | 'manager' | 'viewer'
+export type Permission = string
 export type UnitStatus = 'vacant' | 'occupied' | 'maintenance'
 export type LeaseStatus = 'active' | 'ended' | 'terminated'
 export type PaymentStatus = 'pending' | 'completed' | 'failed'

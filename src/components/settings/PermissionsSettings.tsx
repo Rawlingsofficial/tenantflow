@@ -3,7 +3,8 @@
 import { Crown, Shield, UserCheck, Eye, CheckCircle2, XCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PERMISSION_GROUPS, ROLE_PERMISSIONS, hasPermission } from '@/lib/permissions'
-import type { Role, Permission } from '@/types'
+import type { Role } from '@/types'
+import type { Permission } from '@/lib/permissions'
 
 const ROLES: Role[] = ['owner', 'admin', 'manager', 'viewer']
 
