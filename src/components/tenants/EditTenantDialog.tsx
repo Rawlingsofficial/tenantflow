@@ -76,9 +76,9 @@ export default function EditTenantDialog({ open, onClose, onSaved, tenant }: Pro
     setError('')
 
     try {
-      const { data, error: err } = await supabase
-        .from('tenants')
-        .update({
+     const { data, error: err } = await (supabase as any)
+  .from('tenants')
+  .update({
           first_name: form.first_name.trim(),
           last_name: form.last_name.trim() || null,
           primary_phone: form.primary_phone.trim() || null,
@@ -207,7 +207,7 @@ export default function EditTenantDialog({ open, onClose, onSaved, tenant }: Pro
                   <Label>Marital status</Label>
                   <Select
                     value={form.marital_status}
-                    onValueChange={(v) => set('marital_status', v)}
+                    onValueChange={(v) => set('marital_status', v ?? '')}
                   >
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
@@ -222,7 +222,7 @@ export default function EditTenantDialog({ open, onClose, onSaved, tenant }: Pro
                   <Label>Employment type</Label>
                   <Select
                     value={form.employment_type}
-                    onValueChange={(v) => set('employment_type', v)}
+                    onValueChange={(v) => set('employment_type', v ?? '')}
                   >
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
