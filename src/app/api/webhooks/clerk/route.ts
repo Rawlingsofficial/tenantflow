@@ -58,13 +58,13 @@ export async function POST(req: NextRequest) {
       const full_name = [first_name, last_name].filter(Boolean).join(" ") || null;
 
       const { error } = await supabase.from("users").upsert(
-        {
+        ({
           clerk_user_id: id,
           email,
           full_name,
           phone,
           status: "active",
-        },
+        } as any),
         { onConflict: "clerk_user_id" }
       );
 
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
       const { error } = await supabase
         .from("users")
-        .update({ email, full_name, phone })
+        .update({ email, full_name, phone } as any)
         .eq("clerk_user_id", id);
 
       if (error) console.error("Failed to update user:", error);
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       const { id } = data;
       const { error } = await supabase
         .from("users")
-        .update({ status: "inactive" })
+        .update({ status: "inactive" } as any)
         .eq("clerk_user_id", id);
 
       if (error) console.error("Failed to deactivate user:", error);
@@ -107,12 +107,7 @@ export async function POST(req: NextRequest) {
       const { id, name } = data;
 
       const { error } = await supabase.from("organizations").upsert(
-        {
-          id,
-          name,
-          plan_type: "free",
-          status: "active",
-        },
+        ({ id, name, plan_type: "free", status: "active" } as any),
         { onConflict: "id" }
       );
 
@@ -130,7 +125,7 @@ export async function POST(req: NextRequest) {
 
       const { error } = await supabase
         .from("organizations")
-        .update({ name })
+        .update({ name } as any)
         .eq("id", id);
 
       if (error) console.error("Failed to update org:", error);
@@ -142,7 +137,7 @@ export async function POST(req: NextRequest) {
 
       const { error } = await supabase
         .from("organizations")
-        .update({ status: "inactive" })
+        .update({ status: "inactive" } as any)
         .eq("id", id);
 
       if (error) console.error("Failed to deactivate org:", error);
@@ -168,12 +163,7 @@ export async function POST(req: NextRequest) {
       const normalizedRole = normalizeRole(role);
 
       const { error } = await supabase.from("organization_memberships").upsert(
-        {
-          user_id: userData.id,
-          organization_id: organization.id,
-          role: normalizedRole,
-          status: "active",
-        },
+        ({ user_id: userData.id, organization_id: organization.id, role: normalizedRole, status: "active" } as any),
         { onConflict: "user_id,organization_id" }
       );
 
@@ -195,7 +185,7 @@ export async function POST(req: NextRequest) {
         const normalizedRole = normalizeRole(role);
         await supabase
           .from("organization_memberships")
-          .update({ role: normalizedRole })
+          .update({ role: normalizedRole } as any)
           .eq("user_id", userData.id)
           .eq("organization_id", organization.id);
       }
@@ -214,7 +204,7 @@ export async function POST(req: NextRequest) {
       if (userData) {
         await supabase
           .from("organization_memberships")
-          .update({ status: "inactive" })
+          .update({ status: "inactive" } as any)
           .eq("user_id", userData.id)
           .eq("organization_id", organization.id);
       }
@@ -235,4 +225,3 @@ function normalizeRole(clerkRole: string): "owner" | "admin" | "manager" | "view
   if (clerkRole === "admin") return "admin";
   return "viewer";
 }
-
