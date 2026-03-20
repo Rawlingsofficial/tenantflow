@@ -58,13 +58,13 @@ export function AddBuildingDialog({
     }
     setSaving(true);
     try {
-      const { error } = await supabase.from("buildings").insert({
-        organization_id: orgId,
-        name: form.name.trim(),
-        address: form.address.trim() || null,
-        status: form.status,
-        photo_url: form.photo_url.trim() || null,
-      });
+     const { error } = await supabase.from("buildings").insert({
+  organization_id: orgId,
+  name: form.name.trim(),
+  address: form.address.trim() || null,
+  status: form.status as "active" | "inactive",
+  photo_url: form.photo_url.trim() || null,
+} as any);
       if (error) throw error;
       toast.success("Building created successfully.");
       setForm({ name: "", address: "", status: "active", photo_url: "" });
@@ -126,7 +126,7 @@ export function AddBuildingDialog({
             </Label>
             <Select
               value={form.status}
-              onValueChange={(v) => updateField("status", v)}
+              onValueChange={(v) => setForm((prev) => ({ ...prev, status: v as "active" | "inactive" }))}
               disabled={saving}
             >
               <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">

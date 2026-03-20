@@ -141,11 +141,11 @@ export function BuildingsTable({ buildings, onRefresh }: BuildingsTableProps) {
               </td>
               <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 transition-all">
-                      <MoreHorizontal className="h-4 w-4 text-gray-400" />
-                    </button>
-                  </DropdownMenuTrigger>
+                  <DropdownMenuTrigger>
+  <button className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-gray-100 transition-all">
+    <MoreHorizontal className="h-4 w-4 text-gray-400" />
+  </button>
+</DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="text-xs">
                     <DropdownMenuItem
                       onClick={() => router.push(`/buildings/${b.id}`)}

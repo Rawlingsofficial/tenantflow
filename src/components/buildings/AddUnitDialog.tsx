@@ -97,14 +97,14 @@ export function AddUnitDialog({
     setSaving(true);
     try {
       const { error } = await supabase.from("units").insert({
-        building_id: form.building_id,
-        unit_code: form.unit_code.trim().toUpperCase(),
-        unit_type: form.unit_type || null,
-        bedrooms: form.bedrooms ? parseInt(form.bedrooms) : null,
-        bathrooms: form.bathrooms ? parseInt(form.bathrooms) : null,
-        default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
-        status: form.status,
-      });
+  building_id: form.building_id,
+  unit_code: form.unit_code.trim().toUpperCase(),
+  unit_type: form.unit_type || null,
+  bedrooms: form.bedrooms ? parseInt(form.bedrooms) : null,
+  bathrooms: form.bathrooms ? parseInt(form.bathrooms) : null,
+  default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
+  status: form.status as "vacant" | "occupied" | "maintenance",
+} as any);
       if (error) throw error;
       toast.success("Unit added successfully.");
       resetForm();
@@ -172,7 +172,7 @@ export function AddUnitDialog({
             ) : (
               <Select
                 value={form.building_id}
-                onValueChange={(v) => updateField("building_id", v)}
+                onValueChange={(v) => setForm((prev) => ({ ...prev, status: v as "vacant" | "occupied" | "maintenance" }))}
                 disabled={saving}
               >
                 <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
@@ -243,7 +243,7 @@ export function AddUnitDialog({
               </Label>
               <Select
                 value={form.unit_type || "flat"}
-                onValueChange={(v) => updateField("unit_type", v)}
+                onValueChange={(v) => setForm((prev) => ({ ...prev, status: v as "vacant" | "occupied" | "maintenance" }))}
                 disabled={saving}
               >
                 <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
@@ -264,7 +264,7 @@ export function AddUnitDialog({
               </Label>
               <Select
                 value={form.status}
-                onValueChange={(v) => updateField("status", v)}
+                onValueChange={(v) => setForm((prev) => ({ ...prev, status: v as "vacant" | "occupied" | "maintenance" }))}
                 disabled={saving}
               >
                 <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
