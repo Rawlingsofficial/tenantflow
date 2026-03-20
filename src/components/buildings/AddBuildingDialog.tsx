@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { useOrg } from "@/hooks/useOrg";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,7 @@ export function AddBuildingDialog({
   onClose,
   onSuccess,
 }: AddBuildingDialogProps) {
-  const { orgId } = useOrg();
+  const { orgId } = useAuth();
   const supabase = createBrowserClient();
 
   const [form, setForm] = useState({
@@ -177,4 +177,5 @@ export function AddBuildingDialog({
     </Dialog>
   );
 }
+
 
