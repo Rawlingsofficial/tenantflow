@@ -70,11 +70,10 @@ export function AddBuildingDialog({
       setForm({ name: "", address: "", status: "active", photo_url: "" });
       onSuccess();
     } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Failed to create building.");
-    } finally {
-      setSaving(false);
-    }
+  console.error(err);
+  alert(JSON.stringify(err));
+  toast.error(err.message || "Failed to create building.");
+}
   }
 
   function handleClose() {
