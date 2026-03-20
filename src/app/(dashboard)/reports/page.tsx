@@ -10,7 +10,6 @@ import TenantReport from '@/components/reports/TenantReport'
 import LeaseReport from '@/components/reports/LeaseReport'
 
 export type ReportData = {
-  // Portfolio
   totalBuildings: number
   totalUnits: number
   occupiedUnits: number
@@ -18,7 +17,6 @@ export type ReportData = {
   maintenanceUnits: number
   occupancyRate: number
 
-  // Revenue
   activeLeases: {
     id: string
     rent_amount: number
@@ -46,7 +44,6 @@ export type ReportData = {
     lease_id: string
   }[]
 
-  // Tenants
   tenants: {
     id: string
     first_name: string | null
@@ -57,7 +54,6 @@ export type ReportData = {
     leases: { status: string; lease_start: string; lease_end: string | null }[]
   }[]
 
-  // Leases
   allLeases: {
     id: string
     status: string
@@ -83,17 +79,12 @@ export default function ReportsPage() {
   async function loadReportData() {
     setLoading(true)
 
-    const [buildingsRes, unitsRes, leasesRes, tenantsRes, paymentsRes] = await Promise.all([
+    const [buildingsRes, leasesRes, tenantsRes, paymentsRes] = await Promise.all([
       supabase
         .from('buildings')
         .select('id, name, status')
         .eq('organization_id', orgId!)
         .eq('status', 'active'),
-
-      supabase
-        .from('units')
-        .select('id, status, building_id')
-        .in('building_id', []),
 
       supabase
         .from('leases')
@@ -119,35 +110,40 @@ export default function ReportsPage() {
         .order('payment_date', { ascending: false }),
     ])
 
-    // Fetch units separately with building IDs
-    const buildingIds = (buildingsRes.data ?? []).map((b) => b.id)
+    // Fetch units with explicit building IDs
+    const buildingIds: string[] = (buildingsRes.data ?? []).map(
+      (b: { id: string }) => b.id
+    )
+
     const { data: unitsData } = await supabase
       .from('units')
       .select('id, status, building_id')
       .in('building_id', buildingIds.length > 0 ? buildingIds : ['none'])
 
-    const units = unitsData ?? []
+    const units: { id: string; status: string; building_id: string }[] =
+      (unitsData ?? []) as { id: string; status: string; building_id: string }[]
+
     const totalUnits = units.length
     const occupiedUnits = units.filter((u) => u.status === 'occupied').length
     const vacantUnits = units.filter((u) => u.status === 'vacant').length
     const maintenanceUnits = units.filter((u) => u.status === 'maintenance').length
-    const occupancyRate = totalUnits > 0
-      ? Math.round((occupiedUnits / totalUnits) * 100)
-      : 0
+    const occupancyRate =
+      totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0
 
-    const activeLeases = (leasesRes.data ?? []).filter((l) => l.status === 'active')
+    const allLeases = (leasesRes.data ?? []) as any[]
+    const activeLeases = allLeases.filter((l) => l.status === 'active')
 
     setData({
-      totalBuildings: buildingsRes.data?.length ?? 0,
+      totalBuildings: (buildingsRes.data ?? []).length,
       totalUnits,
       occupiedUnits,
       vacantUnits,
       maintenanceUnits,
       occupancyRate,
-      activeLeases: activeLeases as any,
-      allPayments: paymentsRes.data ?? [],
-      tenants: tenantsRes.data as any ?? [],
-      allLeases: leasesRes.data as any ?? [],
+      activeLeases,
+      allPayments: (paymentsRes.data ?? []) as any[],
+      tenants: (tenantsRes.data ?? []) as any[],
+      allLeases,
     })
 
     setLoading(false)
@@ -162,7 +158,6 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Reports</h1>
         <p className="text-slate-500 text-sm mt-1">
@@ -170,7 +165,6 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 p-1 bg-slate-100 rounded-lg w-fit">
         {tabs.map((tab) => (
           <button
@@ -187,7 +181,6 @@ export default function ReportsPage() {
         ))}
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="space-y-4">
           <div className="grid grid-cols-4 gap-4">
@@ -209,4 +202,5 @@ export default function ReportsPage() {
     </div>
   )
 }
+
 
