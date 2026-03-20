@@ -104,7 +104,7 @@ export default function BillingSettings() {
       .eq('organization_id', orgId!)
       .eq('status', 'active')
 
-    const buildingIds = (buildings ?? []).map((b) => b.id)
+   const buildingIds: string[] = (buildings ?? []).map((b: { id: string }) => b.id)
     const { data: units } = await supabase
       .from('units')
       .select('id')
