@@ -65,7 +65,7 @@ export default function OrgSettings() {
       supabase.from('organization_memberships').select('id').eq('organization_id', orgId!).eq('status', 'active'),
     ])
 
-    const buildingIds = (buildingsRes.data ?? []).map((b) => b.id)
+    const buildingIds: string[] = (buildingsRes.data ?? []).map((b: { id: string }) => b.id)
     const { data: units } = await supabase
       .from('units')
       .select('id')
@@ -84,14 +84,13 @@ export default function OrgSettings() {
     setSaving(true)
     setError('')
     try {
-      const { error: err } = await supabase
-        .from('organizations')
-        .update({
-          name: form.name.trim(),
-          country: form.country.trim() || null,
-        })
-        .eq('id', orgId!)
-
+      const { error: err } = await (supabase as any)
+  .from('organizations')
+  .update({
+    name: form.name.trim(),
+    country: form.country.trim() || null,
+  })
+  .eq('id', orgId!)
       if (err) throw new Error(err.message)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
