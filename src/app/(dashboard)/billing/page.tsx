@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/nextjs'
 import { useEffect, useState } from 'react'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import {
-  Zap, Check, X, Building2, Users, Home,
+  Zap, Check, X, Building2, Users,
   FileText, CreditCard, BarChart3,
   Shield, Headphones, Star, ArrowRight,
   Lock, Globe, Phone, Mail
@@ -212,12 +212,13 @@ export default function BillingPage() {
   }, [orgId])
 
   async function loadOrg() {
-    const { data } = await supabase
+    const { data: orgData } = await supabase
       .from('organizations')
       .select('*')
       .eq('id', orgId!)
       .single() as { data: Organization | null; error: any }
-    if (data) setOrg(data)
+
+    if (orgData) setOrg(orgData)
 
     const { data: buildings } = await supabase
       .from('buildings')
@@ -225,7 +226,9 @@ export default function BillingPage() {
       .eq('organization_id', orgId!)
       .eq('status', 'active')
 
-    const buildingIds = (buildings ?? []).map((b) => b.id)
+    const buildingIds: string[] = (buildings ?? []).map(
+      (b: { id: string }) => b.id
+    )
 
     const { data: units } = await supabase
       .from('units')
@@ -239,8 +242,8 @@ export default function BillingPage() {
       .eq('status', 'active')
 
     setStats({
-      units: units?.length ?? 0,
-      members: members?.length ?? 0,
+      units: (units ?? []).length,
+      members: (members ?? []).length,
     })
   }
 
@@ -296,9 +299,11 @@ export default function BillingPage() {
               showXAF ? 'bg-indigo-600' : 'bg-slate-200'
             }`}
           >
-            <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-              showXAF ? 'translate-x-5' : 'translate-x-0'
-            }`} />
+            <span
+              className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                showXAF ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
           </button>
           <span className={`text-sm font-medium ${showXAF ? 'text-slate-900' : 'text-slate-400'}`}>
             XAF (FCFA)
@@ -325,7 +330,9 @@ export default function BillingPage() {
             >
               {/* Badge */}
               {plan.badge && (
-                <div className={`absolute top-4 right-4 text-xs font-bold px-2.5 py-1 rounded-full ${plan.badgeBg}`}>
+                <div
+                  className={`absolute top-4 right-4 text-xs font-bold px-2.5 py-1 rounded-full ${plan.badgeBg}`}
+                >
                   {plan.badge}
                 </div>
               )}
@@ -391,17 +398,21 @@ export default function BillingPage() {
               <div className="p-5 bg-white flex-1 space-y-2.5">
                 {plan.features.map((feature, i) => (
                   <div key={i} className="flex items-center gap-2.5">
-                    <div className={`h-4 w-4 rounded-full flex items-center justify-center shrink-0 ${
-                      feature.included ? 'bg-emerald-100' : 'bg-slate-100'
-                    }`}>
+                    <div
+                      className={`h-4 w-4 rounded-full flex items-center justify-center shrink-0 ${
+                        feature.included ? 'bg-emerald-100' : 'bg-slate-100'
+                      }`}
+                    >
                       {feature.included
                         ? <Check className="h-2.5 w-2.5 text-emerald-600" />
                         : <X className="h-2.5 w-2.5 text-slate-300" />
                       }
                     </div>
-                    <span className={`text-xs ${
-                      feature.included ? 'text-slate-700' : 'text-slate-300'
-                    }`}>
+                    <span
+                      className={`text-xs ${
+                        feature.included ? 'text-slate-700' : 'text-slate-300'
+                      }`}
+                    >
                       {feature.text}
                     </span>
                   </div>
@@ -414,9 +425,12 @@ export default function BillingPage() {
                   disabled={isCurrent}
                   onClick={() => {
                     if (isEnterprise) {
-                      window.location.href = 'mailto:hello@tenantflow.app?subject=Enterprise Plan Inquiry'
+                      window.location.href =
+                        'mailto:hello@tenantflow.app?subject=Enterprise Plan Inquiry'
                     } else if (!isCurrent) {
-                      alert(`Upgrade to ${plan.name} coming soon! We'll notify you when payments go live.`)
+                      alert(
+                        `Upgrade to ${plan.name} coming soon! We'll notify you when payments go live.`
+                      )
                     }
                   }}
                   className={`w-full h-10 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${
@@ -619,7 +633,9 @@ export default function BillingPage() {
               <ArrowRight className="h-4 w-4" />
             </button>
             <button
-              onClick={() => { window.location.href = 'mailto:hello@tenantflow.app' }}
+              onClick={() => {
+                window.location.href = 'mailto:hello@tenantflow.app'
+              }}
               className="flex items-center gap-2 px-6 py-3.5 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white text-sm font-medium rounded-xl transition-colors"
             >
               <Mail className="h-4 w-4" />
@@ -633,7 +649,10 @@ export default function BillingPage() {
               { icon: Check, text: 'Cancel anytime' },
               { icon: Globe, text: 'Simple, transparent pricing' },
             ].map((item) => (
-              <div key={item.text} className="flex items-center gap-1.5 text-slate-500 text-xs">
+              <div
+                key={item.text}
+                className="flex items-center gap-1.5 text-slate-500 text-xs"
+              >
                 <item.icon className="h-3.5 w-3.5" />
                 {item.text}
               </div>
