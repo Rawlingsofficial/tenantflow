@@ -44,6 +44,7 @@ export interface Building {
   name: string
   address: string | null
   status: OrgStatus
+  photo_url: string | null  // ← add this
 }
 
 export interface Unit {
@@ -212,15 +213,16 @@ export type Database = {
         Update: Partial<User>
       }
       buildings: {
-        Row: Building
-        Insert: {
-          organization_id: string
-          name: string
-          address?: string | null
-          status?: OrgStatus
-        }
-        Update: Partial<Building>
-      }
+  Row: Building
+  Insert: {
+    organization_id: string
+    name: string
+    address?: string | null
+    status?: OrgStatus
+    photo_url?: string | null  // ← add this
+  }
+  Update: Partial<Building>
+}
       units: {
         Row: Unit
         Insert: {
