@@ -79,11 +79,12 @@ export default function AddTenantDialog({
 
     try {
       if (editTenant) {
-        const { data, error: err } = await supabase
-          .from('tenants')
-          .update(payload)
-          .eq('id', editTenant.id)
-          .select()
+        const { data, error: err } = await (supabase as any)
+  .from('tenants')
+  .update(payload)
+  .eq('id', editTenant.id)
+  .select()
+  .single()
           .single() as { data: Tenant | null; error: any }
         if (err || !data) throw new Error(err?.message)
         onSaved(data)
@@ -172,7 +173,7 @@ export default function AddTenantDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Marital status</Label>
-                  <Select value={form.marital_status} onValueChange={(v) => set('marital_status', v)}>
+                  <Select value={form.marital_status} onValueChange={(v) => set('marital_status', v ?? '')}>
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="single">Single</SelectItem>
@@ -184,7 +185,7 @@ export default function AddTenantDialog({
                 </div>
                 <div className="space-y-2">
                   <Label>Employment type</Label>
-                  <Select value={form.employment_type} onValueChange={(v) => set('employment_type', v)}>
+                  <Select value={form.employment_type} onValueChange={(v) => set('employment_type', v ?? '')}>
                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="employed">Employed</SelectItem>
