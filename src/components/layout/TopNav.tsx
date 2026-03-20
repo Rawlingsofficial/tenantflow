@@ -11,9 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import { format, differenceInDays } from 'date-fns'
-
-// ── Types ──────────────────────────────────────────────────────────────
+import { differenceInDays } from 'date-fns'
 
 interface SearchResult {
   type: 'tenant' | 'unit' | 'lease'
@@ -44,7 +42,6 @@ function GlobalSearch({ orgId }: { orgId: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Keyboard shortcut ⌘K
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -62,7 +59,6 @@ function GlobalSearch({ orgId }: { orgId: string }) {
     return () => window.removeEventListener('keydown', handleKey)
   }, [])
 
-  // Click outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -73,7 +69,6 @@ function GlobalSearch({ orgId }: { orgId: string }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // Search
   useEffect(() => {
     if (!query.trim() || query.length < 2) {
       setResults([])
@@ -86,18 +81,19 @@ function GlobalSearch({ orgId }: { orgId: string }) {
   async function doSearch(q: string) {
     setLoading(true)
     const term = `%${q}%`
-    const results: SearchResult[] = []
+    const found: SearchResult[] = []
+    const db = supabase as any
 
     // Search tenants
-    const { data: tenants } = await supabase
+    const { data: tenants } = await db
       .from('tenants')
       .select('id, first_name, last_name, primary_phone, email, occupation')
       .eq('organization_id', orgId)
       .or(`first_name.ilike.${term},last_name.ilike.${term},primary_phone.ilike.${term},email.ilike.${term},occupation.ilike.${term}`)
       .limit(4)
 
-    tenants?.forEach((t) => {
-      results.push({
+    ;(tenants ?? []).forEach((t: any) => {
+      found.push({
         type: 'tenant',
         id: t.id,
         title: `${t.first_name ?? ''} ${t.last_name ?? ''}`.trim() || 'Unknown',
@@ -107,15 +103,15 @@ function GlobalSearch({ orgId }: { orgId: string }) {
     })
 
     // Search units
-    const { data: units } = await supabase
+    const { data: units } = await db
       .from('units')
       .select('id, unit_code, unit_type, status, building_id, buildings!inner(name, organization_id)')
       .eq('buildings.organization_id', orgId)
       .ilike('unit_code', term)
       .limit(3)
 
-    units?.forEach((u: any) => {
-      results.push({
+    ;(units ?? []).forEach((u: any) => {
+      found.push({
         type: 'unit',
         id: u.id,
         title: `Unit ${u.unit_code}`,
@@ -124,8 +120,8 @@ function GlobalSearch({ orgId }: { orgId: string }) {
       })
     })
 
-    // Search leases by tenant name
-    const { data: leases } = await supabase
+    // Search leases
+    const { data: leases } = await db
       .from('leases')
       .select(`
         id, status, rent_amount,
@@ -136,13 +132,13 @@ function GlobalSearch({ orgId }: { orgId: string }) {
       .eq('status', 'active')
       .limit(3)
 
-    leases
-      ?.filter((l: any) => {
+    ;(leases ?? [])
+      .filter((l: any) => {
         const name = `${l.tenants?.first_name ?? ''} ${l.tenants?.last_name ?? ''}`.toLowerCase()
         return name.includes(q.toLowerCase())
       })
       .forEach((l: any) => {
-        results.push({
+        found.push({
           type: 'lease',
           id: l.id,
           title: `Lease — ${l.tenants?.first_name ?? ''} ${l.tenants?.last_name ?? ''}`.trim(),
@@ -151,7 +147,7 @@ function GlobalSearch({ orgId }: { orgId: string }) {
         })
       })
 
-    setResults(results)
+    setResults(found)
     setLoading(false)
   }
 
@@ -169,7 +165,6 @@ function GlobalSearch({ orgId }: { orgId: string }) {
 
   return (
     <div ref={containerRef} className="relative flex-1 max-w-sm">
-      {/* Trigger */}
       {!open ? (
         <button
           onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50) }}
@@ -200,8 +195,7 @@ function GlobalSearch({ orgId }: { orgId: string }) {
         </div>
       )}
 
-      {/* Dropdown results */}
-      {open && (query.length >= 2) && (
+      {open && query.length >= 2 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
           {loading ? (
             <div className="px-4 py-6 text-center text-sm text-slate-400">
@@ -277,11 +271,11 @@ function NotificationsBell({ orgId }: { orgId: string }) {
   }, [])
 
   async function loadNotifications() {
-    // Expiring leases within 30 days
+    const db = supabase as any
     const today = new Date().toISOString().split('T')[0]
     const in30 = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    const { data: expiring } = await supabase
+    const { data: expiring } = await db
       .from('leases')
       .select(`
         id, lease_end, rent_amount,
@@ -296,25 +290,25 @@ function NotificationsBell({ orgId }: { orgId: string }) {
 
     setExpiringLeases(expiring ?? [])
 
-    // Vacant units
-    const { data: buildings } = await supabase
+    const { data: buildings } = await db
       .from('buildings')
       .select('id')
       .eq('organization_id', orgId)
       .eq('status', 'active')
 
-    if (buildings && buildings.length > 0) {
-      const { data: units } = await supabase
+    const buildingIds: string[] = (buildings ?? []).map((b: any) => b.id)
+
+    if (buildingIds.length > 0) {
+      const { data: units } = await db
         .from('units')
         .select('id')
-        .in('building_id', buildings.map((b) => b.id))
+        .in('building_id', buildingIds)
         .eq('status', 'vacant')
 
-      setVacantCount(units?.length ?? 0)
+      setVacantCount((units ?? []).length)
     }
 
-    // DB notifications
-    const { data: notifs } = await supabase
+    const { data: notifs } = await db
       .from('notifications')
       .select('*')
       .eq('organization_id', orgId)
@@ -322,13 +316,13 @@ function NotificationsBell({ orgId }: { orgId: string }) {
       .order('created_at', { ascending: false })
       .limit(5)
 
-    setNotifications((notifs ?? []).map((n) => ({
-      ...n,
-      href: '/dashboard',
-    })))
+    setNotifications(
+      (notifs ?? []).map((n: any) => ({ ...n, href: '/dashboard' }))
+    )
   }
 
-  const totalCount = expiringLeases.length + (vacantCount > 0 ? 1 : 0) + notifications.length
+  const totalCount =
+    expiringLeases.length + (vacantCount > 0 ? 1 : 0) + notifications.length
 
   return (
     <div ref={ref} className="relative">
@@ -361,7 +355,6 @@ function NotificationsBell({ orgId }: { orgId: string }) {
               </div>
             ) : (
               <div className="py-2">
-                {/* Vacant units */}
                 {vacantCount > 0 && (
                   <button
                     onClick={() => { setOpen(false); router.push('/buildings') }}
@@ -381,7 +374,6 @@ function NotificationsBell({ orgId }: { orgId: string }) {
                   </button>
                 )}
 
-                {/* Expiring leases */}
                 {expiringLeases.map((lease: any) => {
                   const name = `${lease.tenants?.first_name ?? ''} ${lease.tenants?.last_name ?? ''}`.trim()
                   const days = differenceInDays(new Date(lease.lease_end), new Date())
@@ -403,14 +395,16 @@ function NotificationsBell({ orgId }: { orgId: string }) {
                           {name} — Unit {lease.units?.unit_code}
                         </p>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Lease expires in <span className="font-semibold text-amber-600">{days} day{days !== 1 ? 's' : ''}</span>
+                          Lease expires in{' '}
+                          <span className="font-semibold text-amber-600">
+                            {days} day{days !== 1 ? 's' : ''}
+                          </span>
                         </p>
                       </div>
                     </button>
                   )
                 })}
 
-                {/* DB notifications */}
                 {notifications.map((notif) => (
                   <button
                     key={notif.id}
@@ -431,7 +425,6 @@ function NotificationsBell({ orgId }: { orgId: string }) {
             )}
           </div>
 
-          {/* Footer */}
           <div className="px-4 py-2.5 border-t border-slate-100">
             <button
               onClick={() => { setOpen(false); router.push('/dashboard') }}
@@ -494,7 +487,6 @@ function UserMenu() {
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
-          {/* User info */}
           <div className="px-4 py-3 border-b border-slate-100">
             <p className="text-sm font-semibold text-slate-900">
               {user?.fullName ?? 'Account'}
@@ -504,7 +496,6 @@ function UserMenu() {
             </p>
           </div>
 
-          {/* Menu items */}
           <div className="py-1">
             <button
               onClick={() => { setOpen(false); openUserProfile() }}
@@ -538,7 +529,7 @@ function UserMenu() {
   )
 }
 
-// ── OrgSwitcher ────────────────────────────────────────────────────────
+// ── Org Display ────────────────────────────────────────────────────────
 
 function OrgDisplay({ orgId }: { orgId: string }) {
   const supabase = getSupabaseBrowserClient()
@@ -546,12 +537,13 @@ function OrgDisplay({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     if (orgId) {
-      supabase
+      const db = supabase as any
+      db
         .from('organizations')
         .select('name')
         .eq('id', orgId)
         .single()
-        .then(({ data }) => {
+        .then(({ data }: { data: { name: string } | null }) => {
           if (data) setOrgName(data.name)
         })
     }
@@ -576,18 +568,10 @@ export default function TopNav() {
 
   return (
     <header className="h-16 border-b border-slate-200 bg-white flex items-center px-6 gap-4 shrink-0">
-      {/* Org display */}
       {orgId && <OrgDisplay orgId={orgId} />}
-
-      {/* Global search */}
       {orgId && <GlobalSearch orgId={orgId} />}
-
-      {/* Right side */}
       <div className="flex items-center gap-2 ml-auto">
-        {/* Notifications */}
         {orgId && <NotificationsBell orgId={orgId} />}
-
-        {/* User menu */}
         <UserMenu />
       </div>
     </header>
