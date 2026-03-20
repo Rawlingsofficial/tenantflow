@@ -83,8 +83,8 @@ export default function AddUnitDialog({
     }
   }, [open, editUnit])
 
-  function set(field: string, value: string | UnitStatus) {
-  setForm((prev) => ({ ...prev, [field]: value }))
+  function set(field: string, value: string | null) {
+  setForm((prev) => ({ ...prev, [field]: value ?? '' }))
 }
 
   async function handleSave() {
