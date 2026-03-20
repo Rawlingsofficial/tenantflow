@@ -63,7 +63,6 @@ export default function AddUnitDialog({
       setConfirmDelete(false)
       setError('')
       if (editUnit) {
-        // Parse extra rooms from unit_type field if stored
         setForm({
           unit_code: editUnit.unit_code ?? '',
           unit_type: editUnit.unit_type ?? '',
@@ -84,9 +83,9 @@ export default function AddUnitDialog({
     }
   }, [open, editUnit])
 
-  function set(field: string, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }
+  function set(field: string, value: string | UnitStatus) {
+  setForm((prev) => ({ ...prev, [field]: value }))
+}
 
   async function handleSave() {
     if (!form.unit_code.trim()) { setError('Unit code is required'); return }
@@ -94,39 +93,43 @@ export default function AddUnitDialog({
     setLoading(true)
     setError('')
 
-    const payload = {
-      unit_code: form.unit_code.trim(),
-      unit_type: form.unit_type,
-      bedrooms: parseInt(form.bedrooms) || 0,
-      bathrooms: parseInt(form.bathrooms) || 0,
-      default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
-      status: form.status,
-    }
+    const db = supabase as any
 
     try {
-      let result: Unit | null = null
-
       if (editUnit) {
-        const { data, error: err } = await supabase
+        const { data, error: err } = await db
           .from('units')
-          .update(payload)
+          .update({
+            unit_code: form.unit_code.trim(),
+            unit_type: form.unit_type,
+            bedrooms: parseInt(form.bedrooms) || 0,
+            bathrooms: parseInt(form.bathrooms) || 0,
+            default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
+            status: form.status,
+          })
           .eq('id', editUnit.id)
           .select()
-          .single() as { data: Unit | null; error: any }
+          .single()
         if (err || !data) throw new Error(err?.message)
-        result = data
-        onSaved(data)
+        onSaved(data as Unit)
         onClose()
       } else {
-        const { data, error: err } = await supabase
+        const { data, error: err } = await db
           .from('units')
-          .insert({ ...payload, building_id: buildingId } as any)
+          .insert({
+            building_id: buildingId,
+            unit_code: form.unit_code.trim(),
+            unit_type: form.unit_type,
+            bedrooms: parseInt(form.bedrooms) || 0,
+            bathrooms: parseInt(form.bathrooms) || 0,
+            default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
+            status: form.status,
+          })
           .select()
-          .single() as { data: Unit | null; error: any }
+          .single()
         if (err || !data) throw new Error(err?.message)
-        result = data
-        onSaved(data)
-        setSavedUnit(data) // show assign prompt
+        onSaved(data as Unit)
+        setSavedUnit(data as Unit)
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save unit')
@@ -140,7 +143,8 @@ export default function AddUnitDialog({
     setDeleting(true)
     setError('')
     try {
-      const { error: err } = await supabase
+      const db = supabase as any
+      const { error: err } = await db
         .from('units')
         .delete()
         .eq('id', editUnit.id)
@@ -154,7 +158,6 @@ export default function AddUnitDialog({
     }
   }
 
-  // After saving new unit — show assign prompt
   if (savedUnit) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
@@ -199,7 +202,6 @@ export default function AddUnitDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Unit code + type */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Unit code *</Label>
@@ -227,7 +229,6 @@ export default function AddUnitDialog({
             </div>
           </div>
 
-          {/* Monthly rent */}
           <div className="space-y-2">
             <Label>Monthly rent (XAF / local currency)</Label>
             <Input
@@ -239,105 +240,51 @@ export default function AddUnitDialog({
             />
           </div>
 
-          {/* Rooms */}
           <div>
             <Label className="block mb-2">Rooms</Label>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-500">Bedrooms</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('bedrooms', String(Math.max(0, parseInt(form.bedrooms) - 1)))}
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {form.bedrooms}
-                  </span>
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('bedrooms', String(parseInt(form.bedrooms) + 1))}
-                  >
-                    +
-                  </button>
+              {[
+                { label: 'Bedrooms', field: 'bedrooms' },
+                { label: 'Toilets', field: 'bathrooms' },
+                { label: 'Kitchen', field: 'kitchen' },
+                { label: 'Parlour', field: 'parlour' },
+              ].map((item) => (
+                <div key={item.field} className="space-y-2">
+                  <Label className="text-xs text-slate-500">{item.label}</Label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+                      onClick={() =>
+                        set(
+                          item.field,
+                          String(Math.max(0, parseInt(form[item.field as keyof typeof form] as string) - 1))
+                        )
+                      }
+                    >
+                      −
+                    </button>
+                    <span className="w-6 text-center text-sm font-medium">
+                      {form[item.field as keyof typeof form]}
+                    </span>
+                    <button
+                      type="button"
+                      className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
+                      onClick={() =>
+                        set(
+                          item.field,
+                          String(parseInt(form[item.field as keyof typeof form] as string) + 1)
+                        )
+                      }
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-500">Toilets</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('bathrooms', String(Math.max(0, parseInt(form.bathrooms) - 1)))}
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {form.bathrooms}
-                  </span>
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('bathrooms', String(parseInt(form.bathrooms) + 1))}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-500">Kitchen</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('kitchen', String(Math.max(0, parseInt(form.kitchen) - 1)))}
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {form.kitchen}
-                  </span>
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('kitchen', String(parseInt(form.kitchen) + 1))}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-500">Parlour</Label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('parlour', String(Math.max(0, parseInt(form.parlour) - 1)))}
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm font-medium">
-                    {form.parlour}
-                  </span>
-                  <button
-                    type="button"
-                    className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                    onClick={() => set('parlour', String(parseInt(form.parlour) + 1))}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Status */}
           <div className="space-y-2">
             <Label>Status</Label>
             <Select
@@ -353,7 +300,6 @@ export default function AddUnitDialog({
             </Select>
           </div>
 
-          {/* Delete confirmation */}
           {editUnit && confirmDelete && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
               <p className="text-sm font-medium text-red-700">Delete this unit?</p>
