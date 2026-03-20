@@ -15,3 +15,6 @@ export function getSupabaseBrowserClient() {
   if (!client) client = createBrowserClient()
   return client
 }
+
+
+// Types for our Supabase database tables    

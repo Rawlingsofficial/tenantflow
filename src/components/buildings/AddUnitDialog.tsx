@@ -1,372 +1,353 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Loader2, Trash2, UserPlus } from 'lucide-react'
+import { useEffect, useState } from "react";
+import { createBrowserClient } from "@/lib/supabase/client";
+import { useOrg } from "@/hooks/useOrg";
 import {
-  Dialog, DialogContent, DialogHeader,
-  DialogTitle, DialogFooter
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue
-} from '@/components/ui/select'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import type { Unit, UnitStatus } from '@/types'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { X } from "lucide-react";
 
-interface Props {
-  open: boolean
-  onClose: () => void
-  onSaved: (unit: Unit) => void
-  onDeleted?: (unitId: string) => void
-  onAssignTenant?: (unit: Unit) => void
-  buildingId: string
-  editUnit?: Unit | null
+interface AddUnitDialogProps {
+  open: boolean;
+  buildingId?: string;
+  buildingName?: string;
+  onClose: () => void;
+  onSuccess: () => void;
 }
 
-const UNIT_TYPES = [
-  'Apartment',
-  'Studio',
-  'One Room',
-  'Office',
-  'Shop',
-  'Others',
-]
+interface Building {
+  id: string;
+  name: string;
+}
 
-export default function AddUnitDialog({
-  open, onClose, onSaved, onDeleted,
-  onAssignTenant, buildingId, editUnit
-}: Props) {
-  const supabase = getSupabaseBrowserClient()
-  const [loading, setLoading] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [error, setError] = useState('')
-  const [savedUnit, setSavedUnit] = useState<Unit | null>(null)
+export function AddUnitDialog({
+  open,
+  buildingId,
+  buildingName,
+  onClose,
+  onSuccess,
+}: AddUnitDialogProps) {
+  const { orgId } = useOrg();
+  const supabase = createBrowserClient();
 
+  const [buildings, setBuildings] = useState<Building[]>([]);
   const [form, setForm] = useState({
-    unit_code: '',
-    unit_type: '',
-    bedrooms: '0',
-    bathrooms: '0',
-    kitchen: '0',
-    parlour: '0',
-    default_rent: '',
-    status: 'vacant' as UnitStatus,
-  })
+    building_id: buildingId || "",
+    unit_code: "",
+    unit_type: "",
+    bedrooms: "",
+    bathrooms: "",
+    default_rent: "",
+    status: "vacant",
+    average_rent: "",
+  });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setSavedUnit(null)
-      setConfirmDelete(false)
-      setError('')
-      if (editUnit) {
-        setForm({
-          unit_code: editUnit.unit_code ?? '',
-          unit_type: editUnit.unit_type ?? '',
-          bedrooms: editUnit.bedrooms?.toString() ?? '0',
-          bathrooms: editUnit.bathrooms?.toString() ?? '0',
-          kitchen: '1',
-          parlour: '1',
-          default_rent: editUnit.default_rent?.toString() ?? '',
-          status: editUnit.status ?? 'vacant',
-        })
-      } else {
-        setForm({
-          unit_code: '', unit_type: '', bedrooms: '0',
-          bathrooms: '0', kitchen: '0', parlour: '0',
-          default_rent: '', status: 'vacant',
-        })
-      }
+    if (open && orgId) {
+      loadBuildings();
     }
-  }, [open, editUnit])
+  }, [open, orgId]);
 
-  function set(field: string, value: string | null) {
-  setForm((prev) => ({ ...prev, [field]: value ?? '' }))
-}
+  useEffect(() => {
+    if (buildingId) {
+      setForm((prev) => ({ ...prev, building_id: buildingId }));
+    }
+  }, [buildingId]);
 
-  async function handleSave() {
-    if (!form.unit_code.trim()) { setError('Unit code is required'); return }
-    if (!form.unit_type) { setError('Unit type is required'); return }
-    setLoading(true)
-    setError('')
+  async function loadBuildings() {
+    const { data } = await supabase
+      .from("buildings")
+      .select("id, name")
+      .eq("organization_id", orgId!)
+      .eq("status", "active")
+      .order("name");
+    setBuildings(data || []);
+  }
 
-    const db = supabase as any
+  function updateField(field: string, value: string) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
 
+  async function handleSubmit() {
+    if (!form.building_id) {
+      toast.error("Please select a building.");
+      return;
+    }
+    if (!form.unit_code.trim()) {
+      toast.error("Unit code is required.");
+      return;
+    }
+
+    setSaving(true);
     try {
-      if (editUnit) {
-        const { data, error: err } = await db
-          .from('units')
-          .update({
-            unit_code: form.unit_code.trim(),
-            unit_type: form.unit_type,
-            bedrooms: parseInt(form.bedrooms) || 0,
-            bathrooms: parseInt(form.bathrooms) || 0,
-            default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
-            status: form.status,
-          })
-          .eq('id', editUnit.id)
-          .select()
-          .single()
-        if (err || !data) throw new Error(err?.message)
-        onSaved(data as Unit)
-        onClose()
-      } else {
-        const { data, error: err } = await db
-          .from('units')
-          .insert({
-            building_id: buildingId,
-            unit_code: form.unit_code.trim(),
-            unit_type: form.unit_type,
-            bedrooms: parseInt(form.bedrooms) || 0,
-            bathrooms: parseInt(form.bathrooms) || 0,
-            default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
-            status: form.status,
-          })
-          .select()
-          .single()
-        if (err || !data) throw new Error(err?.message)
-        onSaved(data as Unit)
-        setSavedUnit(data as Unit)
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save unit')
+      const { error } = await supabase.from("units").insert({
+        building_id: form.building_id,
+        unit_code: form.unit_code.trim().toUpperCase(),
+        unit_type: form.unit_type || null,
+        bedrooms: form.bedrooms ? parseInt(form.bedrooms) : null,
+        bathrooms: form.bathrooms ? parseInt(form.bathrooms) : null,
+        default_rent: form.default_rent ? parseFloat(form.default_rent) : null,
+        status: form.status,
+      });
+      if (error) throw error;
+      toast.success("Unit added successfully.");
+      resetForm();
+      onSuccess();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to add unit.");
     } finally {
-      setLoading(false)
+      setSaving(false);
     }
   }
 
-  async function handleDelete() {
-    if (!editUnit || !onDeleted) return
-    setDeleting(true)
-    setError('')
-    try {
-      const db = supabase as any
-      const { error: err } = await db
-        .from('units')
-        .delete()
-        .eq('id', editUnit.id)
-      if (err) throw new Error(err.message)
-      onDeleted(editUnit.id)
-      onClose()
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to delete unit')
-    } finally {
-      setDeleting(false)
+  function resetForm() {
+    setForm({
+      building_id: buildingId || "",
+      unit_code: "",
+      unit_type: "",
+      bedrooms: "",
+      bathrooms: "",
+      default_rent: "",
+      status: "vacant",
+      average_rent: "",
+    });
+  }
+
+  function handleClose() {
+    if (!saving) {
+      resetForm();
+      onClose();
     }
   }
 
-  if (savedUnit) {
-    return (
-      <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Unit {savedUnit.unit_code} created!</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-3">
-            <p className="text-sm text-slate-600">
-              Would you like to assign a tenant to this unit now?
-            </p>
-            <div className="flex flex-col gap-2">
-              <Button
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
-                onClick={() => {
-                  onClose()
-                  onAssignTenant?.(savedUnit)
-                }}
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Assign tenant now
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={onClose}
-              >
-                Leave vacant for now
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    )
-  }
+  const selectedBuildingName =
+    buildingName ||
+    buildings.find((b) => b.id === form.building_id)?.name ||
+    "";
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{editUnit ? 'Edit unit' : 'Add unit'}</DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <DialogTitle className="text-sm font-semibold text-gray-900">
+            Add New Unit
+          </DialogTitle>
+          <button
+            onClick={handleClose}
+            disabled={saving}
+            className="p-1 rounded-md hover:bg-gray-100 transition-colors text-gray-400"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-        <div className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Unit code *</Label>
-              <Input
-                placeholder="e.g. A101"
-                value={form.unit_code}
-                onChange={(e) => set('unit_code', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Unit type *</Label>
+        <div className="px-6 py-5 space-y-4">
+          {/* Building select */}
+          <div>
+            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+              Building Name
+            </Label>
+            {buildingId ? (
+              <div className="h-9 px-3 rounded-lg border border-gray-200 bg-gray-50 flex items-center text-sm text-gray-700">
+                {selectedBuildingName}
+              </div>
+            ) : (
               <Select
-                value={form.unit_type}
-                onValueChange={(v) => set('unit_type', v)}
+                value={form.building_id}
+                onValueChange={(v) => updateField("building_id", v)}
+                disabled={saving}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type..." />
+                <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
+                  <SelectValue placeholder="Select building..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {UNIT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {buildings.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Unit code */}
+          <div>
+            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+              Unit Code <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              placeholder="e.g. APT 101"
+              value={form.unit_code}
+              onChange={(e) => updateField("unit_code", e.target.value)}
+              className="h-9 text-sm rounded-lg border-gray-200"
+              disabled={saving}
+            />
+          </div>
+
+          {/* Bedrooms + Bathrooms */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                Bedrooms
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                placeholder="2"
+                value={form.bedrooms}
+                onChange={(e) => updateField("bedrooms", e.target.value)}
+                className="h-9 text-sm rounded-lg border-gray-200"
+                disabled={saving}
+              />
+            </div>
+            <div>
+              <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                Bathrooms
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                placeholder="2"
+                value={form.bathrooms}
+                onChange={(e) => updateField("bathrooms", e.target.value)}
+                className="h-9 text-sm rounded-lg border-gray-200"
+                disabled={saving}
+              />
+            </div>
+          </div>
+
+          {/* Unit type + Status */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                Add Units
+              </Label>
+              <Select
+                value={form.unit_type || "flat"}
+                onValueChange={(v) => updateField("unit_type", v)}
+                disabled={saving}
+              >
+                <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="flat">Flat</SelectItem>
+                  <SelectItem value="studio">Studio</SelectItem>
+                  <SelectItem value="duplex">Duplex</SelectItem>
+                  <SelectItem value="penthouse">Penthouse</SelectItem>
+                  <SelectItem value="commercial">Commercial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                Status
+              </Label>
+              <Select
+                value={form.status}
+                onValueChange={(v) => updateField("status", v)}
+                disabled={saving}
+              >
+                <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="vacant">Vacant</SelectItem>
+                  <SelectItem value="occupied">Occupied</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>Monthly rent (XAF / local currency)</Label>
-            <Input
-              type="number"
-              min="0"
-              placeholder="e.g. 50000"
-              value={form.default_rent}
-              onChange={(e) => set('default_rent', e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label className="block mb-2">Rooms</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: 'Bedrooms', field: 'bedrooms' },
-                { label: 'Toilets', field: 'bathrooms' },
-                { label: 'Kitchen', field: 'kitchen' },
-                { label: 'Parlour', field: 'parlour' },
-              ].map((item) => (
-                <div key={item.field} className="space-y-2">
-                  <Label className="text-xs text-slate-500">{item.label}</Label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                      onClick={() =>
-                        set(
-                          item.field,
-                          String(Math.max(0, parseInt(form[item.field as keyof typeof form] as string) - 1))
-                        )
-                      }
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-sm font-medium">
-                      {form[item.field as keyof typeof form]}
-                    </span>
-                    <button
-                      type="button"
-                      className="h-8 w-8 rounded-md border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50"
-                      onClick={() =>
-                        set(
-                          item.field,
-                          String(parseInt(form[item.field as keyof typeof form] as string) + 1)
-                        )
-                      }
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v) => set('status', v)}
-            >
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="vacant">Vacant</SelectItem>
-                <SelectItem value="occupied">Occupied</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {editUnit && confirmDelete && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
-              <p className="text-sm font-medium text-red-700">Delete this unit?</p>
-              <p className="text-xs text-red-500">
-                This will permanently delete unit {editUnit.unit_code}.
-                Only delete if there are no active leases.
-              </p>
-              <div className="flex gap-2 pt-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs"
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  className="text-xs bg-red-600 hover:bg-red-700"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  {deleting
-                    ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Deleting...</>
-                    : 'Yes, delete'
-                  }
-                </Button>
+          {/* Rent */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                Rent Date
+              </Label>
+              <div className="h-9 px-3 rounded-lg border border-gray-200 bg-gray-50 flex items-center text-sm text-gray-400">
+                $1,00/me
               </div>
             </div>
-          )}
+            <div>
+              <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                Default Rent
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="0.00"
+                  value={form.default_rent}
+                  onChange={(e) => updateField("default_rent", e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200 pl-6"
+                  disabled={saving}
+                />
+              </div>
+            </div>
+          </div>
 
-          {error && (
-            <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
-              {error}
-            </p>
-          )}
+          {/* Purpose / notes */}
+          <div>
+            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+              Purpose{" "}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </Label>
+            <Input
+              placeholder="e.g. Residential"
+              className="h-9 text-sm rounded-lg border-gray-200"
+              disabled={saving}
+            />
+          </div>
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          {editUnit && !confirmDelete && (
-            <Button
-              variant="outline"
-              className="text-red-500 hover:text-red-600 hover:border-red-200 sm:mr-auto"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="h-4 w-4 mr-1" />
-              Delete unit
-            </Button>
-          )}
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
           <Button
-            onClick={handleSave}
-            disabled={loading}
-            className="bg-indigo-600 hover:bg-indigo-700"
+            variant="outline"
+            size="sm"
+            onClick={handleClose}
+            disabled={saving}
+            className="h-9 text-sm rounded-lg"
           >
-            {loading
-              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
-              : editUnit ? 'Save changes' : 'Add unit'
-            }
+            Cancel
           </Button>
-        </DialogFooter>
+          <Button
+            size="sm"
+            onClick={handleSubmit}
+            disabled={saving}
+            className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg px-5"
+          >
+            {saving ? "Saving..." : "Save Unit"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 
 
-
-//qqqqqqqqqqqqqqqqqqqqq
