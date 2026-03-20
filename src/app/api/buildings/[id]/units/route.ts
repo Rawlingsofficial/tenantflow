@@ -4,10 +4,10 @@ import { createServerClient } from "@/lib/supabase/server";
 // GET /api/buildings/[id]/units
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerClient();
-  const buildingId = params.id;
+  const buildingId = (await params).id;
 
   const { data, error } = await supabase
     .from("units")
@@ -46,10 +46,10 @@ export async function GET(
 // POST /api/buildings/[id]/units
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerClient();
-  const buildingId = params.id;
+  const { id: buildingId } = await params;
   const body = await req.json();
 
   const { unit_code, unit_type, bedrooms, bathrooms, default_rent, status } = body;
