@@ -247,7 +247,7 @@ export default function RecordPaymentDialog({
               <Label>Method</Label>
               <Select
                 value={form.method}
-                onValueChange={(v) => setForm((p) => ({ ...p, method: v }))}
+                onValueChange={(v) => setForm((p) => ({ ...p, method: v ?? 'cash' }))}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
