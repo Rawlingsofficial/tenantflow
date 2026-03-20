@@ -47,26 +47,26 @@ export default function AddBuildingDialog({
     setError('')
     try {
       if (editBuilding) {
-        const { data, error: err } = await supabase
+        const { data, error: err } = await (supabase as any)
           .from('buildings')
           .update({ name: name.trim(), address: address.trim() || null })
           .eq('id', editBuilding.id)
           .select()
-          .single() as { data: Building | null; error: any }
+          .single()
         if (err || !data) throw new Error(err?.message)
-        onSaved(data)
+        onSaved(data as Building)
       } else {
-        const { data, error: err } = await supabase
+        const { data, error: err } = await (supabase as any)
           .from('buildings')
           .insert({
             organization_id: organizationId,
             name: name.trim(),
-            address: address.trim() || null
-          } as any)
+            address: address.trim() || null,
+          })
           .select()
-          .single() as { data: Building | null; error: any }
+          .single()
         if (err || !data) throw new Error(err?.message)
-        onSaved(data)
+        onSaved(data as Building)
       }
       onClose()
     } catch (err: unknown) {
@@ -81,8 +81,7 @@ export default function AddBuildingDialog({
     setDeleting(true)
     setError('')
     try {
-      // Soft delete — set status to inactive
-      const { error: err } = await supabase
+      const { error: err } = await (supabase as any)
         .from('buildings')
         .update({ status: 'inactive' })
         .eq('id', editBuilding.id)
@@ -127,7 +126,6 @@ export default function AddBuildingDialog({
             />
           </div>
 
-          {/* Delete confirmation */}
           {editBuilding && confirmDelete && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
               <p className="text-sm font-medium text-red-700">
@@ -168,7 +166,6 @@ export default function AddBuildingDialog({
           )}
         </div>
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          {/* Delete button — only on edit */}
           {editBuilding && !confirmDelete && (
             <Button
               variant="outline"
