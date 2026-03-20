@@ -140,7 +140,7 @@ export default function PaymentsSummary({
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number) => [value.toLocaleString(), 'Amount']}
+                    formatter={(value) => [Number(value).toLocaleString(), 'Amount']}
                     contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
                   />
                 </PieChart>
