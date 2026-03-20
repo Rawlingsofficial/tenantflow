@@ -98,10 +98,10 @@ export default function TeamSettings() {
     setUpdatingRole(memberId)
     setOpenDropdown(null)
     try {
-      const { error } = await supabase
-        .from('organization_memberships')
-        .update({ role: newRole })
-        .eq('id', memberId)
+      const { error } = await (supabase as any)
+  .from('organization_memberships')
+  .update({ role: newRole })
+  .eq('id', memberId)
 
       if (error) throw new Error(error.message)
       setMembers((prev) =>
@@ -117,10 +117,10 @@ export default function TeamSettings() {
   async function handleRemoveMember(memberId: string) {
     setRemovingMember(memberId)
     try {
-      const { error } = await supabase
-        .from('organization_memberships')
-        .update({ status: 'inactive' })
-        .eq('id', memberId)
+      const { error } = await (supabase as any)
+  .from('organization_memberships')
+  .update({ status: 'inactive' })
+  .eq('id', memberId)
 
       if (error) throw new Error(error.message)
       setMembers((prev) => prev.filter((m) => m.id !== memberId))
