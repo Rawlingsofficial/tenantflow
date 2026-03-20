@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { useOrg } from "@/hooks/useOrg";
 import { AddUnitDialog } from "@/components/buildings/AddUnitDialog";
 import { UnitHistoryDialog } from "@/components/buildings/UnitHistoryDialog";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,7 @@ interface Unit {
 export default function BuildingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { orgId } = useOrg();
+  const { orgId } = useAuth();
   const supabase = createBrowserClient();
 
   const [building, setBuilding] = useState<Building | null>(null);
@@ -575,10 +575,8 @@ function UnitRow({
             Vacant
           </span>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="text-[10px] px-2 py-0.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50">
-                To LBO ▾
-              </button>
+            <DropdownMenuTrigger className="text-[10px] px-2 py-0.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50">
+              To LBO ▾
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               <DropdownMenuItem>Mark Occupied</DropdownMenuItem>
@@ -634,10 +632,8 @@ function UnitRow({
       <td className="px-3 py-3">{statusEl()}</td>
       <td className="px-4 py-3">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100">
-              <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
-            </button>
+          <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100">
+            <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="text-xs">
             <DropdownMenuItem onClick={onHistory}>
@@ -658,5 +654,3 @@ function UnitRow({
     </tr>
   );
 }
-
-

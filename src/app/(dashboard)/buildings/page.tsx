@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { useOrg } from "@/hooks/useOrg";
 import { AddBuildingDialog } from "@/components/buildings/AddBuildingDialog";
 import { BuildingsTable } from "@/components/buildings/BuildingsTable";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ interface BuildingWithStats {
 }
 
 export default function BuildingsPage() {
-  const { orgId } = useOrg();
+  const { orgId } = useAuth();
   const supabase = createBrowserClient();
 
   const [buildings, setBuildings] = useState<BuildingWithStats[]>([]);
