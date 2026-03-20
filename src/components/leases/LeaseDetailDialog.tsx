@@ -78,16 +78,17 @@ export default function LeaseDetailDialog({
 
   async function handleTerminate() {
     if (!lease) return
+    const db = supabase as any
     setLoading(true)
     setError('')
     try {
-      const { error: leaseErr } = await supabase
+      const { error: leaseErr } = await db
         .from('leases')
         .update({ status: 'terminated' })
         .eq('id', lease.id)
       if (leaseErr) throw new Error(leaseErr.message)
 
-      await supabase
+      await db
         .from('units')
         .update({ status: 'vacant' })
         .eq('id', lease.unit_id)
@@ -103,10 +104,11 @@ export default function LeaseDetailDialog({
 
   async function handleEndLease() {
     if (!lease) return
+    const db = supabase as any
     setLoading(true)
     setError('')
     try {
-      const { error: leaseErr } = await supabase
+      const { error: leaseErr } = await db
         .from('leases')
         .update({
           status: 'ended',
@@ -115,7 +117,7 @@ export default function LeaseDetailDialog({
         .eq('id', lease.id)
       if (leaseErr) throw new Error(leaseErr.message)
 
-      await supabase
+      await db
         .from('units')
         .update({ status: 'vacant' })
         .eq('id', lease.unit_id)
@@ -133,15 +135,16 @@ export default function LeaseDetailDialog({
     if (!lease) return
     if (!renewForm.rent_amount) { setError('Rent amount is required'); return }
     if (!renewForm.lease_start) { setError('Start date is required'); return }
+    const db = supabase as any
     setLoading(true)
     setError('')
     try {
-      await supabase
+      await db
         .from('leases')
         .update({ status: 'ended' })
         .eq('id', lease.id)
 
-      const { error: newErr } = await supabase
+      const { error: newErr } = await db
         .from('leases')
         .insert({
           organization_id: organizationId,
@@ -152,7 +155,7 @@ export default function LeaseDetailDialog({
           lease_end: renewForm.lease_end || null,
           renewal_date: renewForm.renewal_date || null,
           status: 'active',
-        } as any)
+        })
       if (newErr) throw new Error(newErr.message)
 
       onUpdated()
@@ -168,10 +171,11 @@ export default function LeaseDetailDialog({
     if (!lease) return
     if (!paymentForm.amount) { setError('Amount is required'); return }
     if (!paymentForm.payment_date) { setError('Payment date is required'); return }
+    const db = supabase as any
     setLoading(true)
     setError('')
     try {
-      const { error: payErr } = await supabase
+      const { error: payErr } = await db
         .from('rent_payments')
         .insert({
           lease_id: lease.id,
@@ -180,7 +184,7 @@ export default function LeaseDetailDialog({
           method: paymentForm.method || null,
           reference: paymentForm.reference.trim() || null,
           status: 'completed',
-        } as any)
+        })
       if (payErr) throw new Error(payErr.message)
       onUpdated()
       handleClose()
@@ -195,10 +199,11 @@ export default function LeaseDetailDialog({
     if (!lease) return
     if (!newLeaseForm.rent_amount) { setError('Rent amount is required'); return }
     if (!newLeaseForm.lease_start) { setError('Start date is required'); return }
+    const db = supabase as any
     setLoading(true)
     setError('')
     try {
-      const { error: newErr } = await supabase
+      const { error: newErr } = await db
         .from('leases')
         .insert({
           organization_id: organizationId,
@@ -209,7 +214,7 @@ export default function LeaseDetailDialog({
           lease_end: newLeaseForm.lease_end || null,
           renewal_date: newLeaseForm.renewal_date || null,
           status: 'active',
-        } as any)
+        })
       if (newErr) throw new Error(newErr.message)
       onUpdated()
       handleClose()
@@ -286,9 +291,7 @@ export default function LeaseDetailDialog({
         {/* ── DETAIL VIEW ── */}
         {action === null && (
           <div className="space-y-4 py-2">
-            {/* Summary card */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-              {/* Tenant */}
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-indigo-100 rounded-lg">
                   <User className="h-4 w-4 text-indigo-600" />
@@ -301,7 +304,6 @@ export default function LeaseDetailDialog({
                 </div>
               </div>
 
-              {/* Unit */}
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-100 rounded-lg">
                   <Home className="h-4 w-4 text-emerald-600" />
@@ -316,7 +318,6 @@ export default function LeaseDetailDialog({
                 </div>
               </div>
 
-              {/* Date grid */}
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div className="flex items-start gap-2">
                   <Calendar className="h-3.5 w-3.5 text-slate-400 mt-0.5" />
@@ -381,7 +382,6 @@ export default function LeaseDetailDialog({
                 </div>
               </div>
 
-              {/* Days remaining banner */}
               {lease.status === 'active' && daysLeft !== null && (
                 <div className={`px-3 py-2 rounded-lg text-xs font-medium ${
                   daysLeft < 0 ? 'bg-red-100 text-red-700'
@@ -398,7 +398,6 @@ export default function LeaseDetailDialog({
               )}
             </div>
 
-            {/* Payment history */}
             {completedPayments.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
@@ -436,7 +435,6 @@ export default function LeaseDetailDialog({
               </div>
             )}
 
-            {/* Action buttons */}
             <div className="space-y-2 pt-1">
               {lease.status === 'active' && (
                 <Button
@@ -589,7 +587,7 @@ export default function LeaseDetailDialog({
                 <Label>Method</Label>
                 <Select
                   value={paymentForm.method}
-                  onValueChange={(v) => setPaymentForm((p) => ({ ...p, method: v }))}
+                  onValueChange={(v) => setPaymentForm((p) => ({ ...p, method: v as string }))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -615,9 +613,7 @@ export default function LeaseDetailDialog({
             </div>
 
             {error && (
-              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
-                {error}
-              </p>
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>
             )}
           </div>
         )}
@@ -653,10 +649,7 @@ export default function LeaseDetailDialog({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>
-                  End date{' '}
-                  <span className="text-slate-400 text-xs">(optional)</span>
-                </Label>
+                <Label>End date <span className="text-slate-400 text-xs">(optional)</span></Label>
                 <Input
                   type="date"
                   value={newLeaseForm.lease_end}
@@ -664,10 +657,7 @@ export default function LeaseDetailDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>
-                  Renewal date{' '}
-                  <span className="text-slate-400 text-xs">(optional)</span>
-                </Label>
+                <Label>Renewal date <span className="text-slate-400 text-xs">(optional)</span></Label>
                 <Input
                   type="date"
                   value={newLeaseForm.renewal_date}
@@ -676,9 +666,7 @@ export default function LeaseDetailDialog({
               </div>
             </div>
             {error && (
-              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
-                {error}
-              </p>
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>
             )}
           </div>
         )}
@@ -712,10 +700,7 @@ export default function LeaseDetailDialog({
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>
-                  New end date{' '}
-                  <span className="text-slate-400 text-xs">(optional)</span>
-                </Label>
+                <Label>New end date <span className="text-slate-400 text-xs">(optional)</span></Label>
                 <Input
                   type="date"
                   value={renewForm.lease_end}
@@ -723,10 +708,7 @@ export default function LeaseDetailDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>
-                  Renewal date{' '}
-                  <span className="text-slate-400 text-xs">(optional)</span>
-                </Label>
+                <Label>Renewal date <span className="text-slate-400 text-xs">(optional)</span></Label>
                 <Input
                   type="date"
                   value={renewForm.renewal_date}
@@ -735,9 +717,7 @@ export default function LeaseDetailDialog({
               </div>
             </div>
             {error && (
-              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
-                {error}
-              </p>
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>
             )}
           </div>
         )}
@@ -761,9 +741,7 @@ export default function LeaseDetailDialog({
               </p>
             </div>
             {error && (
-              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
-                {error}
-              </p>
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>
             )}
           </div>
         )}
@@ -787,9 +765,7 @@ export default function LeaseDetailDialog({
               </p>
             </div>
             {error && (
-              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">
-                {error}
-              </p>
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-md">{error}</p>
             )}
           </div>
         )}
