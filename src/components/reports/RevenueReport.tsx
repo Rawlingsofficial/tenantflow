@@ -147,7 +147,7 @@ export default function RevenueReport({ data }: Props) {
               <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
               <Tooltip
-                formatter={(value: number) => [value.toLocaleString(), '']}
+                formatter={(value) => [Number(value).toLocaleString(), '']}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
               />
               <Bar dataKey="collected" fill="#6366f1" radius={[4, 4, 0, 0]} name="Collected" />
