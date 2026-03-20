@@ -127,6 +127,7 @@ export async function POST(req: NextRequest) {
         .from("users")
         .select("id")
         .eq("clerk_user_id", public_user_data.user_id)
+        .returns<{ id: string }[]>()
         .single();
 
       if (userError || !userData) {
@@ -151,6 +152,7 @@ export async function POST(req: NextRequest) {
         .from("users")
         .select("id")
         .eq("clerk_user_id", public_user_data.user_id)
+        .returns<{ id: string }[]>()
         .single();
 
       if (userData) {
@@ -171,6 +173,7 @@ export async function POST(req: NextRequest) {
         .from("users")
         .select("id")
         .eq("clerk_user_id", public_user_data.user_id)
+        .returns<{ id: string }[]>()
         .single();
 
       if (userData) {
