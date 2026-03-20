@@ -111,15 +111,16 @@ export default function TenantProfile({
       const url = `${urlData.publicUrl}?t=${Date.now()}`
       setPhotoUrl(url)
 
-      const { data: updated, error: updateErr } = await supabase
-        .from('tenants')
-        .update({ photo_url: url } as any)
-        .eq('id', tenant.id)
-        .select()
+      const { data: updated, error: updateErr } = await (supabase as any)
+  .from('tenants')
+  .update({ photo_url: url })
+  .eq('id', tenant.id)
+  .select()
+  .single()
         .single() as { data: Tenant | null; error: any }
 
       if (updateErr) throw new Error(updateErr.message)
-      if (updated) onTenantUpdated(updated)
+      if (updated) onTenantUpdated(updated as Tenant)
     } catch (err: unknown) {
       setPhotoError(err instanceof Error ? err.message : 'Upload failed')
     } finally {
@@ -140,16 +141,17 @@ export default function TenantProfile({
             .remove([`${tenant.id}/avatar.${ext}`])
         )
       )
-      const { data: updated, error: updateErr } = await supabase
-        .from('tenants')
-        .update({ photo_url: null } as any)
-        .eq('id', tenant.id)
-        .select()
+      const { data: updated, error: updateErr } = await (supabase as any)
+  .from('tenants')
+  .update({ photo_url: null })
+  .eq('id', tenant.id)
+  .select()
+  .single()
         .single() as { data: Tenant | null; error: any }
 
       if (updateErr) throw new Error(updateErr.message)
       setPhotoUrl(null)
-      if (updated) onTenantUpdated(updated)
+      if (updated) onTenantUpdated(updated as Tenant)
     } catch (err: unknown) {
       setPhotoError(err instanceof Error ? err.message : 'Delete failed')
     } finally {
