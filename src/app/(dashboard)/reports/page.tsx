@@ -24,7 +24,7 @@ export default function ReportsPage() {
 
   async function loadAll() {
     setLoading(true)
-    const [buildingsRes, unitsRes, leasesRes, paymentsRes] = await Promise.all([
+    const [buildingsRes, unitsRes, leasesRes, orgLeasesRes] = await Promise.all([
       supabase.from('buildings').select('id, name, address').eq('organization_id', orgId!),
       supabase.from('units').select(`
         id, unit_code, unit_type, status, default_rent, building_id,
@@ -35,17 +35,26 @@ export default function ReportsPage() {
         tenants(first_name, last_name, photo_url),
         units(unit_code, buildings(name))
       `).eq('organization_id', orgId!),
-      supabase.from('rent_payments').select(`
-        id, amount, payment_date, status, method, lease_id,
-        leases!inner(organization_id)
-      `).eq('leases.organization_id', orgId!),
+      // Two-step: get lease IDs first, then payments — join filters don't work in Supabase JS
+    supabase.from('leases').select('id').eq('organization_id', orgId!),
     ])
+
+    // Fetch payments for this org's leases
+    const leaseIds = (orgLeasesRes.data ?? []).map((l: any) => l.id)
+    let payments: any[] = []
+    if (leaseIds.length > 0) {
+      const { data: payData } = await supabase
+        .from('rent_payments')
+        .select('id, amount, payment_date, status, method, reference, lease_id')
+        .in('lease_id', leaseIds)
+      payments = payData ?? []
+    }
 
     setData({
       buildings: buildingsRes.data ?? [],
       units: unitsRes.data ?? [],
       leases: leasesRes.data ?? [],
-      payments: paymentsRes.data ?? [],
+      payments,
     })
     setLoading(false)
   }
@@ -561,5 +570,3 @@ export default function ReportsPage() {
     </div>
   )
 }
-
-
