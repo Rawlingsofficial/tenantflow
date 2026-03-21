@@ -49,11 +49,12 @@ export default function LeaseDetailPage() {
           buildings(id, name, address)),
         rent_payments(id, amount, payment_date, method, reference, status)`)
       .eq('id', id).single()
-    setLease(data)
-    if (data) {
-      setPayForm(p => ({ ...p, amount: String(data.rent_amount) }))
-      setExtendForm(p => ({ ...p, new_end_date: data.lease_end ?? '', new_rent: String(data.rent_amount) }))
-      setRenewForm(p => ({ ...p, rent_amount: String(data.rent_amount) }))
+    const lease = data as any
+    setLease(lease)
+    if (lease) {
+      setPayForm(p => ({ ...p, amount: String(lease.rent_amount) }))
+      setExtendForm(p => ({ ...p, new_end_date: lease.lease_end ?? '', new_rent: String(lease.rent_amount) }))
+      setRenewForm(p => ({ ...p, rent_amount: String(lease.rent_amount) }))
     }
     setLoading(false)
   }
@@ -607,5 +608,3 @@ export default function LeaseDetailPage() {
     </div>
   )
 }
-
-
