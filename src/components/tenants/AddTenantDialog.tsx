@@ -1,18 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, ChevronDown } from 'lucide-react'
-import {
-  Dialog, DialogContent, DialogHeader,
-  DialogTitle, DialogFooter
-} from '@/components/ui/dialog'
+import { Loader2, ChevronDown, User, Briefcase, Phone, Mail, MapPin, FileText, X } from 'lucide-react'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { Tenant } from '@/types'
 
@@ -24,13 +18,7 @@ interface AddTenantDialogProps {
   editTenant?: Tenant | null
 }
 
-export default function AddTenantDialog({
-  open,
-  onClose,
-  onSaved,
-  organizationId,
-  editTenant,
-}: AddTenantDialogProps) {
+export default function AddTenantDialog({ open, onClose, onSaved, organizationId, editTenant }: AddTenantDialogProps) {
   const supabase = getSupabaseBrowserClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -60,7 +48,6 @@ export default function AddTenantDialog({
     if (!form.first_name.trim()) { setError('First name is required'); return }
     setLoading(true)
     setError('')
-
     const payload = {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim() || null,
@@ -76,24 +63,16 @@ export default function AddTenantDialog({
       marital_status: form.marital_status || null,
       notes: form.notes.trim() || null,
     }
-
     try {
       if (editTenant) {
         const { data, error: err } = await (supabase as any)
-  .from('tenants')
-  .update(payload)
-  .eq('id', editTenant.id)
-  .select()
-  .single()
-          .single() as { data: Tenant | null; error: any }
+          .from('tenants').update(payload).eq('id', editTenant.id).select().single() as { data: Tenant | null; error: any }
         if (err || !data) throw new Error(err?.message)
         onSaved(data)
       } else {
         const { data, error: err } = await supabase
-          .from('tenants')
-          .insert({ ...payload, organization_id: organizationId } as any)
-          .select()
-          .single() as { data: Tenant | null; error: any }
+          .from('tenants').insert({ ...payload, organization_id: organizationId } as any)
+          .select().single() as { data: Tenant | null; error: any }
         if (err || !data) throw new Error(err?.message)
         onSaved(data)
       }
@@ -107,112 +86,169 @@ export default function AddTenantDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{editTenant ? 'Edit tenant' : 'Add tenant'}</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          {/* Required fields */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>First name *</Label>
-              <Input placeholder="John" value={form.first_name} onChange={(e) => set('first_name', e.target.value)} />
+      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-2xl max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+              <User className="h-4.5 w-4.5 text-emerald-600" />
             </div>
-            <div className="space-y-2">
-              <Label>Last name</Label>
-              <Input placeholder="Doe" value={form.last_name} onChange={(e) => set('last_name', e.target.value)} />
+            <div>
+              <DialogTitle className="text-base font-semibold text-gray-900">
+                {editTenant ? 'Edit Tenant' : 'Add New Tenant'}
+              </DialogTitle>
+              <p className="text-xs text-gray-400 mt-0.5">Fill in the tenant's details below</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
+
+          {/* Section: Basic Info */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <User className="h-3.5 w-3.5 text-emerald-600" />
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Basic Information</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
+                  First Name <span className="text-red-500">*</span>
+                </Label>
+                <Input placeholder="John" value={form.first_name}
+                  onChange={(e) => set('first_name', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200 focus:border-emerald-500 focus:ring-emerald-500/20" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Last Name</Label>
+                <Input placeholder="Doe" value={form.last_name}
+                  onChange={(e) => set('last_name', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Country</Label>
+                <Input placeholder="e.g. Cameroon" value={form.country}
+                  onChange={(e) => set('country', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Date of Birth</Label>
+                <Input type="date" value={form.date_of_birth}
+                  onChange={(e) => set('date_of_birth', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200" />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Primary phone</Label>
-              <Input placeholder="+237 6XX XXX XXX" value={form.primary_phone} onChange={(e) => set('primary_phone', e.target.value)} />
+          {/* Section: Contact */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Phone className="h-3.5 w-3.5 text-emerald-600" />
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact Details</p>
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input type="email" placeholder="john@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Primary Phone</Label>
+                <Input placeholder="+237 6XX XXX XXX" value={form.primary_phone}
+                  onChange={(e) => set('primary_phone', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Email</Label>
+                <Input type="email" placeholder="john@example.com" value={form.email}
+                  onChange={(e) => set('email', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200" />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Occupation</Label>
-              <Input placeholder="e.g. Engineer" value={form.occupation} onChange={(e) => set('occupation', e.target.value)} />
+          {/* Section: Employment */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <Briefcase className="h-3.5 w-3.5 text-emerald-600" />
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Employment</p>
             </div>
-            <div className="space-y-2">
-              <Label>Country</Label>
-              <Input placeholder="e.g. Cameroon" value={form.country} onChange={(e) => set('country', e.target.value)} />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Occupation</Label>
+                <Input placeholder="e.g. Engineer" value={form.occupation}
+                  onChange={(e) => set('occupation', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Employment Type</Label>
+                <Select value={form.employment_type}
+                  // @ts-ignore
+                  onValueChange={(v: string) => set('employment_type', v ?? '')}>
+                  <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200"><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="employed">Employed</SelectItem>
+                    <SelectItem value="self_employed">Self-employed</SelectItem>
+                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="unemployed">Unemployed</SelectItem>
+                    <SelectItem value="retired">Retired</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Employer Name</Label>
+                <Input placeholder="e.g. Acme Corp" value={form.employer_name}
+                  onChange={(e) => set('employer_name', e.target.value)}
+                  className="h-9 text-sm rounded-lg border-gray-200" />
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Marital Status</Label>
+                <Select value={form.marital_status}
+                  // @ts-ignore
+                  onValueChange={(v: string) => set('marital_status', v ?? '')}>
+                  <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200"><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single</SelectItem>
+                    <SelectItem value="married">Married</SelectItem>
+                    <SelectItem value="divorced">Divorced</SelectItem>
+                    <SelectItem value="widowed">Widowed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
-          {/* Optional fields toggle */}
-          <button
-            type="button"
-            onClick={() => setShowOptional(!showOptional)}
-            className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-          >
+          {/* Optional toggle */}
+          <button type="button" onClick={() => setShowOptional(!showOptional)}
+            className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-medium">
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showOptional ? 'rotate-180' : ''}`} />
-            {showOptional ? 'Hide' : 'Show'} optional fields
+            {showOptional ? 'Hide' : 'Show'} additional fields
           </button>
 
           {showOptional && (
             <div className="space-y-4 pt-1">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Secondary phone</Label>
-                  <Input placeholder="+237 6XX XXX XXX" value={form.secondary_phone} onChange={(e) => set('secondary_phone', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Date of birth</Label>
-                  <Input type="date" value={form.date_of_birth} onChange={(e) => set('date_of_birth', e.target.value)} />
-                </div>
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-3.5 w-3.5 text-emerald-600" />
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Additional Info</p>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Marital status</Label>
-                  <Select value={form.marital_status} onValueChange={(v) => set('marital_status', v ?? '')}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="single">Single</SelectItem>
-                      <SelectItem value="married">Married</SelectItem>
-                      <SelectItem value="divorced">Divorced</SelectItem>
-                      <SelectItem value="widowed">Widowed</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Secondary Phone</Label>
+                  <Input placeholder="+237 6XX XXX XXX" value={form.secondary_phone}
+                    onChange={(e) => set('secondary_phone', e.target.value)}
+                    className="h-9 text-sm rounded-lg border-gray-200" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Employment type</Label>
-                  <Select value={form.employment_type} onValueChange={(v) => set('employment_type', v ?? '')}>
-                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="employed">Employed</SelectItem>
-                      <SelectItem value="self_employed">Self-employed</SelectItem>
-                      <SelectItem value="student">Student</SelectItem>
-                      <SelectItem value="unemployed">Unemployed</SelectItem>
-                      <SelectItem value="retired">Retired</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Work Address</Label>
+                  <Input placeholder="e.g. 123 Business Ave" value={form.work_address}
+                    onChange={(e) => set('work_address', e.target.value)}
+                    className="h-9 text-sm rounded-lg border-gray-200" />
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label>Employer name</Label>
-                <Input placeholder="e.g. Acme Corp" value={form.employer_name} onChange={(e) => set('employer_name', e.target.value)} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Work address</Label>
-                <Input placeholder="e.g. 123 Business Ave" value={form.work_address} onChange={(e) => set('work_address', e.target.value)} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Internal notes</Label>
+              <div>
+                <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Internal Notes</Label>
                 <textarea
-                  className="w-full min-h-[80px] px-3 py-2 text-sm border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Private notes about this tenant..."
+                  className="w-full min-h-[90px] px-3 py-2.5 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-gray-800 placeholder-gray-400"
+                  placeholder="Private notes about this tenant (not visible to tenant)..."
                   value={form.notes}
                   onChange={(e) => set('notes', e.target.value)}
                 />
@@ -220,17 +256,25 @@ export default function AddTenantDialog({
             </div>
           )}
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700">
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : 'Save tenant'}
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex-shrink-0">
+          <Button variant="outline" onClick={onClose} disabled={loading}
+            className="h-9 text-sm rounded-lg px-5">
+            Cancel
           </Button>
-        </DialogFooter>
+          <Button onClick={handleSave} disabled={loading}
+            className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg px-6">
+            {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : editTenant ? 'Save Changes' : 'Add Tenant'}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )
 }
-
