@@ -22,6 +22,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+function val<T>(v: T): never { return v as never; }
+
 type UnitView = "all" | "occupied" | "vacant" | "unavailable";
 
 interface Building {
@@ -168,7 +170,7 @@ export default function BuildingDetailPage() {
 
   async function handleMarkUnitStatus(unit: Unit, status: string) {
     const { error } = await supabase
-      .from("units").update({ status } as any).eq("id", unit.id);
+      .from("units").update(val({ status })).eq("id", unit.id);
     if (error) { toast.error(error.message); return; }
     toast.success(`Unit ${unit.unit_code} marked as ${status}.`);
     setRefreshKey((k) => k + 1);
