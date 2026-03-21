@@ -81,7 +81,6 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
         <tr className="border-b border-gray-50 bg-gray-50/30">
           <th className="px-5 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Lease</th>
           <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Unit</th>
-          <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Tenant</th>
           <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
             Start Date <span className="inline-block ml-0.5">↕</span>
           </th>
@@ -134,9 +133,6 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
                 <p className="text-sm font-semibold text-gray-800">{unit?.unit_code ?? '—'}</p>
                 <p className="text-[11px] text-gray-400">{building?.name ?? '—'}</p>
               </td>
-
-              {/* Tenant name */}
-              <td className="px-4 py-3.5 text-sm text-gray-700 font-medium">{fullName || '—'}</td>
 
               {/* Start date */}
               <td className="px-4 py-3.5">
