@@ -160,43 +160,30 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
         })}
       </tbody>
 
-      {/* Footer row — stats */}
+      {/* Footer summary row */}
       <tfoot>
         <tr className="border-t border-gray-100 bg-gray-50/50">
-          <td className="px-5 py-2.5" colSpan={2}>
+          <td className="px-5 py-2.5" colSpan={3}>
             <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span>Activated <span className="font-semibold text-gray-700">{leases.filter(l => l.status === 'active').length}</span></span>
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="font-semibold text-gray-700">{leases.filter(l => l.status === 'active').length}</span> active
+              </span>
               <span className="text-gray-300">·</span>
-              <span>{leases.filter(l => l.status === 'ended').length}</span>
+              <span><span className="font-semibold text-gray-700">{leases.filter(l => l.status === 'ended').length}</span> ended</span>
               <span className="text-gray-300">·</span>
-              <span>{leases.filter(l => l.status === 'terminated').length}</span>
+              <span><span className="font-semibold text-gray-700">{leases.filter(l => l.status === 'terminated').length}</span> terminated</span>
               <span className="text-gray-300">·</span>
-              <span>{leases.length}</span>
+              <span><span className="font-semibold text-gray-700">{leases.length}</span> total</span>
             </div>
           </td>
-          <td className="px-4 py-2.5" colSpan={2}>
-            <p className="text-xs text-gray-400">
-              Variational latest{' '}
-              <ChevronDown className="h-3 w-3 inline" />
-            </p>
-          </td>
-          <td className="px-4 py-2.5 text-right" colSpan={2}>
-            <span className="text-xs font-semibold text-emerald-600">
-              Need CTORG +
+          <td className="px-4 py-2.5 text-right" colSpan={3}>
+            <span className="text-xs text-gray-400">
+              ${leases.filter(l => l.status === 'active').reduce((s, l) => s + Number(l.rent_amount), 0).toLocaleString()}/mo active revenue
             </span>
           </td>
-        </tr>
-        {/* Second footer row */}
-        <tr className="border-t border-gray-50 bg-white">
-          <td className="px-5 py-2.5 text-xs text-gray-500 font-medium">Stoutss</td>
-          <td className="px-4 py-2.5 text-xs text-gray-500">Olwit</td>
-          <td className="px-4 py-2.5 text-xs text-gray-500">Rent</td>
-          <td className="px-4 py-2.5 text-xs text-gray-500">Status</td>
-          <td colSpan={2} />
         </tr>
       </tfoot>
     </table>
   )
 }
-
-

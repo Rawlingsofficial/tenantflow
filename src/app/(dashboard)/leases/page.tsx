@@ -86,7 +86,7 @@ export default function LeasesPage() {
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Leases</h1>
         <Button onClick={() => setNewLeaseDialog(true)}
           className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg flex items-center gap-1.5 px-4">
-          <Plus className="h-3.5 w-3.5" /> Contact New Leases
+          <Plus className="h-3.5 w-3.5" /> Create New Lease
         </Button>
       </div>
 
@@ -97,7 +97,7 @@ export default function LeasesPage() {
             { label: 'All', value: 'all' as FilterTab },
             { label: 'Active', value: 'active' as FilterTab },
             { label: 'Expiring Soon', value: 'expiring_soon' as FilterTab },
-            { label: 'Active', value: 'ended' as FilterTab },
+            { label: 'Ended', value: 'ended' as FilterTab },
           ]).map((tab, i) => (
             <button key={i} onClick={() => setFilter(tab.value)}
               className={`px-3.5 py-1 text-sm font-medium rounded-full transition-colors ${

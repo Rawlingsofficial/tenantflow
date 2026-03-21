@@ -187,10 +187,7 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
               </DialogTitle>
             </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={() => {}} variant="outline"
-                className="h-7 text-xs rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50 gap-1">
-                <Plus className="h-3 w-3" /> Create New Lease
-              </Button>
+
               <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
                 <X className="h-4 w-4" />
               </button>
@@ -240,7 +237,7 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
                     </span>
                     <span className="text-xs text-gray-400">
                       {format(new Date(lease.lease_start), 'MMM d, yyyy')} –{' '}
-                      {lease.lease_end ? format(new Date(lease.lease_end), 'Apr dd, yyyy') : 'Open ended'}
+                      {lease.lease_end ? format(new Date(lease.lease_end), 'MMM d, yyyy') : 'Open ended'}
                     </span>
                   </div>
                   <button onClick={() => {
@@ -250,9 +247,6 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
                     <Pencil className="h-3 w-3" /> Edit Lease
                   </button>
                 </div>
-
-                {/* Sub info */}
-                <p className="text-xs text-gray-400 mb-1">Ava 6mnm U88 · Appyeries</p>
 
                 {/* Big date range */}
                 <p className="text-2xl font-bold text-gray-900">
@@ -319,20 +313,31 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
                 </Button>
               </div>
 
-              {/* Status / state selector */}
-              <div className="flex items-center gap-2">
-                <button className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {lease.status === 'active' ? 'Shift' : lease.status}
-                </button>
-                <select className="flex-1 h-8 px-3 text-xs border border-gray-200 rounded-lg bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
-                  <option>State reason...</option>
-                  <option>End Lease</option>
-                  <option>Terminate</option>
-                  <option>Renew</option>
-                </select>
-                <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
-              </div>
+              {/* Quick action selector */}
+              {lease.status === 'active' && (
+                <div className="flex items-center gap-2">
+                  <span className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                  </span>
+                  <select
+                    className="flex-1 h-8 px-3 text-xs border border-gray-200 rounded-lg bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === 'extend') { setExtendForm({ new_end_date: lease.lease_end ?? '', rent_amount: String(lease.rent_amount), no_rent_change: true }); setAction('extend') }
+                      if (v === 'renew') { setRenewForm({ rent_amount: String(lease.rent_amount), lease_start: new Date().toISOString().split('T')[0], lease_end: '', renewal_date: '' }); setAction('renew') }
+                      if (v === 'end') setAction('end')
+                      if (v === 'terminate') setAction('terminate')
+                      e.target.value = ''
+                    }}>
+                    <option value="" disabled>Quick action...</option>
+                    <option value="extend">Extend lease</option>
+                    <option value="renew">Renew lease</option>
+                    <option value="end">End lease</option>
+                    <option value="terminate">Terminate lease</option>
+                  </select>
+                </div>
+              )}
 
               {/* Action buttons */}
               <div className="space-y-2 pt-1">
