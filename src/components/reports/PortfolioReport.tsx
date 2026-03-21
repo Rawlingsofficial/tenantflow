@@ -3,7 +3,7 @@
 import { Building2, Home, Users, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RadialBarChart, RadialBar, ResponsiveContainer, Tooltip } from 'recharts'
-import type { ReportData } from '@/app/(dashboard)/reports/page'
+import type { ReportData } from '@/types/reports'
 
 interface Props { data: ReportData }
 
