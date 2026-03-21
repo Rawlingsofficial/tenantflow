@@ -38,7 +38,18 @@ export interface UnitItem {
   buildings?: { name?: string } | null
 }
 
+export interface TenantItem {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  status: string
+  occupation?: string | null
+  photo_url?: string | null
+  leases?: { status: string; lease_start: string; lease_end?: string | null }[]
+}
+
 export interface ReportData {
+  tenants: TenantItem[]
   // Buildings
   totalBuildings: number
   buildings: BuildingItem[]
