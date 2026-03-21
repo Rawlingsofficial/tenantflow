@@ -1,71 +1,84 @@
-// Shared types for report components
-// Import from here, NOT from the page file
+// Central types for all report pages and components
+// Source of truth — import ONLY from here
 
-export interface LeaseItem {
-  id: string
-  status: string
-  rent_amount: number | string
-  lease_start: string
-  lease_end?: string | null
-  tenant_id?: string
-  unit_id?: string
-  tenants?: { first_name?: string | null; last_name?: string | null; photo_url?: string | null } | null
-  units?: { unit_code?: string; buildings?: { name?: string } | null } | null
-}
-
-export interface PaymentItem {
-  id: string
-  amount: number | string
-  payment_date: string
-  status: string
-  method?: string | null
-  reference?: string | null
-  lease_id?: string
-}
-
-export interface BuildingItem {
+export interface ReportBuilding {
   id: string
   name: string
   address?: string | null
 }
 
-export interface UnitItem {
+export interface ReportUnit {
   id: string
   unit_code: string
-  status: string
-  building_id: string
+  unit_type?: string | null
+  status: 'vacant' | 'occupied' | 'maintenance' | string
   default_rent?: number | null
-  buildings?: { name?: string } | null
+  building_id: string
+  buildings?: ReportBuilding | null
 }
 
-export interface TenantItem {
+export interface ReportTenant {
   id: string
   first_name?: string | null
   last_name?: string | null
-  status: string
-  occupation?: string | null
   photo_url?: string | null
-  leases?: { status: string; lease_start: string; lease_end?: string | null }[]
+  primary_phone?: string | null
+  occupation?: string | null
+  employment_type?: string | null
+  country?: string | null
+  date_of_birth?: string | null
+  status: string
 }
 
+export interface ReportPayment {
+  id: string
+  amount: number
+  payment_date: string
+  status: string
+  method?: string | null
+  reference?: string | null
+  lease_id: string
+}
+
+export interface ReportLease {
+  id: string
+  organization_id: string
+  tenant_id: string
+  unit_id: string
+  rent_amount: number
+  lease_start: string
+  lease_end?: string | null
+  renewal_date?: string | null
+  status: string
+  // joined
+  tenants?: ReportTenant | null
+  units?: (ReportUnit & { buildings?: ReportBuilding | null }) | null
+}
+
+// The full data bundle loaded once and shared across report pages
+export interface PortfolioData {
+  buildings: ReportBuilding[]
+  units: ReportUnit[]
+  leases: ReportLease[]
+  payments: ReportPayment[]
+  tenants: ReportTenant[]
+}
+
+// Legacy aliases (keep for backward compat with existing components)
+export type LeaseItem = ReportLease
+export type PaymentItem = ReportPayment
+export type BuildingItem = ReportBuilding
+export type UnitItem = ReportUnit
+export type TenantItem = ReportTenant
+
 export interface ReportData {
-  tenants: TenantItem[]
-  // Buildings
+  tenants: ReportTenant[]
+  allLeases: ReportLease[]
+  allPayments: ReportPayment[]
+  occupancyRate: number
   totalBuildings: number
-  buildings: BuildingItem[]
-  // Units
   totalUnits: number
   occupiedUnits: number
   vacantUnits: number
   maintenanceUnits: number
-  occupancyRate: number
-  units: UnitItem[]
-  // Leases
-  allLeases: LeaseItem[]
-  // Payments
-  allPayments: PaymentItem[]
-  totalCollected: number
-  totalExpected: number
-  outstanding: number
-  collectionRate: number
 }
