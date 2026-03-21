@@ -17,7 +17,7 @@ interface Props {
   preselectedLeaseId?: string
 }
 
-function val<T>(v: T): never { return v as never }
+function dbVal<T>(v: T): never { return v as never }
 
 export default function RecordPaymentDialog({ open, onClose, onSaved, organizationId, preselectedLeaseId }: Props) {
   const supabase = getSupabaseBrowserClient()
@@ -52,9 +52,10 @@ export default function RecordPaymentDialog({ open, onClose, onSaved, organizati
       .eq('organization_id', organizationId)
       .eq('status', 'active')
       .order('lease_start', { ascending: false })
-    setLeases(data ?? [])
+    const rows = (data ?? []) as any[]
+    setLeases(rows)
     if (preselectedLeaseId) {
-      const l = (data ?? []).find((x: any) => x.id === preselectedLeaseId)
+      const l = rows.find((x: any) => x.id === preselectedLeaseId)
       if (l) setForm(f => ({ ...f, amount: String(l.rent_amount) }))
     }
   }
@@ -75,7 +76,7 @@ export default function RecordPaymentDialog({ open, onClose, onSaved, organizati
     if (!form.payment_date) { setError('Payment date is required'); return }
     setLoading(true); setError('')
     try {
-      const { error: err } = await supabase.from('rent_payments').insert(val({
+      const { error: err } = await supabase.from('rent_payments').insert(dbVal({
         lease_id: selectedLeaseId,
         amount: parseFloat(form.amount),
         payment_date: form.payment_date,
