@@ -1,8 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { FileText, AlertCircle, CheckCircle2, XCircle, Clock, MoreHorizontal } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { FileText, AlertCircle, ChevronDown } from 'lucide-react'
 import { differenceInDays, format } from 'date-fns'
 import type { LeaseWithDetails } from '@/types'
 import {
@@ -15,32 +14,49 @@ interface Props {
   onViewDetail: (lease: LeaseWithDetails) => void
 }
 
-const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  active:     { label: 'Active',      bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  ended:      { label: 'Ended',       bg: 'bg-gray-100',   text: 'text-gray-500'   },
-  terminated: { label: 'Terminated',  bg: 'bg-red-50',     text: 'text-red-600'    },
-}
+function StatusBadge({ lease }: { lease: LeaseWithDetails }) {
+  const leaseEnd = lease.lease_end
+  const status = lease.status
 
-function LeaseEndBadge({ leaseEnd, status }: { leaseEnd: string | null; status: string }) {
-  if (status !== 'active') return null
-  if (!leaseEnd) return <span className="text-xs text-emerald-600 font-medium">Open-ended</span>
+  if (status === 'terminated') return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-200">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Terminated
+    </span>
+  )
+  if (status === 'ended') return (
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+      <span className="w-1.5 h-1.5 rounded-full bg-gray-400" /> Ended
+    </span>
+  )
 
-  const days = differenceInDays(new Date(leaseEnd), new Date())
-  if (days < 0) return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600 border border-red-200">
-      <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Expired
-    </span>
-  )
-  if (days <= 30) return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-      <AlertCircle className="h-3 w-3" /> Expiring Soon
-    </span>
-  )
-  return (
-    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
-    </span>
-  )
+  if (status === 'active') {
+    if (!leaseEnd) return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+        <ChevronDown className="h-3 w-3 ml-0.5" />
+      </span>
+    )
+    const days = differenceInDays(new Date(leaseEnd), new Date())
+    if (days < 0) return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-red-500" /> Expired
+        <ChevronDown className="h-3 w-3 ml-0.5" />
+      </span>
+    )
+    if (days <= 30) return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+        <AlertCircle className="h-3 w-3" /> Expiring Soon
+        <ChevronDown className="h-3 w-3 ml-0.5" />
+      </span>
+    )
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+        <ChevronDown className="h-3 w-3 ml-0.5" />
+      </span>
+    )
+  }
+  return null
 }
 
 export default function LeasesTable({ leases, onViewDetail }: Props) {
@@ -62,12 +78,17 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
   return (
     <table className="w-full">
       <thead>
-        <tr className="border-b border-gray-50 bg-gray-50/50">
-          {['Lease', 'Unit', 'Tenant', 'Start Date', 'Rent', 'Status', ''].map((h) => (
-            <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide first:px-5">
-              {h}
-            </th>
-          ))}
+        <tr className="border-b border-gray-50 bg-gray-50/30">
+          <th className="px-5 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Lease</th>
+          <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Unit</th>
+          <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Tenant</th>
+          <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+            Start Date <span className="inline-block ml-0.5">↕</span>
+          </th>
+          <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+            Rent <span className="inline-block ml-0.5">↕</span>
+          </th>
+          <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide" />
         </tr>
       </thead>
       <tbody>
@@ -77,20 +98,22 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
           const building = unit?.buildings
           const fullName = `${tenant?.first_name ?? ''} ${tenant?.last_name ?? ''}`.trim()
           const initials = `${tenant?.first_name?.[0] ?? ''}${tenant?.last_name?.[0] ?? ''}`.toUpperCase()
-          const cfg = statusConfig[lease.status] ?? statusConfig.ended
           const leaseEnd = lease.lease_end
           const days = leaseEnd ? differenceInDays(new Date(leaseEnd), new Date()) : null
-          const isExpiringSoon = lease.status === 'active' && days !== null && days <= 30
+          const isExpiringSoon = lease.status === 'active' && days !== null && days <= 30 && days >= 0
+          const isExpired = lease.status === 'active' && days !== null && days < 0
 
           return (
             <tr key={lease.id}
-              className={`border-b border-gray-50 hover:bg-gray-50/60 cursor-pointer transition-colors group ${isExpiringSoon ? 'bg-amber-50/20' : ''}`}
+              className={`border-b border-gray-50 hover:bg-gray-50/60 cursor-pointer transition-colors group ${
+                isExpiringSoon ? 'bg-amber-50/30' : isExpired ? 'bg-red-50/20' : ''
+              }`}
               onClick={() => onViewDetail(lease)}>
 
-              {/* Lease / avatar */}
+              {/* Tenant avatar + name */}
               <td className="px-5 py-3.5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full overflow-hidden bg-emerald-100 flex-shrink-0 border border-gray-100">
+                  <div className="w-9 h-9 rounded-full overflow-hidden bg-emerald-100 flex-shrink-0 border border-gray-100 shadow-sm">
                     {tenant?.photo_url ? (
                       <img src={tenant.photo_url} alt={fullName} className="w-full h-full object-cover" />
                     ) : (
@@ -113,7 +136,7 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
               </td>
 
               {/* Tenant name */}
-              <td className="px-4 py-3.5 text-sm text-gray-600">{fullName || '—'}</td>
+              <td className="px-4 py-3.5 text-sm text-gray-700 font-medium">{fullName || '—'}</td>
 
               {/* Start date */}
               <td className="px-4 py-3.5">
@@ -125,39 +148,55 @@ export default function LeasesTable({ leases, onViewDetail }: Props) {
 
               {/* Rent */}
               <td className="px-4 py-3.5">
-                <span className="text-sm font-semibold text-gray-800">
-                  ${Number(lease.rent_amount).toLocaleString()}
-                </span>
-                <span className="text-[11px] text-gray-400 ml-0.5">/mo</span>
+                <span className="text-sm font-semibold text-gray-800">${Number(lease.rent_amount).toLocaleString()}</span>
               </td>
 
-              {/* Status badge */}
+              {/* Status */}
               <td className="px-4 py-3.5">
-                <LeaseEndBadge leaseEnd={leaseEnd ?? null} status={lease.status} />
-                {lease.status !== 'active' && (
-                  <span className={`inline-flex text-[10px] font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
-                    {cfg.label}
-                  </span>
-                )}
-              </td>
-
-              {/* Actions */}
-              <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100">
-                    <MoreHorizontal className="h-4 w-4 text-gray-400" />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="text-xs w-40">
-                    <DropdownMenuItem onClick={() => onViewDetail(lease)}>View Details</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push(`/tenants/${lease.tenant_id}`)}>View Tenant</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <StatusBadge lease={lease} />
               </td>
             </tr>
           )
         })}
       </tbody>
+
+      {/* Footer row — stats */}
+      <tfoot>
+        <tr className="border-t border-gray-100 bg-gray-50/50">
+          <td className="px-5 py-2.5" colSpan={2}>
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <span>Activated <span className="font-semibold text-gray-700">{leases.filter(l => l.status === 'active').length}</span></span>
+              <span className="text-gray-300">·</span>
+              <span>{leases.filter(l => l.status === 'ended').length}</span>
+              <span className="text-gray-300">·</span>
+              <span>{leases.filter(l => l.status === 'terminated').length}</span>
+              <span className="text-gray-300">·</span>
+              <span>{leases.length}</span>
+            </div>
+          </td>
+          <td className="px-4 py-2.5" colSpan={2}>
+            <p className="text-xs text-gray-400">
+              Variational latest{' '}
+              <ChevronDown className="h-3 w-3 inline" />
+            </p>
+          </td>
+          <td className="px-4 py-2.5 text-right" colSpan={2}>
+            <span className="text-xs font-semibold text-emerald-600">
+              Need CTORG +
+            </span>
+          </td>
+        </tr>
+        {/* Second footer row */}
+        <tr className="border-t border-gray-50 bg-white">
+          <td className="px-5 py-2.5 text-xs text-gray-500 font-medium">Stoutss</td>
+          <td className="px-4 py-2.5 text-xs text-gray-500">Olwit</td>
+          <td className="px-4 py-2.5 text-xs text-gray-500">Rent</td>
+          <td className="px-4 py-2.5 text-xs text-gray-500">Status</td>
+          <td colSpan={2} />
+        </tr>
+      </tfoot>
     </table>
   )
 }
+
 
