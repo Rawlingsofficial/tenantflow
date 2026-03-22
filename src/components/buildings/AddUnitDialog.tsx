@@ -66,10 +66,11 @@ export function AddUnitDialog({ open, buildingId, buildingName, onClose, onSucce
       .eq("organization_id", orgId!)
       .eq("status", "active")
       .order("name");
-    setBuildings(data || []);
+    const buildings = (data as any[]) || [];
+    setBuildings(buildings);
     // Auto-set building type if buildingId is provided
-    if (buildingId && data) {
-      const b = data.find((b: any) => b.id === buildingId);
+    if (buildingId) {
+      const b = buildings.find((b: any) => b.id === buildingId);
       if (b) setSelectedBuildingType(b.building_type ?? "residential");
     }
   }
@@ -324,5 +325,3 @@ export function AddUnitDialog({ open, buildingId, buildingName, onClose, onSucce
     </Dialog>
   );
 }
-
-
