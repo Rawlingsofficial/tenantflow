@@ -113,7 +113,7 @@ export default function OnboardingPage() {
   }
 
   function handleFinish() {
-    router.push('/dashboard')
+    window.location.href = '/dashboard'
   }
 
   const selected = PROPERTY_TYPES.find(p => p.type === selectedType)
