@@ -79,11 +79,12 @@ export function AddUnitDialog({ open, buildingId, buildingName, onClose, onSucce
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleBuildingChange(id: string) {
-    setForm((prev) => ({ ...prev, building_id: id }));
-    const b = buildings.find((b) => b.id === id);
-    setSelectedBuildingType(b?.building_type ?? "residential");
-  }
+  function handleBuildingChange(id: string | null) {
+  if (!id) return
+  setForm((prev) => ({ ...prev, building_id: id }));
+  const b = buildings.find((b) => b.id === id);
+  setSelectedBuildingType(b?.building_type ?? "residential");
+}
 
   const isCommercial = selectedBuildingType === "commercial";
 
