@@ -9,6 +9,7 @@ export type LeaseStatus = 'active' | 'ended' | 'terminated'
 export type PaymentStatus = 'pending' | 'completed' | 'failed'
 export type TenantStatus = 'active' | 'inactive'
 export type UserStatus = 'active' | 'inactive'
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void'
 
 export interface Organization {
   id: string
@@ -18,6 +19,7 @@ export interface Organization {
   unit_limit: number
   user_limit: number
   status: OrgStatus
+  property_type: string | null
 }
 
 export interface OrganizationMembership {
@@ -44,7 +46,8 @@ export interface Building {
   name: string
   address: string | null
   status: OrgStatus
-  photo_url: string | null  // ← add this
+  photo_url: string | null
+  building_type: string | null
 }
 
 export interface Unit {
@@ -56,6 +59,9 @@ export interface Unit {
   bathrooms: number | null
   default_rent: number | null
   status: UnitStatus
+  unit_purpose: string | null
+  area_sqm: number | null
+  floor_number: number | null
 }
 
 export interface Tenant {
@@ -76,6 +82,14 @@ export interface Tenant {
   notes: string | null
   status: TenantStatus
   photo_url?: string | null
+  tenant_type: string | null       // 'individual' | 'company'
+  company_name: string | null
+  company_reg_number: string | null
+  vat_number: string | null
+  industry: string | null
+  company_size: string | null
+  contact_person: string | null
+  contact_role: string | null
 }
 
 export interface Lease {
@@ -88,6 +102,10 @@ export interface Lease {
   lease_end: string | null
   renewal_date: string | null
   status: LeaseStatus
+  service_charge: number | null
+  escalation_rate: number | null
+  break_clause_date: string | null
+  payment_terms: number | null
 }
 
 export interface RentPayment {
@@ -98,6 +116,21 @@ export interface RentPayment {
   method: string | null
   reference: string | null
   status: PaymentStatus
+}
+
+export interface Invoice {
+  id: string
+  organization_id: string
+  lease_id: string
+  invoice_number: string
+  invoice_date: string
+  due_date: string
+  rent_amount: number
+  service_charge: number
+  total_amount: number
+  status: InvoiceStatus
+  paid_date: string | null
+  notes: string | null
 }
 
 export interface TenantDocument {
@@ -150,7 +183,7 @@ export interface UnitWithBuilding extends Unit {
 }
 
 export interface LeaseWithDetails extends Lease {
-  tenants: Pick<Tenant, 'id' | 'first_name' | 'last_name' | 'email' | 'primary_phone'>
+  tenants: Pick<Tenant, 'id' | 'first_name' | 'last_name' | 'email' | 'primary_phone' | 'tenant_type' | 'company_name'>
   units: UnitWithBuilding
 }
 
@@ -168,6 +201,7 @@ export interface DashboardStats {
   activeTenants: number
   expiringLeases: number
   activeLeases: number
+  occupancyRate: number            // ← added
   expectedMonthly: number
   collectedThisMonth: number
   outstandingBalance: number
@@ -187,6 +221,7 @@ export type Database = {
           unit_limit?: number
           user_limit?: number
           status?: OrgStatus
+          property_type?: string | null
         }
         Update: Partial<Organization>
       }
@@ -213,16 +248,17 @@ export type Database = {
         Update: Partial<User>
       }
       buildings: {
-  Row: Building
-  Insert: {
-    organization_id: string
-    name: string
-    address?: string | null
-    status?: OrgStatus
-    photo_url?: string | null  // ← add this
-  }
-  Update: Partial<Building>
-}
+        Row: Building
+        Insert: {
+          organization_id: string
+          name: string
+          address?: string | null
+          status?: OrgStatus
+          photo_url?: string | null
+          building_type?: string | null
+        }
+        Update: Partial<Building>
+      }
       units: {
         Row: Unit
         Insert: {
@@ -233,6 +269,9 @@ export type Database = {
           bathrooms?: number | null
           default_rent?: number | null
           status?: UnitStatus
+          unit_purpose?: string | null
+          area_sqm?: number | null
+          floor_number?: number | null
         }
         Update: Partial<Unit>
       }
@@ -255,6 +294,14 @@ export type Database = {
           notes?: string | null
           status?: TenantStatus
           photo_url?: string | null
+          tenant_type?: string | null
+          company_name?: string | null
+          company_reg_number?: string | null
+          vat_number?: string | null
+          industry?: string | null
+          company_size?: string | null
+          contact_person?: string | null
+          contact_role?: string | null
         }
         Update: Partial<Tenant>
       }
@@ -269,8 +316,29 @@ export type Database = {
           lease_end?: string | null
           renewal_date?: string | null
           status?: LeaseStatus
+          service_charge?: number | null
+          escalation_rate?: number | null
+          break_clause_date?: string | null
+          payment_terms?: number | null
         }
         Update: Partial<Lease>
+      }
+      invoices: {
+        Row: Invoice
+        Insert: {
+          organization_id: string
+          lease_id: string
+          invoice_number: string
+          invoice_date: string
+          due_date: string
+          rent_amount: number
+          service_charge: number
+          total_amount: number
+          status?: InvoiceStatus
+          paid_date?: string | null
+          notes?: string | null
+        }
+        Update: Partial<Invoice>
       }
       rent_payments: {
         Row: RentPayment
@@ -339,4 +407,3 @@ export type Database = {
     }
   }
 }
-
