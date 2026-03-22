@@ -84,10 +84,10 @@ export default function OnboardingPage() {
       const org = await createOrganization({ name: orgName.trim() })
       await setActive({ organization: org.id })
       const { error: e } = await supabase.from('organizations').insert(dbVal({
-        id: org.id,
-        name: orgName.trim(),
-        property_type: 'residential', // default — updated in step 2
-      }))
+  id: org.id,
+  name: orgName.trim(),
+  // property_type intentionally omitted — set in step 2
+}))
       if (e) throw new Error(e.message)
       setCreatedOrgId(org.id)
       setStep(2)
