@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { usePropertyType } from "@/hooks/usePropertyType";
 import { useMixedModeStore } from "@/store/mixedModeStore";
-import { Home, Briefcase } from "lucide-react";
+import { Home, Briefcase, Building2, MapPin, Image, X } from "lucide-react";
 
 interface AddBuildingDialogProps {
   open: boolean;
@@ -25,7 +26,6 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
   const { type } = usePropertyType();
   const { mode } = useMixedModeStore();
 
-  // Determine the default building_type based on portfolio type
   const defaultBuildingType =
     type === "commercial" ? "commercial" :
     type === "mixed" ? mode :
@@ -39,7 +39,6 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
     building_type: defaultBuildingType,
   });
   const [saving, setSaving] = useState(false);
-
   const isMixed = type === "mixed";
 
   function updateField(field: string, value: string) {
@@ -77,22 +76,35 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
     }
   }
 
+  const isCommercial = form.building_type === "commercial";
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md rounded-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-base font-semibold text-gray-900">
-            Add New Building
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-2xl border-slate-200/80 shadow-xl">
+        {/* Header */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-slate-100">
+          <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-teal-500/5 to-transparent pointer-events-none" />
+          <div className="relative flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1B3B6F] shadow-sm">
+              <Building2 className="h-4 w-4 text-[#14b8a6]" />
+            </div>
+            <div>
+              <DialogTitle className="text-sm font-semibold text-slate-900">Add New Building</DialogTitle>
+              <p className="text-xs text-slate-400 mt-0.5">Register a property in your portfolio</p>
+            </div>
+          </div>
+          <button onClick={handleClose} disabled={saving}
+            className="absolute right-4 top-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-        <div className="space-y-4 pt-1">
-
-          {/* Building type — only shown for mixed portfolios */}
+        <div className="px-6 py-5 space-y-4">
+          {/* Mixed mode: portfolio type toggle */}
           {isMixed && (
             <div>
-              <Label className="text-xs font-medium text-gray-600 mb-2 block">
-                Portfolio Type <span className="text-red-500">*</span>
+              <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 block">
+                Portfolio Type <span className="text-red-400">*</span>
               </Label>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -100,103 +112,129 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
                   onClick={() => updateField("building_type", "residential")}
                   className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
                     form.building_type === "residential"
-                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
-                  }`}>
-                  <Home className="h-4 w-4" />
-                  Residential
+                      ? "border-teal-500 bg-teal-50/80 text-teal-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                  }`}
+                >
+                  <Home className="h-4 w-4" /> Residential
                 </button>
                 <button
                   type="button"
                   onClick={() => updateField("building_type", "commercial")}
                   className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
                     form.building_type === "commercial"
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
-                  }`}>
-                  <Briefcase className="h-4 w-4" />
-                  Commercial
+                      ? "border-[#1B3B6F] bg-[#1B3B6F]/5 text-[#1B3B6F] shadow-sm"
+                      : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                  }`}
+                >
+                  <Briefcase className="h-4 w-4" /> Commercial
                 </button>
               </div>
-              <p className="text-[10px] text-gray-400 mt-1.5">
-                This determines which portfolio the building belongs to.
-              </p>
+              <p className="text-[10px] text-slate-400 mt-1.5">Determines which portfolio this building belongs to.</p>
             </div>
           )}
 
+          {/* Building name */}
           <div>
-            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
-              Building Name <span className="text-red-500">*</span>
+            <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              Building Name <span className="text-red-400">*</span>
             </Label>
-            <Input
-              placeholder={form.building_type === "commercial" ? "e.g. Acme Business Centre" : "e.g. Palm Grove Apartments"}
-              value={form.name}
-              onChange={(e) => updateField("name", e.target.value)}
-              className="h-9 text-sm rounded-lg border-gray-200"
-              disabled={saving}
-            />
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder={isCommercial ? "e.g. Acme Business Centre" : "e.g. Palm Grove Apartments"}
+                value={form.name}
+                onChange={(e) => updateField("name", e.target.value)}
+                className="h-9 text-sm pl-9 rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400"
+                disabled={saving}
+              />
+            </div>
           </div>
 
+          {/* Address */}
           <div>
-            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Address</Label>
-            <Input
-              placeholder="e.g. 4 Seeview Rd, Miami, FL 33199"
-              value={form.address}
-              onChange={(e) => updateField("address", e.target.value)}
-              className="h-9 text-sm rounded-lg border-gray-200"
-              disabled={saving}
-            />
+            <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Address</Label>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="e.g. 4 Seaview Rd, Miami, FL 33199"
+                value={form.address}
+                onChange={(e) => updateField("address", e.target.value)}
+                className="h-9 text-sm pl-9 rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400"
+                disabled={saving}
+              />
+            </div>
           </div>
 
+          {/* Status */}
           <div>
-            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Status</Label>
+            <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</Label>
             <Select
               value={form.status}
               onValueChange={(v) => setForm((prev) => ({ ...prev, status: v as "active" | "inactive" }))}
-              disabled={saving}>
-              <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
+              disabled={saving}
+            >
+              <SelectTrigger className="h-9 text-sm rounded-xl border-slate-200">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="active">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-teal-500" /> Active
+                  </div>
+                </SelectItem>
+                <SelectItem value="inactive">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-slate-400" /> Inactive
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {/* Photo URL */}
           <div>
-            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">
-              Photo URL <span className="text-gray-400 font-normal">(optional)</span>
+            <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">
+              Photo URL <span className="text-slate-400 font-normal normal-case">(optional)</span>
             </Label>
-            <Input
-              placeholder="https://..."
-              value={form.photo_url}
-              onChange={(e) => updateField("photo_url", e.target.value)}
-              className="h-9 text-sm rounded-lg border-gray-200"
-              disabled={saving}
-            />
+            <div className="relative">
+              <Image className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                placeholder="https://..."
+                value={form.photo_url}
+                onChange={(e) => updateField("photo_url", e.target.value)}
+                className="h-9 text-sm pl-9 rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400"
+                disabled={saving}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-50 mt-2">
-          <Button variant="outline" size="sm" onClick={handleClose} disabled={saving} className="h-9 text-sm rounded-lg">
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
+          <Button variant="outline" size="sm" onClick={handleClose} disabled={saving}
+            className="h-9 text-sm rounded-xl border-slate-200 text-slate-600">
             Cancel
           </Button>
           <Button
             size="sm"
             onClick={handleSubmit}
             disabled={saving}
-            className={`h-9 text-white text-sm rounded-lg px-5 ${
-              form.building_type === "commercial"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-emerald-600 hover:bg-emerald-700"
-            }`}>
-            {saving ? "Saving..." : "Save Building"}
+            className={`h-9 text-white text-sm rounded-xl px-5 font-semibold shadow-sm ${
+              isCommercial
+                ? "bg-[#1B3B6F] hover:bg-[#162d52]"
+                : "bg-teal-600 hover:bg-teal-700"
+            }`}
+          >
+            {saving ? (
+              <div className="flex items-center gap-2">
+                <div className="h-3.5 w-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                Saving…
+              </div>
+            ) : "Save Building"}
           </Button>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-
-

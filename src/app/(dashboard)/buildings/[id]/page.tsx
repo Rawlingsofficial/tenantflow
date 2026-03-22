@@ -4,16 +4,17 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { motion, AnimatePresence } from "framer-motion";
 import { AddUnitDialog } from "@/components/buildings/AddUnitDialog";
 import { UnitHistoryDialog } from "@/components/buildings/UnitHistoryDialog";
 import { EditBuildingDialog } from "@/components/buildings/EditBuildingDialog";
 import { EditUnitDialog } from "@/components/buildings/EditUnitDialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, Plus, Building2, ChevronRight, MoreHorizontal,
   Search, Pencil, Trash2, AlertTriangle, MapPin, Home,
-  BedDouble, Bath, DollarSign, Settings, FileText,
+  DollarSign, FileText, Settings, TrendingUp, CheckCircle2,
+  Wrench, Clock, ArrowUpRight
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -21,44 +22,64 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { format } from "date-fns";
 
 function val<T>(v: T): never { return v as never; }
 
 type UnitView = "all" | "occupied" | "vacant" | "unavailable";
 
 interface Building {
-  id: string;
-  name: string;
-  address: string | null;
-  status: string;
-  photo_url: string | null;
-  organization_id: string;
+  id: string; name: string; address: string | null;
+  status: string; photo_url: string | null; organization_id: string;
 }
-
 interface Unit {
-  id: string;
-  unit_code: string;
-  unit_type: string | null;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  default_rent: number | null;
-  status: string;
-  building_id: string;
+  id: string; unit_code: string; unit_type: string | null;
+  bedrooms: number | null; bathrooms: number | null;
+  default_rent: number | null; status: string; building_id: string;
   activeLease?: {
-    id: string;
-    tenant_id: string;
-    lease_start: string;
-    lease_end: string | null;
-    rent_amount: number;
-    status: string;
+    id: string; tenant_id: string; lease_start: string;
+    lease_end: string | null; rent_amount: number; status: string;
     tenant: {
-      id: string;
-      first_name: string | null;
-      last_name: string | null;
-      primary_phone: string | null;
-      photo_url: string | null;
+      id: string; first_name: string | null; last_name: string | null;
+      primary_phone: string | null; photo_url: string | null;
     } | null;
   };
+}
+
+// ── Status badge ───────────────────────────────────────────────
+function UnitStatusBadge({ status }: { status: string }) {
+  if (status === "occupied")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-teal-500" /> Occupied
+      </span>
+    );
+  if (status === "vacant")
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Vacant
+      </span>
+    );
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Maintenance
+    </span>
+  );
+}
+
+// ── Mini stat card ─────────────────────────────────────────────
+function MiniStat({ label, value, color = "text-slate-800", icon: Icon, bg = "bg-slate-50" }: {
+  label: string; value: number | string; color?: string; icon?: any; bg?: string;
+}) {
+  return (
+    <div className={`${bg} rounded-xl p-3.5 border border-slate-100`}>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
+        {Icon && <Icon className="h-3.5 w-3.5 text-slate-300" />}
+      </div>
+      <p className={`text-2xl font-bold ${color} tabular-nums`}>{value}</p>
+    </div>
+  );
 }
 
 export default function BuildingDetailPage() {
@@ -76,21 +97,19 @@ export default function BuildingDetailPage() {
   const [editBuildingOpen, setEditBuildingOpen] = useState(false);
   const [historyUnit, setHistoryUnit] = useState<Unit | null>(null);
   const [editUnit, setEditUnit] = useState<Unit | null>(null);
-  const [activeTab, setActiveTab] = useState<"units" | "overview" | "files" | "settings">("units");
+  const [activeTab, setActiveTab] = useState<"units" | "overview" | "settings">("units");
   const [refreshKey, setRefreshKey] = useState(0);
   const [deletingBuilding, setDeletingBuilding] = useState(false);
   const [confirmDeleteBuilding, setConfirmDeleteBuilding] = useState(false);
-
   const [recentTenant, setRecentTenant] = useState<{
-    name: string; date: string; photo_url?: string; units?: number;
+    name: string; date: string; photo_url?: string;
   } | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
     setLoading(true);
     try {
-      const { data: bData } = await supabase
-        .from("buildings").select("*").eq("id", id).single();
+      const { data: bData } = await supabase.from("buildings").select("*").eq("id", id).single();
       setBuilding(bData || null);
 
       const { data: uData } = await supabase
@@ -121,9 +140,8 @@ export default function BuildingDetailPage() {
         const t = withTenant[0].activeLease!.tenant!;
         setRecentTenant({
           name: `${t.first_name || ""} ${t.last_name || ""}`.trim(),
-          date: new Date(withTenant[0].activeLease!.lease_start).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+          date: format(new Date(withTenant[0].activeLease!.lease_start), "MMM d, yyyy"),
           photo_url: t.photo_url || undefined,
-          units: withTenant.length,
         });
       }
     } finally {
@@ -134,10 +152,7 @@ export default function BuildingDetailPage() {
   useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 
   async function handleDeleteUnit(unit: Unit) {
-    if (unit.activeLease) {
-      toast.error("Cannot delete a unit with an active lease. End the lease first.");
-      return;
-    }
+    if (unit.activeLease) { toast.error("Cannot delete a unit with an active lease."); return; }
     if (!confirm(`Delete unit ${unit.unit_code}? This cannot be undone.`)) return;
     const { error } = await supabase.from("units").delete().eq("id", unit.id);
     if (error) { toast.error(error.message); return; }
@@ -146,15 +161,13 @@ export default function BuildingDetailPage() {
   }
 
   async function handleDeleteBuilding() {
-    const hasActiveLeases = units.some((u) => u.activeLease);
-    if (hasActiveLeases) {
-      toast.error("Cannot delete a building with active leases. End all leases first.");
+    if (units.some((u) => u.activeLease)) {
+      toast.error("Cannot delete a building with active leases.");
       setConfirmDeleteBuilding(false);
       return;
     }
     setDeletingBuilding(true);
     try {
-      // Delete all units first, then the building
       await supabase.from("units").delete().eq("building_id", id);
       const { error } = await supabase.from("buildings").delete().eq("id", id);
       if (error) throw error;
@@ -169,8 +182,7 @@ export default function BuildingDetailPage() {
   }
 
   async function handleMarkUnitStatus(unit: Unit, status: string) {
-    const { error } = await supabase
-      .from("units").update(val({ status })).eq("id", unit.id);
+    const { error } = await supabase.from("units").update(val({ status })).eq("id", unit.id);
     if (error) { toast.error(error.message); return; }
     toast.success(`Unit ${unit.unit_code} marked as ${status}.`);
     setRefreshKey((k) => k + 1);
@@ -188,27 +200,31 @@ export default function BuildingDetailPage() {
     return true;
   });
 
-  const occupied = units.filter((u) => u.status === "occupied").length;
-  const vacant = units.filter((u) => u.status === "vacant").length;
+  const occupied    = units.filter((u) => u.status === "occupied").length;
+  const vacant      = units.filter((u) => u.status === "vacant").length;
   const maintenance = units.filter((u) => u.status === "maintenance").length;
   const totalMonthlyRevenue = units
     .filter((u) => u.activeLease)
     .reduce((sum, u) => sum + (u.activeLease?.rent_amount || 0), 0);
+  const occupancyRate = units.length > 0 ? Math.round((occupied / units.length) * 100) : 0;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center">
-        <div className="text-gray-400 text-sm animate-pulse">Loading building...</div>
+      <div className="min-h-screen bg-slate-50/70 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-400">Loading building…</p>
+        </div>
       </div>
     );
   }
 
   if (!building) {
     return (
-      <div className="min-h-screen bg-[#F8F9FB] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50/70 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-500">Building not found.</p>
-          <Button variant="outline" className="mt-3" onClick={() => router.push("/buildings")}>
+          <p className="text-slate-500 text-sm">Building not found.</p>
+          <Button variant="outline" className="mt-3 rounded-xl" onClick={() => router.push("/buildings")}>
             Back to Buildings
           </Button>
         </div>
@@ -216,40 +232,68 @@ export default function BuildingDetailPage() {
     );
   }
 
+  const tabs = [
+    { key: "units" as const, label: "Units", count: units.length },
+    { key: "overview" as const, label: "Overview" },
+    { key: "settings" as const, label: "Settings" },
+  ];
+
+  const unitViewTabs = [
+    { label: "All", value: "all" as UnitView, count: units.length },
+    { label: "Occupied", value: "occupied" as UnitView, count: occupied },
+    { label: "Vacant", value: "vacant" as UnitView, count: vacant },
+    { label: "Maintenance", value: "unavailable" as UnitView, count: maintenance },
+  ];
+
   return (
-    <div className="flex flex-col min-h-screen bg-[#F8F9FB]">
-      {/* Header */}
-      <div className="px-6 pt-5 pb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <button onClick={() => router.push("/buildings")} className="flex items-center gap-1 hover:text-gray-800 transition-colors">
-            <ArrowLeft className="h-3.5 w-3.5" />
+    <div className="flex flex-col min-h-screen bg-slate-50/70">
+      {/* Breadcrumb + actions */}
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="px-6 pt-5 pb-3 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <button onClick={() => router.push("/buildings")}
+            className="p-1 rounded-lg hover:bg-slate-200 transition-colors">
+            <ArrowLeft className="h-4 w-4" />
           </button>
-          <span className="hover:text-gray-800 cursor-pointer" onClick={() => router.push("/buildings")}>
-            Buildings
-          </span>
+          <span className="hover:text-slate-800 cursor-pointer" onClick={() => router.push("/buildings")}>Buildings</span>
           <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-gray-800 font-medium">{building.name}</span>
+          <span className="text-slate-800 font-semibold">{building.name}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setEditBuildingOpen(true)}
-            className="h-8 text-gray-500 hover:text-gray-700 gap-1.5">
+            className="h-8 text-slate-500 hover:text-slate-700 gap-1.5 rounded-xl">
             <Pencil className="h-3.5 w-3.5" /> Edit
           </Button>
           <Button size="sm" onClick={() => setAddUnitOpen(true)}
-            className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 rounded-lg flex items-center gap-1">
-            <Plus className="h-3.5 w-3.5" /> Add New Unit
+            className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-3 rounded-xl shadow-sm flex items-center gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Add Unit
           </Button>
         </div>
-      </div>
+      </motion.div>
 
+      {/* Building header */}
       <div className="px-6 pb-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-900">{building.name}</h1>
-          {building.address && (
-            <p className="text-xs text-gray-400 flex items-center gap-1">
-              <MapPin className="h-3 w-3" /> {building.address}
-            </p>
-          )}
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">{building.name}</h1>
+            {building.address && (
+              <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                <MapPin className="h-3 w-3" /> {building.address}
+              </p>
+            )}
+          </div>
+          <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${
+            building.status === "active"
+              ? "bg-teal-50 text-teal-700 border border-teal-200"
+              : "bg-slate-100 text-slate-500 border border-slate-200"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${building.status === "active" ? "bg-teal-500 animate-pulse" : "bg-slate-400"}`} />
+            {building.status}
+          </span>
         </div>
       </div>
 
@@ -257,75 +301,81 @@ export default function BuildingDetailPage() {
         {/* Main panel */}
         <div className="flex-1 min-w-0">
           {/* Tabs */}
-          <div className="flex items-center border-b border-gray-200 mb-0">
-            {(["units", "overview", "files", "settings"] as const).map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px capitalize ${
-                  activeTab === tab ? "border-emerald-600 text-emerald-700" : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}>
-                {tab}
+          <div className="flex items-center border-b border-slate-200 mb-0">
+            {tabs.map((tab) => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+                  activeTab === tab.key
+                    ? "border-teal-600 text-teal-700"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    activeTab === tab.key ? "bg-teal-100 text-teal-700" : "bg-slate-100 text-slate-500"
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
               </button>
             ))}
           </div>
 
-          {/* ── UNITS TAB ── */}
+          {/* UNITS TAB */}
           {activeTab === "units" && (
-            <div className="bg-white rounded-b-xl border border-t-0 border-gray-100 shadow-sm">
-              <div className="px-4 pt-3 pb-0 flex items-center justify-between border-b border-gray-50">
-                <div className="flex items-center gap-1">
-                  {([
-                    { label: "All", value: "all" },
-                    { label: "Occupied", value: "occupied" },
-                    { label: "Vacant", value: "vacant" },
-                    { label: "Maintenance", value: "unavailable" },
-                  ] as { label: string; value: UnitView }[]).map((tab) => (
+            <div className="bg-white rounded-b-2xl border border-t-0 border-slate-200/80 shadow-sm overflow-hidden">
+              {/* Sub-filter tabs + search */}
+              <div className="px-4 pt-3 pb-0 flex items-center justify-between border-b border-slate-100">
+                <div className="flex items-center gap-0.5">
+                  {unitViewTabs.map((tab) => (
                     <button key={tab.value} onClick={() => setUnitView(tab.value)}
-                      className={`px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
-                        unitView === tab.value ? "border-emerald-600 text-emerald-700" : "border-transparent text-gray-500 hover:text-gray-700"
-                      }`}>
+                      className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors -mb-px ${
+                        unitView === tab.value ? "border-teal-600 text-teal-700" : "border-transparent text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
                       {tab.label}
-                      <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-full ${
-                        unitView === tab.value ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                        unitView === tab.value ? "bg-teal-100 text-teal-700" : "bg-slate-100 text-slate-500"
                       }`}>
-                        {tab.value === "all" ? units.length :
-                          tab.value === "occupied" ? occupied :
-                          tab.value === "vacant" ? vacant : maintenance}
+                        {tab.count}
                       </span>
                     </button>
                   ))}
                 </div>
                 <div className="relative mb-2">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                  <Input placeholder="Search units..." value={search}
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                  <Input placeholder="Search units…" value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-8 h-7 w-44 text-xs bg-gray-50 border-gray-200 rounded-md" />
+                    className="pl-7 h-7 w-44 text-xs bg-slate-50 border-slate-200 rounded-lg" />
                 </div>
               </div>
 
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-gray-50 bg-gray-50/30">
-                    <th className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Unit</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Type</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Beds/Bath</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Rent</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Lease End</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Status</th>
+                  <tr className="border-b border-slate-100 bg-slate-50/40">
+                    <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Type</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Bed/Bath</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Rent</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Lease End</th>
+                    <th className="px-3 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 w-10" />
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUnits.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                      <td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-sm">
                         No units match the current filter.
                       </td>
                     </tr>
                   ) : (
-                    filteredUnits.map((unit) => (
+                    filteredUnits.map((unit, i) => (
                       <UnitRow
                         key={unit.id}
                         unit={unit}
+                        index={i}
                         onHistory={() => setHistoryUnit(unit)}
                         onEdit={() => setEditUnit(unit)}
                         onDelete={() => handleDeleteUnit(unit)}
@@ -338,62 +388,63 @@ export default function BuildingDetailPage() {
             </div>
           )}
 
-          {/* ── OVERVIEW TAB ── */}
+          {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
-            <div className="bg-white rounded-b-xl border border-t-0 border-gray-100 shadow-sm p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <StatCard label="Total Units" value={units.length} icon={<Home className="h-4 w-4" />} />
-                <StatCard label="Occupied" value={occupied} color="text-emerald-600" icon={<Home className="h-4 w-4 text-emerald-500" />} />
-                <StatCard label="Vacant" value={vacant} color="text-blue-600" icon={<Home className="h-4 w-4 text-blue-500" />} />
-                <StatCard label="Maintenance" value={maintenance} color="text-amber-600" icon={<AlertTriangle className="h-4 w-4 text-amber-500" />} />
+            <div className="bg-white rounded-b-2xl border border-t-0 border-slate-200/80 shadow-sm p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MiniStat label="Total Units" value={units.length} icon={Home} />
+                <MiniStat label="Occupied" value={occupied} color="text-teal-600" icon={CheckCircle2} bg="bg-teal-50" />
+                <MiniStat label="Vacant" value={vacant} color="text-blue-600" icon={Home} bg="bg-blue-50" />
+                <MiniStat label="Maintenance" value={maintenance} color="text-amber-600" icon={Wrench} bg="bg-amber-50" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                  <p className="text-xs text-emerald-600 font-semibold uppercase tracking-wide">Monthly Revenue</p>
-                  <p className="text-2xl font-bold text-emerald-700 mt-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-gradient-to-br from-teal-500/8 to-teal-500/3 rounded-2xl p-4 border border-teal-200/60">
+                  <p className="text-[10px] font-semibold text-teal-600 uppercase tracking-wider">Monthly Revenue</p>
+                  <p className="text-2xl font-bold text-teal-700 mt-1 tabular-nums">
                     ${totalMonthlyRevenue.toLocaleString()}
                   </p>
-                  <p className="text-xs text-emerald-500 mt-0.5">from {occupied} active leases</p>
+                  <p className="text-xs text-teal-500 mt-0.5">from {occupied} active lease{occupied !== 1 ? "s" : ""}</p>
                 </div>
-                <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Occupancy Rate</p>
-                  <p className="text-2xl font-bold text-gray-800 mt-1">
-                    {units.length > 0 ? Math.round((occupied / units.length) * 100) : 0}%
-                  </p>
-                  <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 rounded-full transition-all"
-                      style={{ width: `${units.length > 0 ? Math.round((occupied / units.length) * 100) : 0}%` }} />
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Occupancy Rate</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1 tabular-nums">{occupancyRate}%</p>
+                  <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                    <motion.div className="h-full bg-teal-500 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${occupancyRate}%` }}
+                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                    />
                   </div>
                 </div>
               </div>
 
               {building.address && (
-                <div className="pt-4 border-t border-gray-50">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-2">Address</p>
-                  <p className="text-sm text-gray-700 flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 text-gray-400" /> {building.address}
+                <div className="pt-4 border-t border-slate-100">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Address</p>
+                  <p className="text-sm text-slate-700 flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 text-slate-400" /> {building.address}
                   </p>
                 </div>
               )}
 
-              <div className="pt-4 border-t border-gray-50">
-                <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">Unit Breakdown</p>
+              <div className="pt-4 border-t border-slate-100">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Unit Breakdown</p>
                 <div className="space-y-2">
                   {["flat", "studio", "duplex", "penthouse", "commercial"].map((type) => {
                     const count = units.filter((u) => u.unit_type === type).length;
                     if (count === 0) return null;
                     return (
                       <div key={type} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 capitalize">{type}</span>
-                        <span className="font-medium text-gray-700">{count} unit{count > 1 ? "s" : ""}</span>
+                        <span className="text-slate-500 capitalize">{type}</span>
+                        <span className="font-semibold text-slate-700">{count} unit{count > 1 ? "s" : ""}</span>
                       </div>
                     );
                   })}
                   {units.filter((u) => !u.unit_type).length > 0 && (
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-500">Unspecified</span>
-                      <span className="font-medium text-gray-700">{units.filter((u) => !u.unit_type).length} units</span>
+                      <span className="text-slate-500">Unspecified</span>
+                      <span className="font-semibold text-slate-700">{units.filter((u) => !u.unit_type).length} units</span>
                     </div>
                   )}
                 </div>
@@ -401,90 +452,62 @@ export default function BuildingDetailPage() {
             </div>
           )}
 
-          {/* ── FILES TAB ── */}
-          {activeTab === "files" && (
-            <div className="bg-white rounded-b-xl border border-t-0 border-gray-100 shadow-sm p-10 text-center">
-              <FileText className="h-10 w-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-sm font-medium text-gray-500">No files uploaded yet</p>
-              <p className="text-xs text-gray-400 mt-1">Upload lease agreements, inspection reports, or insurance documents</p>
-              <Button size="sm" variant="outline" className="mt-4 text-xs h-8 rounded-lg">
-                Upload File
-              </Button>
-            </div>
-          )}
-
-          {/* ── SETTINGS TAB ── */}
+          {/* SETTINGS TAB */}
           {activeTab === "settings" && (
-            <div className="bg-white rounded-b-xl border border-t-0 border-gray-100 shadow-sm divide-y divide-gray-50">
-              {/* Building Info */}
+            <div className="bg-white rounded-b-2xl border border-t-0 border-slate-200/80 shadow-sm divide-y divide-slate-100">
               <div className="p-6">
-                <h3 className="text-sm font-semibold text-gray-800 mb-4">Building Information</h3>
+                <h3 className="text-sm font-semibold text-slate-800 mb-4">Building Information</h3>
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Name</span>
-                    <span className="font-medium text-gray-800">{building.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Address</span>
-                    <span className="font-medium text-gray-800">{building.address || "—"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Status</span>
-                    <Badge variant="outline" className={`text-xs ${
-                      building.status === "active"
-                        ? "border-emerald-200 text-emerald-700 bg-emerald-50"
-                        : "border-gray-200 text-gray-500"
-                    }`}>
-                      {building.status}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Total Units</span>
-                    <span className="font-medium text-gray-800">{units.length}</span>
-                  </div>
+                  {[
+                    { label: "Name", value: building.name },
+                    { label: "Address", value: building.address || "—" },
+                    { label: "Total Units", value: String(units.length) },
+                  ].map((row) => (
+                    <div key={row.label} className="flex justify-between items-center">
+                      <span className="text-slate-500 text-xs">{row.label}</span>
+                      <span className="font-medium text-slate-800 text-xs">{row.value}</span>
+                    </div>
+                  ))}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => setEditBuildingOpen(true)}
-                  className="mt-4 h-8 text-xs rounded-lg gap-1.5">
+                  className="mt-4 h-8 text-xs rounded-xl gap-1.5 border-slate-200">
                   <Pencil className="h-3.5 w-3.5" /> Edit Building Info
                 </Button>
               </div>
 
-              {/* Danger Zone */}
               <div className="p-6">
                 <h3 className="text-sm font-semibold text-red-600 mb-1">Danger Zone</h3>
-                <p className="text-xs text-gray-400 mb-4">
-                  Deleting a building is permanent and cannot be undone. All units will also be deleted.
-                  Buildings with active leases cannot be deleted.
+                <p className="text-xs text-slate-400 mb-4">
+                  Permanently deletes the building and all its units. Buildings with active leases cannot be deleted.
                 </p>
                 {!confirmDeleteBuilding ? (
                   <Button size="sm" variant="outline"
                     onClick={() => setConfirmDeleteBuilding(true)}
-                    className="h-8 text-xs rounded-lg border-red-200 text-red-600 hover:bg-red-50 gap-1.5">
+                    className="h-8 text-xs rounded-xl border-red-200 text-red-600 hover:bg-red-50 gap-1.5">
                     <Trash2 className="h-3.5 w-3.5" /> Delete Building
                   </Button>
                 ) : (
-                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-red-50 border border-red-200 rounded-2xl p-4"
+                  >
+                    <div className="flex items-start gap-2 mb-3">
+                      <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
                       <p className="text-xs font-semibold text-red-700">
-                        Are you sure? This will permanently delete "{building.name}" and all its units.
+                        This will permanently delete "{building.name}" and all its units.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline"
-                        onClick={() => setConfirmDeleteBuilding(false)}
-                        className="h-7 text-xs rounded-lg">
-                        Cancel
-                      </Button>
-                      <Button size="sm"
-                        onClick={handleDeleteBuilding}
-                        disabled={deletingBuilding}
+                      <Button size="sm" variant="outline" onClick={() => setConfirmDeleteBuilding(false)}
+                        className="h-7 text-xs rounded-lg">Cancel</Button>
+                      <Button size="sm" onClick={handleDeleteBuilding} disabled={deletingBuilding}
                         className="h-7 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg gap-1.5">
                         <Trash2 className="h-3 w-3" />
-                        {deletingBuilding ? "Deleting..." : "Yes, Delete Building"}
+                        {deletingBuilding ? "Deleting…" : "Yes, Delete"}
                       </Button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
               </div>
             </div>
@@ -492,46 +515,60 @@ export default function BuildingDetailPage() {
         </div>
 
         {/* Sidebar */}
-        {recentTenant && (
-          <div className="w-60 flex-shrink-0 space-y-3">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold mb-3">Active Tenant</p>
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-emerald-100 flex-shrink-0 overflow-hidden">
+        <div className="w-56 flex-shrink-0 space-y-3">
+          {/* Active tenant */}
+          {recentTenant && (
+            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Active Tenant</p>
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#1B3B6F] to-[#2a4f8f] flex items-center justify-center">
                   {recentTenant.photo_url ? (
                     <img src={recentTenant.photo_url} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-emerald-700 font-semibold text-sm">
-                      {recentTenant.name.charAt(0)}
-                    </div>
+                    <span className="text-[#14b8a6] font-bold text-sm">{recentTenant.name.charAt(0)}</span>
                   )}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">{recentTenant.name}</p>
-                  <p className="text-[10px] text-gray-400">{recentTenant.date}</p>
+                  <p className="text-sm font-semibold text-slate-800 leading-tight">{recentTenant.name}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{recentTenant.date}</p>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-2.5">
-              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">Summary</p>
-              {[
-                { label: "Occupied", value: occupied, color: "text-emerald-700" },
-                { label: "Vacant", value: vacant, color: "text-gray-700" },
-                { label: "Maintenance", value: maintenance, color: "text-amber-600" },
-              ].map((row) => (
-                <div key={row.label} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{row.label}</span>
-                  <span className={`font-semibold ${row.color}`}>{row.value}</span>
-                </div>
-              ))}
-              <div className="flex justify-between text-xs pt-2 border-t border-gray-50">
-                <span className="text-gray-500">Revenue/mo</span>
-                <span className="font-semibold text-gray-800">${totalMonthlyRevenue.toLocaleString()}</span>
+          {/* Summary */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-2.5">
+            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Summary</p>
+            {[
+              { label: "Occupied", value: occupied, color: "text-teal-700" },
+              { label: "Vacant", value: vacant, color: "text-slate-700" },
+              { label: "Maintenance", value: maintenance, color: "text-amber-600" },
+            ].map((row) => (
+              <div key={row.label} className="flex justify-between items-center text-xs">
+                <span className="text-slate-500">{row.label}</span>
+                <span className={`font-bold tabular-nums ${row.color}`}>{row.value}</span>
+              </div>
+            ))}
+            <div className="flex justify-between items-center text-xs pt-2 border-t border-slate-100">
+              <span className="text-slate-500">Revenue/mo</span>
+              <span className="font-bold text-slate-800 tabular-nums">${totalMonthlyRevenue.toLocaleString()}</span>
+            </div>
+            {/* Occupancy bar */}
+            <div className="pt-1">
+              <div className="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+                <span>Occupancy</span>
+                <span className="font-bold text-teal-600">{occupancyRate}%</span>
+              </div>
+              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <motion.div className="h-full bg-teal-500 rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${occupancyRate}%` }}
+                  transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                />
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Dialogs */}
@@ -547,7 +584,6 @@ export default function BuildingDetailPage() {
         <UnitHistoryDialog open={!!historyUnit} unit={historyUnit}
           buildingName={building.name} onClose={() => setHistoryUnit(null)} />
       )}
-
       {editUnit && (
         <EditUnitDialog open={!!editUnit} unit={editUnit}
           onClose={() => setEditUnit(null)}
@@ -557,25 +593,11 @@ export default function BuildingDetailPage() {
   );
 }
 
-function StatCard({ label, value, color = "text-gray-800", icon }: {
-  label: string; value: number | string; color?: string; icon?: React.ReactNode;
-}) {
-  return (
-    <div className="bg-gray-50 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] text-gray-400 uppercase tracking-wide font-semibold">{label}</p>
-        {icon && <span className="text-gray-300">{icon}</span>}
-      </div>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-    </div>
-  );
-}
+// ─── Unit row ─────────────────────────────────────────────────
 
-function UnitRow({ unit, onHistory, onEdit, onDelete, onMarkStatus }: {
-  unit: Unit;
-  onHistory: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+function UnitRow({ unit, index, onHistory, onEdit, onDelete, onMarkStatus }: {
+  unit: Unit; index: number;
+  onHistory: () => void; onEdit: () => void; onDelete: () => void;
   onMarkStatus: (status: string) => void;
 }) {
   const router = useRouter();
@@ -590,101 +612,81 @@ function UnitRow({ unit, onHistory, onEdit, onDelete, onMarkStatus }: {
   const isDueSoon = leaseEnd && !isPastDue &&
     new Date(leaseEnd) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-  const statusBadge = () => {
-    if (unit.status === "occupied")
-      return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Occupied
-        </span>
-      );
-    if (unit.status === "vacant")
-      return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200">
-          <span className="w-1.5 h-1.5 rounded-full bg-gray-400" /> Vacant
-        </span>
-      );
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Maintenance
-      </span>
-    );
-  };
-
   return (
-    <tr className="border-b border-gray-50 hover:bg-gray-50/40 transition-colors group">
+    <motion.tr
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: index * 0.03 }}
+      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors group"
+    >
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-            <Building2 className="h-3 w-3 text-gray-400" />
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#1B3B6F]/8 to-teal-500/8 flex items-center justify-center shrink-0 border border-slate-200/60">
+            <Building2 className="h-3 w-3 text-slate-400" />
           </div>
           <div>
-            <p className="font-semibold text-gray-800">{unit.unit_code}</p>
+            <p className="font-mono font-semibold text-slate-800">{unit.unit_code}</p>
             {tenant && (
-              <p className="text-gray-500 text-[10px]">{tenant.first_name} {tenant.last_name}</p>
+              <p className="text-slate-400 text-[10px]">{tenant.first_name} {tenant.last_name}</p>
             )}
           </div>
         </div>
       </td>
-      <td className="px-3 py-3 text-gray-500 capitalize">{unit.unit_type || "—"}</td>
-      <td className="px-3 py-3 text-gray-500">
+      <td className="px-3 py-3 text-slate-500 capitalize text-xs">{unit.unit_type || "—"}</td>
+      <td className="px-3 py-3 text-slate-500 text-xs tabular-nums">
         {unit.bedrooms ?? "—"}bd / {unit.bathrooms ?? "—"}ba
       </td>
-      <td className="px-3 py-3 text-gray-700 font-medium">
-        {unit.activeLease?.rent_amount
-          ? `$${unit.activeLease.rent_amount.toLocaleString()}`
-          : unit.default_rent
-          ? `$${unit.default_rent.toLocaleString()}`
-          : "—"}
+      <td className="px-3 py-3 text-xs">
+        <span className="font-semibold text-slate-800 tabular-nums">
+          {unit.activeLease?.rent_amount
+            ? `$${unit.activeLease.rent_amount.toLocaleString()}`
+            : unit.default_rent
+            ? `$${unit.default_rent.toLocaleString()}`
+            : "—"}
+        </span>
       </td>
-      <td className="px-3 py-3">
+      <td className="px-3 py-3 text-xs">
         {leaseEndFormatted ? (
-          <span className={`text-[11px] ${isPastDue ? "text-red-600 font-medium" : isDueSoon ? "text-amber-600" : "text-gray-500"}`}>
+          <span className={isPastDue ? "text-red-600 font-semibold" : isDueSoon ? "text-amber-600 font-medium" : "text-slate-500"}>
             {leaseEndFormatted}
-            {isPastDue && <span className="ml-1 text-[9px] bg-red-100 text-red-600 px-1 rounded">OVERDUE</span>}
-            {isDueSoon && !isPastDue && <span className="ml-1 text-[9px] bg-amber-100 text-amber-600 px-1 rounded">SOON</span>}
+            {isPastDue && <span className="ml-1.5 text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">OVERDUE</span>}
+            {isDueSoon && !isPastDue && <span className="ml-1.5 text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-bold">SOON</span>}
           </span>
         ) : (
-          <span className="text-gray-400 text-[11px]">—</span>
+          <span className="text-slate-300">—</span>
         )}
       </td>
-      <td className="px-3 py-3">{statusBadge()}</td>
+      <td className="px-3 py-3"><UnitStatusBadge status={unit.status} /></td>
       <td className="px-4 py-3">
         <DropdownMenu>
-          <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100">
-            <MoreHorizontal className="h-3.5 w-3.5 text-gray-400" />
+          <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-slate-100">
+            <MoreHorizontal className="h-3.5 w-3.5 text-slate-400" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="text-xs w-44">
-            <DropdownMenuItem onClick={onEdit}>
+          <DropdownMenuContent align="end" className="text-xs w-44 rounded-xl border-slate-200 shadow-lg">
+            <DropdownMenuItem onClick={onEdit} className="rounded-lg cursor-pointer">
               <Pencil className="h-3.5 w-3.5 mr-2" /> Edit Unit
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={onHistory}>
-              View History
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onHistory} className="rounded-lg cursor-pointer">View History</DropdownMenuItem>
             {tenant && (
-              <DropdownMenuItem onClick={() => router.push(`/tenants/${tenant.id}`)}>
+              <DropdownMenuItem onClick={() => router.push(`/tenants/${tenant.id}`)} className="rounded-lg cursor-pointer">
                 View Tenant
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
             {unit.status !== "vacant" && (
-              <DropdownMenuItem onClick={() => onMarkStatus("vacant")}>
-                Mark as Vacant
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onMarkStatus("vacant")} className="rounded-lg cursor-pointer">Mark as Vacant</DropdownMenuItem>
             )}
             {unit.status !== "maintenance" && (
-              <DropdownMenuItem onClick={() => onMarkStatus("maintenance")}>
-                Mark as Maintenance
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onMarkStatus("maintenance")} className="rounded-lg cursor-pointer">Mark as Maintenance</DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={onDelete}
-              className="text-red-600 focus:text-red-600 focus:bg-red-50">
+            <DropdownMenuItem onClick={onDelete}
+              className="text-red-600 focus:text-red-600 focus:bg-red-50 rounded-lg cursor-pointer">
               <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete Unit
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </td>
-    </tr>
+    </motion.tr>
   );
 }
