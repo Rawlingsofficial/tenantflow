@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Home, Building2, Layers, Check, ArrowRight } from 'lucide-react'
 
+// Supabase strict-type bypass — same pattern used throughout the app
+function dbVal<T>(v: T): never { return v as never }
+
 type PropertyType = 'residential' | 'commercial' | 'mixed'
 type Step = 1 | 2 | 3
 
@@ -68,10 +71,11 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<Step>(1)
   const [orgName, setOrgName] = useState('')
   const [selectedType, setSelectedType] = useState<PropertyType | null>(null)
+  const [createdOrgId, setCreatedOrgId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1: create org
+  // Step 1: create org via Clerk + insert into Supabase
   async function handleStep1() {
     if (!orgName.trim()) { setError('Organization name is required'); return }
     if (!createOrganization || !setActive) { setError('Please refresh and try again'); return }
@@ -79,32 +83,28 @@ export default function OnboardingPage() {
     try {
       const org = await createOrganization({ name: orgName.trim() })
       await setActive({ organization: org.id })
-      const { error: e } = await supabase.from('organizations').insert({
+      const { error: e } = await supabase.from('organizations').insert(dbVal({
         id: org.id,
         name: orgName.trim(),
-        property_type: 'residential', // default, will be updated in step 2
-      } as any)
+        property_type: 'residential', // default — updated in step 2
+      }))
       if (e) throw new Error(e.message)
+      setCreatedOrgId(org.id)
       setStep(2)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally { setLoading(false) }
   }
 
-  // Step 2: save property type (org already created, just update it)
+  // Step 2: update property_type on the org we just created
   async function handleStep2() {
-    if (!selectedType) return
+    if (!selectedType || !createdOrgId) return
     setLoading(true); setError('')
     try {
-      // Get the current active org from Clerk context
-      // We update using the org that was just made active in step 1
-      const { data: orgs } = await supabase.from('organizations').select('id').order('id').limit(1)
-      // Actually we need the org ID — it was set active in step 1
-      // Use .update on organizations where name matches (safe since just created)
       const { error: e } = await supabase
         .from('organizations')
-        .update({ property_type: selectedType } as any)
-        .eq('name', orgName.trim())
+        .update(dbVal({ property_type: selectedType }))
+        .eq('id', createdOrgId)
       if (e) throw new Error(e.message)
       setStep(3)
     } catch (err: unknown) {
@@ -112,7 +112,7 @@ export default function OnboardingPage() {
     } finally { setLoading(false) }
   }
 
-  async function handleFinish() {
+  function handleFinish() {
     router.push('/dashboard')
   }
 
@@ -122,7 +122,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-md space-y-6">
 
-        {/* Logo — keep existing branding */}
+        {/* Logo */}
         <div className="flex items-center justify-center gap-2">
           <div className="relative h-9 w-9 shrink-0">
             <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -164,13 +164,10 @@ export default function OnboardingPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium text-slate-700">Organization name *</Label>
-              <Input
-                placeholder="e.g. Acme Properties"
-                value={orgName}
+              <Input placeholder="e.g. Acme Properties" value={orgName}
                 onChange={e => setOrgName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleStep1()}
-                className="h-10 rounded-xl border-slate-200"
-              />
+                className="h-10 rounded-xl border-slate-200" />
             </div>
             {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
             <Button onClick={handleStep1} disabled={loading}
@@ -186,9 +183,10 @@ export default function OnboardingPage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
             <div className="mb-5">
               <h2 className="text-xl font-bold text-slate-900">What do you manage?</h2>
-              <p className="text-sm text-slate-500 mt-1">This shapes your entire experience — labels, forms, and features adapt to your answer.</p>
+              <p className="text-sm text-slate-500 mt-1">
+                This shapes your entire experience — labels, forms, and features adapt to your answer.
+              </p>
             </div>
-
             <div className="space-y-3 mb-5">
               {PROPERTY_TYPES.map(pt => {
                 const isSelected = selectedType === pt.type
@@ -201,7 +199,7 @@ export default function OnboardingPage() {
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
                         isSelected ? 'bg-white/70' : 'bg-slate-100'
                       }`}>
-                        <pt.icon className={`h-4.5 w-4.5 ${isSelected ? pt.color : 'text-slate-400'}`} />
+                        <pt.icon className={`h-5 w-5 ${isSelected ? pt.color : 'text-slate-400'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 mb-0.5">
@@ -241,10 +239,10 @@ export default function OnboardingPage() {
                 )
               })}
             </div>
-
             {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-4">{error}</p>}
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(1)} className="h-10 rounded-xl px-5 text-sm border-slate-200">Back</Button>
+              <Button variant="outline" onClick={() => setStep(1)}
+                className="h-10 rounded-xl px-5 text-sm border-slate-200">Back</Button>
               <Button onClick={handleStep2} disabled={!selectedType || loading}
                 className="flex-1 h-10 bg-[#1B3B6F] hover:bg-[#152e56] text-white rounded-xl font-semibold gap-2">
                 {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Continue <ArrowRight className="h-4 w-4" /></>}
@@ -263,7 +261,6 @@ export default function OnboardingPage() {
               <h2 className="text-xl font-bold text-slate-900">{orgName} is ready 🎉</h2>
               <p className="text-sm text-slate-400 mt-1">Here's how TenantFlow is configured</p>
             </div>
-
             <div className="space-y-2.5 mb-6">
               {[
                 { label: 'Organization', value: orgName },
@@ -273,11 +270,18 @@ export default function OnboardingPage() {
                   value: selected.type === 'commercial' ? 'Companies' :
                     selected.type === 'mixed' ? 'Tenants & Companies (toggle in sidebar)' : 'Tenants',
                 },
-                { label: 'Units section', value: selected.type === 'commercial' ? 'Spaces' : 'Units' },
-                { label: 'Payments', value: selected.type === 'commercial' ? 'Invoices' : selected.type === 'mixed' ? 'Payments & Invoices' : 'Payments' },
+                {
+                  label: 'Units section',
+                  value: selected.type === 'commercial' ? 'Spaces' : 'Units',
+                },
+                {
+                  label: 'Payments',
+                  value: selected.type === 'commercial' ? 'Invoices' :
+                    selected.type === 'mixed' ? 'Payments & Invoices' : 'Payments',
+                },
               ].map(item => (
                 <div key={item.label} className={`flex items-start gap-3 p-3 rounded-xl ${selected.bg}`}>
-                  <div className={`w-4.5 h-4.5 rounded-full ${selected.check} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                  <div className={`w-5 h-5 rounded-full ${selected.check} flex items-center justify-center flex-shrink-0 mt-0.5`}>
                     <Check className="h-2.5 w-2.5 text-white" />
                   </div>
                   <div>
@@ -287,7 +291,6 @@ export default function OnboardingPage() {
                 </div>
               ))}
             </div>
-
             <Button onClick={handleFinish}
               className="w-full h-11 bg-[#1B3B6F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2">
               Launch TenantFlow <ArrowRight className="h-4 w-4" />
