@@ -30,7 +30,7 @@ export function usePropertyType() {
       .eq('id', orgId)
       .single()
       .then(({ data }) => {
-        const t = (data?.property_type as PropertyType) ?? 'residential'
+        const t = ((data as any)?.property_type as PropertyType) ?? 'residential'
         cache[orgId] = t
         setType(t)
         setLoading(false)
@@ -60,5 +60,3 @@ export function usePropertyType() {
 
   return { type, loading, isResidential, isCommercial, isMixed, labels, invalidate }
 }
-
-
