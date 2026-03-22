@@ -14,3 +14,6 @@ export const useOrgStore = create<OrgState>((set) => ({
   setCurrentOrg: (org) => set({ currentOrg: org }),
   setCurrentRole: (role) => set({ currentRole: role }),
 }))
+
+
+//for backward compatibility with useRole
