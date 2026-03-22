@@ -4,28 +4,25 @@ import { NextResponse } from 'next/server'
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/onboarding(.*)',
+  '/api/webhooks/(.*)',
 ])
 
-export default clerkMiddleware(async (auth, request) => {
-  if (isPublicRoute(request)) return NextResponse.next()
-
+export default clerkMiddleware(async (auth, req) => {
   const { userId, orgId } = await auth()
 
-  // Not logged in → sign in
+  // Not logged in — let Clerk handle redirect to sign-in
   if (!userId) {
-    const signInUrl = new URL('/sign-in', request.url)
-    signInUrl.searchParams.set('redirect_url', request.url)
-    return NextResponse.redirect(signInUrl)
+    if (!isPublicRoute(req)) {
+      return (await auth()).redirectToSignIn()
+    }
+    return NextResponse.next()
   }
 
-  // Logged in but no org → onboarding
-  if (!orgId && !request.nextUrl.pathname.startsWith('/onboarding')) {
-    return NextResponse.redirect(new URL('/onboarding', request.url))
-  }
-
-  // Has org but going to onboarding → dashboard
-  if (orgId && request.nextUrl.pathname.startsWith('/onboarding')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Logged in but no org yet → send to onboarding
+  // Skip if already going to onboarding or a public route
+  if (!orgId && !isPublicRoute(req) && !req.nextUrl.pathname.startsWith('/onboarding')) {
+    return NextResponse.redirect(new URL('/onboarding', req.url))
   }
 
   return NextResponse.next()
@@ -33,8 +30,9 @@ export default clerkMiddleware(async (auth, request) => {
 
 export const config = {
   matcher: [
+    // Skip Next.js internals and static files
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
     '/(api|trpc)(.*)',
   ],
 }
-
