@@ -43,7 +43,7 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
 
   const [renewForm,  setRenewForm]  = useState({ rent_amount: '', lease_start: '', lease_end: '', renewal_date: '' })
   const [extendForm, setExtendForm] = useState({ new_end_date: '', rent_amount: '', no_rent_change: true })
-  const [payForm,    setPayForm]    = useState({ amount: '', payment_date: new Date().toISOString().split('T')[0], method: 'cash', reference: '' })
+  const [payForm,    setPayForm]    = useState<{ amount: string; payment_date: string; method: string; reference: string }>({ amount: '', payment_date: new Date().toISOString().split('T')[0], method: 'cash', reference: '' })
 
   function reset()       { setAction(null); setError('') }
   function handleClose() { reset(); setTab('overview'); onClose() }
@@ -455,7 +455,7 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
                 </div>
                 <div>
                   <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Method</Label>
-                  <Select value={payForm.method} onValueChange={(v: string) => setPayForm(p => ({ ...p, method: v }))}>
+                  <Select value={payForm.method} onValueChange={(v) => { if (v) setPayForm(p => ({ ...p, method: v })) }}>
                     <SelectTrigger className="h-9 text-sm rounded-xl border-slate-200"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
@@ -606,5 +606,3 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
     </Dialog>
   )
 }
-
-

@@ -35,7 +35,7 @@ export default function LeaseDetailPage() {
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
 
-  const [payForm,    setPayForm]    = useState({ amount: '', payment_date: new Date().toISOString().split('T')[0], method: 'cash', reference: '' })
+  const [payForm,    setPayForm]    = useState<{ amount: string; payment_date: string; method: string; reference: string }>({ amount: '', payment_date: new Date().toISOString().split('T')[0], method: 'cash', reference: '' })
   const [extendForm, setExtendForm] = useState({ new_end_date: '', no_rent_change: true, new_rent: '' })
   const [renewForm,  setRenewForm]  = useState({ rent_amount: '', lease_start: new Date().toISOString().split('T')[0], lease_end: '', renewal_date: '' })
 
@@ -512,7 +512,7 @@ export default function LeaseDetailPage() {
                   </div>
                   <div>
                     <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Method</Label>
-                    <Select value={payForm.method} onValueChange={(v: string) => setPayForm(p => ({ ...p, method: v }))}>
+                    <Select value={payForm.method} onValueChange={(v) => { if (v) setPayForm(p => ({ ...p, method: v })) }}>
                       <SelectTrigger className="h-9 text-sm rounded-xl border-slate-200"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="cash">Cash</SelectItem>
