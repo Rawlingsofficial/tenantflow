@@ -1,39 +1,17 @@
-import { useOrgStore } from '@/store/orgStore'
-import type { Role } from '@/types'
-import { hasPermission, type Permission } from '@/lib/permissions'
+import { create } from 'zustand'
 
-const ROLE_HIERARCHY: Record<Role, number> = {
-  owner: 4,
-  admin: 3,
-  manager: 2,
-  viewer: 1,
+export type Role = 'owner' | 'admin' | 'manager' | 'viewer'
+
+interface OrgState {
+  currentOrg: { id: string; name: string; property_type?: string } | null
+  currentRole: Role | null
+  setCurrentOrg: (org: { id: string; name: string; property_type?: string } | null) => void
+  setCurrentRole: (role: Role | null) => void
 }
 
-export function useRole() {
-  const { currentRole } = useOrgStore()
-
-  const can = (permission: Permission): boolean => {
-    if (!currentRole) return false
-    return hasPermission(currentRole, permission)
-  }
-
-  const hasRole = (minimumRole: Role): boolean => {
-    if (!currentRole) return false
-    return ROLE_HIERARCHY[currentRole] >= ROLE_HIERARCHY[minimumRole]
-  }
-
-  return {
-    role: currentRole,
-    isOwner: currentRole === 'owner',
-    isAdmin: hasRole('admin'),
-    isManager: hasRole('manager'),
-    isViewer: hasRole('viewer'),
-    can,
-    hasRole,
-    // Legacy helpers
-    canEdit: hasRole('manager'),
-    canDelete: hasRole('admin'),
-    canManageUsers: hasRole('admin'),
-    canManageOrg: currentRole === 'owner',
-  }
-}
+export const useOrgStore = create<OrgState>((set) => ({
+  currentOrg: null,
+  currentRole: null,
+  setCurrentOrg: (org) => set({ currentOrg: org }),
+  setCurrentRole: (role) => set({ currentRole: role }),
+}))
