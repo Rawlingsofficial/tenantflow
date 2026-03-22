@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
+import { motion, AnimatePresence } from 'framer-motion'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Building2 } from 'lucide-react'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Loader2, Building2, User, Phone, Mail, X, Briefcase, Hash, Receipt } from 'lucide-react'
 
 function dbVal<T>(v: T): never { return v as never }
 
@@ -23,6 +24,17 @@ const INDUSTRIES = [
   'Logistics', 'Hospitality', 'Construction', 'Consulting', 'Other'
 ]
 const SIZES = ['1–10', '11–50', '51–200', '201–500', '500+']
+
+function SectionHeader({ icon: Icon, label }: { icon: any; label: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <div className="w-6 h-6 rounded-lg bg-[#1B3B6F]/8 flex items-center justify-center">
+        <Icon className="h-3.5 w-3.5 text-[#1B3B6F]" />
+      </div>
+      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{label}</p>
+    </div>
+  )
+}
 
 export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
   const { orgId } = useAuth()
@@ -68,110 +80,147 @@ export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
     } finally { setSaving(false) }
   }
 
+  const selectClass = "w-full h-9 text-sm rounded-xl border border-slate-200 bg-white px-3 focus:outline-none focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400 text-slate-700"
+  const inputClass  = "h-9 text-sm rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400"
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-blue-600" /> Add Company
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          {/* Company details */}
-          <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-3">
-            <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">Company Details</p>
+      <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border-slate-200/80 shadow-xl max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="relative px-6 pt-6 pb-4 border-b border-slate-100 flex-shrink-0">
+          <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-[#1B3B6F]/5 to-transparent pointer-events-none" />
+          <div className="relative flex items-center gap-3">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#1B3B6F] shadow-sm">
+              <Building2 className="h-4 w-4 text-[#14b8a6]" />
+            </div>
             <div>
-              <Label className="text-xs font-medium text-gray-600 mb-1 block">Company Name *</Label>
-              <Input placeholder="Acme Corp Ltd" value={form.company_name}
-                onChange={e => set('company_name', e.target.value)}
-                className="h-9 text-sm rounded-lg border-gray-200" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">Registration No.</Label>
-                <Input placeholder="RC123456" value={form.company_reg_number}
-                  onChange={e => set('company_reg_number', e.target.value)}
-                  className="h-9 text-sm rounded-lg border-gray-200" />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">VAT Number</Label>
-                <Input placeholder="VAT-000-000" value={form.vat_number}
-                  onChange={e => set('vat_number', e.target.value)}
-                  className="h-9 text-sm rounded-lg border-gray-200" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">Industry</Label>
-                <select value={form.industry} onChange={e => set('industry', e.target.value)}
-                  className="w-full h-9 text-sm rounded-lg border border-gray-200 bg-white px-3">
-                  <option value="">Select industry</option>
-                  {INDUSTRIES.map(i => <option key={i}>{i}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">Company Size</Label>
-                <select value={form.company_size} onChange={e => set('company_size', e.target.value)}
-                  className="w-full h-9 text-sm rounded-lg border border-gray-200 bg-white px-3">
-                  <option value="">Select size</option>
-                  {SIZES.map(s => <option key={s}>{s} employees</option>)}
-                </select>
-              </div>
+              <DialogTitle className="text-sm font-semibold text-slate-900">Add Company</DialogTitle>
+              <p className="text-xs text-slate-400 mt-0.5">Register a commercial tenant</p>
             </div>
           </div>
+          <button onClick={onClose}
+            className="absolute right-4 top-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-          {/* Contact */}
-          <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
-            <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">Contact Person</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">Full Name</Label>
-                <Input placeholder="John Doe" value={form.contact_person}
-                  onChange={e => set('contact_person', e.target.value)}
-                  className="h-9 text-sm rounded-lg border-gray-200" />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">Role / Title</Label>
-                <Input placeholder="CEO, Finance Manager..." value={form.contact_role}
-                  onChange={e => set('contact_role', e.target.value)}
-                  className="h-9 text-sm rounded-lg border-gray-200" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">Phone</Label>
-                <Input placeholder="+237 6XX XXX XXX" value={form.primary_phone}
-                  onChange={e => set('primary_phone', e.target.value)}
-                  className="h-9 text-sm rounded-lg border-gray-200" />
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-gray-600 mb-1 block">Email</Label>
-                <Input placeholder="billing@company.com" value={form.email}
-                  onChange={e => set('email', e.target.value)}
-                  className="h-9 text-sm rounded-lg border-gray-200" />
-              </div>
-            </div>
-          </div>
-
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+          {/* Company details */}
           <div>
-            <Label className="text-xs font-medium text-gray-600 mb-1 block">Notes</Label>
+            <SectionHeader icon={Building2} label="Company Details" />
+            <div className="space-y-3">
+              <div>
+                <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                  Company Name <span className="text-red-400">*</span>
+                </Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input placeholder="Acme Corp Ltd" value={form.company_name}
+                    onChange={e => set('company_name', e.target.value)}
+                    className={`${inputClass} pl-9`} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                    <span className="flex items-center gap-1"><Hash className="h-3 w-3" /> Registration No.</span>
+                  </Label>
+                  <Input placeholder="RC123456" value={form.company_reg_number}
+                    onChange={e => set('company_reg_number', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                    <span className="flex items-center gap-1"><Receipt className="h-3 w-3" /> VAT Number</span>
+                  </Label>
+                  <Input placeholder="VAT-000-000" value={form.vat_number}
+                    onChange={e => set('vat_number', e.target.value)} className={inputClass} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Industry</Label>
+                  <select value={form.industry} onChange={e => set('industry', e.target.value)} className={selectClass}>
+                    <option value="">Select industry…</option>
+                    {INDUSTRIES.map(i => <option key={i}>{i}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Company Size</Label>
+                  <select value={form.company_size} onChange={e => set('company_size', e.target.value)} className={selectClass}>
+                    <option value="">Select size…</option>
+                    {SIZES.map(s => <option key={s}>{s} employees</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact person */}
+          <div>
+            <SectionHeader icon={User} label="Contact Person" />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Full Name</Label>
+                  <Input placeholder="John Doe" value={form.contact_person}
+                    onChange={e => set('contact_person', e.target.value)} className={inputClass} />
+                </div>
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Role / Title</Label>
+                  <Input placeholder="CEO, Finance Manager…" value={form.contact_role}
+                    onChange={e => set('contact_role', e.target.value)} className={inputClass} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Phone</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input placeholder="+237 6XX XXX XXX" value={form.primary_phone}
+                      onChange={e => set('primary_phone', e.target.value)} className={`${inputClass} pl-9`} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input placeholder="billing@company.com" value={form.email}
+                      onChange={e => set('email', e.target.value)} className={`${inputClass} pl-9`} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Notes</Label>
             <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Additional notes..."
-              className="w-full h-20 text-sm rounded-lg border border-gray-200 p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400/30" />
+              placeholder="Additional notes about this company…"
+              className="w-full h-20 text-sm rounded-xl border border-slate-200 p-3 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400 text-slate-800 placeholder-slate-400" />
           </div>
 
-          {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+        </div>
 
-          <div className="flex gap-3 pt-1">
-            <Button variant="outline" onClick={onClose} className="flex-1 h-10 rounded-xl">Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}
-              className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
-              {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</> : 'Add Company'}
-            </Button>
-          </div>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex-shrink-0">
+          <Button variant="outline" onClick={onClose} disabled={saving}
+            className="h-9 text-sm rounded-xl border-slate-200 text-slate-600 px-5">Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}
+            className="h-9 bg-[#1B3B6F] hover:bg-[#162d52] text-white text-sm rounded-xl px-6 font-semibold shadow-sm">
+            {saving
+              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving…</>
+              : 'Add Company'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
   )
 }
+
 
