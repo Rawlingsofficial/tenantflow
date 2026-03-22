@@ -241,7 +241,7 @@ export function AddUnitDialog({ open, buildingId, buildingName, onClose, onSucce
               <div>
                 <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Space Purpose</Label>
                 <Select value={form.unit_purpose || "office"}
-                  onValueChange={(v) => updateField("unit_purpose", v)} disabled={saving}>
+                  onValueChange={(v) => updateField("unit_purpose", v ?? "")} disabled={saving}>
                   <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
                     <SelectValue />
                   </SelectTrigger>
@@ -266,7 +266,7 @@ export function AddUnitDialog({ open, buildingId, buildingName, onClose, onSucce
               <div>
                 <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Unit Type</Label>
                 <Select value={form.unit_type || "flat"}
-                  onValueChange={(v) => updateField("unit_type", v)} disabled={saving}>
+                  onValueChange={(v) => updateField("unit_type", v ?? "")} disabled={saving}>
                   <SelectTrigger className="h-9 text-sm rounded-lg border-gray-200">
                     <SelectValue />
                   </SelectTrigger>
