@@ -9,9 +9,10 @@ import {
   User, ChevronDown, CheckCircle2
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Input } from '@/components/ui/input'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { differenceInDays } from 'date-fns'
+import OrgSwitcher from './OrgSwitcher'
+import { useOrgStore } from '@/store/orgStore'
 
 interface SearchResult {
   type: 'tenant' | 'unit' | 'lease'
@@ -21,39 +22,25 @@ interface SearchResult {
   href: string
 }
 
-interface NotificationItem {
-  id: string
-  message: string
-  type: string
-  is_read: boolean
-  href: string
-}
+// ── Org loader: populates Zustand store from Supabase ─────────────────
 
-// ── Org Search/Display ─────────────────────────────────────────────────
-
-function OrgDisplay({ orgId }: { orgId: string }) {
+function OrgLoader({ orgId }: { orgId: string }) {
   const supabase = getSupabaseBrowserClient()
-  const [orgName, setOrgName] = useState('')
+  const { setCurrentOrg } = useOrgStore()
 
   useEffect(() => {
-    if (orgId) {
-      const db = supabase as any
-      db.from('organizations').select('name').eq('id', orgId).single()
-        .then(({ data }: { data: { name: string } | null }) => {
-          if (data) setOrgName(data.name)
-        })
-    }
+    if (!orgId) return
+    ;(supabase as any)
+      .from('organizations')
+      .select('id, name, property_type')
+      .eq('id', orgId)
+      .single()
+      .then(({ data }: { data: any }) => {
+        if (data) setCurrentOrg({ id: data.id, name: data.name, property_type: data.property_type })
+      })
   }, [orgId])
 
-  return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white min-w-[180px] cursor-pointer hover:border-slate-300 transition-colors">
-      <Building2 className="h-4 w-4 text-slate-400 shrink-0" />
-      <span className="text-sm text-slate-700 truncate flex-1">
-        {orgName || 'Loading...'}
-      </span>
-      <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-    </div>
-  )
+  return null // invisible — just loads the store
 }
 
 // ── Global Search ──────────────────────────────────────────────────────
@@ -102,32 +89,44 @@ function GlobalSearch({ orgId }: { orgId: string }) {
     const db = supabase as any
 
     const { data: tenants } = await db
-      .from('tenants').select('id, first_name, last_name, primary_phone, email, occupation')
+      .from('tenants')
+      .select('id, first_name, last_name, primary_phone, email, occupation, company_name, tenant_type')
       .eq('organization_id', orgId)
-      .or(`first_name.ilike.${term},last_name.ilike.${term},primary_phone.ilike.${term},email.ilike.${term}`)
-      .limit(4)
+      .or(`first_name.ilike.${term},last_name.ilike.${term},primary_phone.ilike.${term},email.ilike.${term},company_name.ilike.${term}`)
+      .limit(5)
 
     ;(tenants ?? []).forEach((t: any) => {
+      const isCompany = t.tenant_type === 'company'
+      const name = isCompany
+        ? (t.company_name ?? 'Unknown Company')
+        : `${t.first_name ?? ''} ${t.last_name ?? ''}`.trim() || 'Unknown'
       found.push({
         type: 'tenant', id: t.id,
-        title: `${t.first_name ?? ''} ${t.last_name ?? ''}`.trim() || 'Unknown',
-        subtitle: t.occupation ?? t.email ?? t.primary_phone ?? 'Tenant',
+        title: name,
+        subtitle: isCompany ? 'Company' : (t.occupation ?? t.email ?? t.primary_phone ?? 'Tenant'),
         href: `/tenants/${t.id}`,
       })
     })
 
-    const { data: units } = await db
-      .from('units').select('id, unit_code, status, buildings!inner(name, organization_id)')
-      .eq('buildings.organization_id', orgId).ilike('unit_code', term).limit(3)
-
-    ;(units ?? []).forEach((u: any) => {
-      found.push({
-        type: 'unit', id: u.id,
-        title: `Unit ${u.unit_code}`,
-        subtitle: `${u.buildings?.name ?? ''} · ${u.status}`,
-        href: '/buildings',
+    // Two-step units search (no join filter)
+    const { data: buildings } = await db.from('buildings').select('id').eq('organization_id', orgId)
+    const bIds = (buildings ?? []).map((b: any) => b.id)
+    if (bIds.length > 0) {
+      const { data: units } = await db
+        .from('units')
+        .select('id, unit_code, status, building_id, buildings(name)')
+        .in('building_id', bIds)
+        .ilike('unit_code', term)
+        .limit(3)
+      ;(units ?? []).forEach((u: any) => {
+        found.push({
+          type: 'unit', id: u.id,
+          title: `Unit ${u.unit_code}`,
+          subtitle: `${u.buildings?.name ?? ''} · ${u.status}`,
+          href: '/buildings',
+        })
       })
-    })
+    }
 
     setResults(found)
     setLoading(false)
@@ -146,17 +145,15 @@ function GlobalSearch({ orgId }: { orgId: string }) {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <input
           ref={inputRef}
-          placeholder="Search tenants, units..."
+          placeholder="Search tenants, units... ⌘K"
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           className="w-full pl-9 pr-9 h-9 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-400/30 focus:border-teal-400 text-slate-700 placeholder-slate-400"
         />
         {query && (
-          <button
-            onClick={() => { setQuery(''); setResults([]) }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-          >
+          <button onClick={() => { setQuery(''); setResults([]) }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
             <X className="h-3.5 w-3.5" />
           </button>
         )}
@@ -173,11 +170,9 @@ function GlobalSearch({ orgId }: { orgId: string }) {
               {results.map((result) => {
                 const Icon = typeIcon[result.type]
                 return (
-                  <button
-                    key={`${result.type}-${result.id}`}
+                  <button key={`${result.type}-${result.id}`}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left"
-                    onClick={() => { setOpen(false); setQuery(''); setResults([]); router.push(result.href) }}
-                  >
+                    onClick={() => { setOpen(false); setQuery(''); setResults([]); router.push(result.href) }}>
                     <div className={`p-1.5 rounded-lg shrink-0 ${typeColor[result.type]}`}>
                       <Icon className="h-3.5 w-3.5" />
                     </div>
@@ -199,7 +194,7 @@ function GlobalSearch({ orgId }: { orgId: string }) {
   )
 }
 
-// ── Notifications Bell ─────────────────────────────────────────────────
+// ── Notifications ──────────────────────────────────────────────────────
 
 function NotificationsBell({ orgId }: { orgId: string }) {
   const router = useRouter()
@@ -209,9 +204,7 @@ function NotificationsBell({ orgId }: { orgId: string }) {
   const [vacantCount, setVacantCount] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (orgId) loadNotifications()
-  }, [orgId])
+  useEffect(() => { if (orgId) loadNotifications() }, [orgId])
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -228,16 +221,16 @@ function NotificationsBell({ orgId }: { orgId: string }) {
 
     const { data: expiring } = await db
       .from('leases')
-      .select(`id, lease_end, tenants ( first_name, last_name ), units ( unit_code )`)
+      .select('id, lease_end, tenants(first_name, last_name, company_name, tenant_type), units(unit_code)')
       .eq('organization_id', orgId).eq('status', 'active')
       .gte('lease_end', today).lte('lease_end', in30).order('lease_end')
-
     setExpiringLeases(expiring ?? [])
 
-    const { data: buildings } = await db.from('buildings').select('id').eq('organization_id', orgId).eq('status', 'active')
-    const buildingIds: string[] = (buildings ?? []).map((b: any) => b.id)
-    if (buildingIds.length > 0) {
-      const { data: units } = await db.from('units').select('id').in('building_id', buildingIds).eq('status', 'vacant')
+    // Two-step for vacant count
+    const { data: buildings } = await db.from('buildings').select('id').eq('organization_id', orgId)
+    const bIds = (buildings ?? []).map((b: any) => b.id)
+    if (bIds.length > 0) {
+      const { data: units } = await db.from('units').select('id').in('building_id', bIds).eq('status', 'vacant')
       setVacantCount((units ?? []).length)
     }
   }
@@ -246,13 +239,11 @@ function NotificationsBell({ orgId }: { orgId: string }) {
 
   return (
     <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-      >
+      <button onClick={() => setOpen(!open)}
+        className="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
         <Bell className="h-5 w-5" />
         {totalCount > 0 && (
-          <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+          <span className="absolute top-1 right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
             {totalCount > 9 ? '9+' : totalCount}
           </span>
         )}
@@ -262,7 +253,7 @@ function NotificationsBell({ orgId }: { orgId: string }) {
         <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <p className="text-sm font-semibold text-slate-900">Notifications</p>
-            {totalCount > 0 && <span className="text-xs text-slate-400">{totalCount} unread</span>}
+            {totalCount > 0 && <span className="text-xs text-slate-400">{totalCount} alerts</span>}
           </div>
           <div className="max-h-80 overflow-y-auto">
             {totalCount === 0 ? (
@@ -285,7 +276,10 @@ function NotificationsBell({ orgId }: { orgId: string }) {
                   </button>
                 )}
                 {expiringLeases.map((lease: any) => {
-                  const name = `${lease.tenants?.first_name ?? ''} ${lease.tenants?.last_name ?? ''}`.trim()
+                  const t = lease.tenants
+                  const name = t?.tenant_type === 'company'
+                    ? (t.company_name ?? 'Company')
+                    : `${t?.first_name ?? ''} ${t?.last_name ?? ''}`.trim()
                   const days = differenceInDays(new Date(lease.lease_end), new Date())
                   return (
                     <button key={lease.id} onClick={() => { setOpen(false); router.push('/leases') }}
@@ -296,7 +290,7 @@ function NotificationsBell({ orgId }: { orgId: string }) {
                       <div>
                         <p className="text-sm font-medium text-slate-900">{name} — Unit {lease.units?.unit_code}</p>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Expires in <span className="font-semibold text-amber-600">{days} day{days !== 1 ? 's' : ''}</span>
+                          Expires in <span className="font-semibold text-amber-600">{days}d</span>
                         </p>
                       </div>
                     </button>
@@ -307,9 +301,7 @@ function NotificationsBell({ orgId }: { orgId: string }) {
           </div>
           <div className="px-4 py-2.5 border-t border-slate-100">
             <button onClick={() => { setOpen(false); router.push('/dashboard') }}
-              className="text-xs text-teal-600 hover:underline">
-              View dashboard →
-            </button>
+              className="text-xs text-teal-600 hover:underline">View dashboard →</button>
           </div>
         </div>
       )}
@@ -335,15 +327,13 @@ function UserMenu() {
   }, [])
 
   const initials = user?.fullName
-    ? user.fullName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+    ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : '?'
 
   return (
     <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors"
-      >
+      <button onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors">
         <Avatar className="h-8 w-8">
           <AvatarImage src={user?.imageUrl} alt={user?.fullName ?? ''} />
           <AvatarFallback className="bg-[#1B3B6F] text-white text-xs font-bold">{initials}</AvatarFallback>
@@ -389,8 +379,15 @@ export default function TopNav() {
 
   return (
     <header className="h-16 border-b border-slate-200 bg-white flex items-center px-6 gap-4 shrink-0">
-      {orgId && <OrgDisplay orgId={orgId} />}
+      {/* Loads org into Zustand store — invisible */}
+      {orgId && <OrgLoader orgId={orgId} />}
+
+      {/* Org name + property type badge */}
+      <OrgSwitcher />
+
+      {/* Global search */}
       {orgId && <GlobalSearch orgId={orgId} />}
+
       <div className="flex items-center gap-2 ml-auto">
         {orgId && <NotificationsBell orgId={orgId} />}
         <UserMenu />
@@ -398,5 +395,3 @@ export default function TopNav() {
     </header>
   )
 }
-
-
