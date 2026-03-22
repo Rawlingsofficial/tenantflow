@@ -8,8 +8,10 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Search, Building2, Users } from 'lucide-react'
+import { Plus, Search, Building2 } from 'lucide-react'
 import AddCompanyDialog from '@/components/companies/AddCompanyDialog'
+import { usePropertyType } from '@/hooks/usePropertyType'
+import { useMixedModeStore } from '@/store/mixedModeStore'
 
 type Tab = 'all' | 'active' | 'inactive'
 
@@ -17,6 +19,8 @@ export default function CompaniesPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
+  const { type } = usePropertyType()
+  const { mode } = useMixedModeStore()
 
   const [companies, setCompanies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -24,18 +28,33 @@ export default function CompaniesPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId])
+  useEffect(() => { if (orgId) load() }, [orgId, mode, type])
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('tenants')
+    const db = supabase as any
+
+    // For mixed mode, filter to commercial buildings only
+    let query = db.from('tenants')
       .select(`*, leases(id, status, rent_amount, service_charge,
-        units(unit_code, unit_purpose, area_sqm, floor_number, buildings(name)))`)
+        units(unit_code, unit_purpose, area_sqm, floor_number, buildings(name, building_type)))`)
       .eq('organization_id', orgId!)
       .eq('tenant_type', 'company')
       .order('company_name')
-    setCompanies(data ?? [])
+
+    const { data } = await query
+    let result = data ?? []
+
+    // In mixed mode, only show companies in commercial buildings
+    if (type === 'mixed') {
+      result = result.filter((c: any) => {
+        const activeLease = (c.leases ?? []).find((l: any) => l.status === 'active')
+        if (!activeLease) return true // show unassigned companies too
+        return activeLease.units?.buildings?.building_type === 'commercial'
+      })
+    }
+
+    setCompanies(result)
     setLoading(false)
   }
 
@@ -44,8 +63,7 @@ export default function CompaniesPage() {
     const match = !q ||
       (c.company_name ?? '').toLowerCase().includes(q) ||
       (c.industry ?? '').toLowerCase().includes(q) ||
-      (c.contact_person ?? '').toLowerCase().includes(q) ||
-      (c.email ?? '').toLowerCase().includes(q)
+      (c.contact_person ?? '').toLowerCase().includes(q)
     if (!match) return false
     if (tab === 'active') return c.status === 'active'
     if (tab === 'inactive') return c.status === 'inactive'
@@ -66,6 +84,7 @@ export default function CompaniesPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Companies</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {activeCount} active · {withLease} with lease · ${monthlyRev.toLocaleString()}/mo
+            {type === 'mixed' && <span className="ml-2 text-blue-500 font-medium">· Commercial portfolio</span>}
           </p>
         </div>
         <Button onClick={() => setAddOpen(true)}
@@ -74,7 +93,6 @@ export default function CompaniesPage() {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="px-6 grid grid-cols-4 gap-3 mb-5">
         {[
           { label: 'Total Companies', value: companies.length, color: 'text-gray-800' },
@@ -89,7 +107,6 @@ export default function CompaniesPage() {
         ))}
       </div>
 
-      {/* Tabs + search */}
       <div className="px-6 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center gap-1">
           {([
@@ -116,7 +133,6 @@ export default function CompaniesPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="px-6 pb-8">
         <div className="bg-white rounded-b-xl border border-t-0 border-gray-100 shadow-sm overflow-hidden">
           {loading ? (
@@ -125,7 +141,6 @@ export default function CompaniesPage() {
             <div className="py-16 text-center">
               <Building2 className="h-10 w-10 text-gray-200 mx-auto mb-3" />
               <p className="text-sm font-medium text-gray-500">No companies found</p>
-              <p className="text-xs text-gray-400 mt-1">{search ? 'Try a different search' : 'Add your first company'}</p>
             </div>
           ) : (
             <table className="w-full">
@@ -161,35 +176,25 @@ export default function CompaniesPage() {
                         {c.company_size && <p className="text-[11px] text-gray-400">{c.company_size} employees</p>}
                       </td>
                       <td className="px-4 py-3.5">
-                        {c.contact_person ? (
-                          <div>
-                            <p className="text-sm font-medium text-gray-800">{c.contact_person}</p>
-                            <p className="text-[11px] text-gray-400">{c.contact_role ?? c.primary_phone ?? '—'}</p>
-                          </div>
-                        ) : <span className="text-sm text-gray-400">—</span>}
+                        {c.contact_person
+                          ? <div>
+                              <p className="text-sm font-medium text-gray-800">{c.contact_person}</p>
+                              <p className="text-[11px] text-gray-400">{c.contact_role ?? c.primary_phone ?? '—'}</p>
+                            </div>
+                          : <span className="text-sm text-gray-400">—</span>}
                       </td>
                       <td className="px-4 py-3.5">
-                        {al ? (
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">{al.units?.unit_code}</p>
-                            <p className="text-[11px] text-gray-400">
-                              {al.units?.buildings?.name}
-                              {al.units?.area_sqm ? ` · ${al.units.area_sqm}m²` : ''}
-                            </p>
-                          </div>
-                        ) : <span className="text-xs text-amber-500 font-medium">No active lease</span>}
+                        {al
+                          ? <div>
+                              <p className="text-sm font-semibold text-gray-800">{al.units?.unit_code}</p>
+                              <p className="text-[11px] text-gray-400">{al.units?.buildings?.name}</p>
+                            </div>
+                          : <span className="text-xs text-amber-500 font-medium">No active lease</span>}
                       </td>
                       <td className="px-4 py-3.5">
-                        {al ? (
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900">${total.toLocaleString()}</p>
-                            {al.service_charge > 0 && (
-                              <p className="text-[11px] text-gray-400">
-                                Rent ${Number(al.rent_amount).toLocaleString()} + SC ${Number(al.service_charge).toLocaleString()}
-                              </p>
-                            )}
-                          </div>
-                        ) : <span className="text-sm text-gray-400">—</span>}
+                        {al
+                          ? <p className="text-sm font-semibold text-gray-900">${total.toLocaleString()}</p>
+                          : <span className="text-sm text-gray-400">—</span>}
                       </td>
                       <td className="px-4 py-3.5">
                         <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${
@@ -199,7 +204,7 @@ export default function CompaniesPage() {
                         }`}>{c.status}</span>
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className="text-gray-300 group-hover:text-gray-500 transition-colors text-lg">›</span>
+                        <span className="text-gray-300 group-hover:text-gray-500 text-lg">›</span>
                       </td>
                     </tr>
                   )

@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, FileText,
   Receipt, BarChart3, Settings, CreditCard,
-  ChevronRight
+  ChevronRight, Home, Briefcase
 } from 'lucide-react'
 import { usePropertyType } from '@/hooks/usePropertyType'
+import { useMixedModeStore } from '@/store/mixedModeStore'
 import OrgSwitcher from './OrgSwitcher'
 
 // ── Residential nav ───────────────────────────────────────────
@@ -23,13 +24,13 @@ const RESIDENTIAL_NAV = [
 
 // ── Commercial nav ────────────────────────────────────────────
 const COMMERCIAL_NAV = [
-  { label: 'Dashboard',         href: '/dashboard',           icon: LayoutDashboard },
-  { label: 'Buildings & Spaces',href: '/buildings',            icon: Building2 },
-  { label: 'Companies',         href: '/companies',            icon: Users },
-  { label: 'Leases',            href: '/leases',               icon: FileText },
-  { label: 'Invoices',          href: '/invoices',             icon: Receipt },
-  { label: 'Reports',           href: '/commercial/reports',   icon: BarChart3 },
-  { label: 'Settings',          href: '/settings',             icon: Settings },
+  { label: 'Dashboard',          href: '/dashboard',          icon: LayoutDashboard },
+  { label: 'Buildings & Spaces', href: '/buildings',          icon: Building2 },
+  { label: 'Companies',          href: '/companies',          icon: Users },
+  { label: 'Leases',             href: '/leases',             icon: FileText },
+  { label: 'Invoices',           href: '/invoices',           icon: Receipt },
+  { label: 'Reports',            href: '/commercial/reports', icon: BarChart3 },
+  { label: 'Settings',           href: '/settings',           icon: Settings },
 ]
 
 function NavItem({ item, active }: { item: typeof RESIDENTIAL_NAV[0]; active: boolean }) {
@@ -40,7 +41,7 @@ function NavItem({ item, active }: { item: typeof RESIDENTIAL_NAV[0]; active: bo
           ? 'bg-emerald-50 text-emerald-700'
           : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
       }`}>
-      <item.icon className={`h-4.5 w-4.5 flex-shrink-0 ${active ? 'text-emerald-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+      <item.icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-emerald-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
       <span className="flex-1">{item.label}</span>
       {active && <ChevronRight className="h-3.5 w-3.5 text-emerald-400" />}
     </Link>
@@ -50,8 +51,10 @@ function NavItem({ item, active }: { item: typeof RESIDENTIAL_NAV[0]; active: bo
 export default function Sidebar() {
   const pathname = usePathname()
   const { type, loading } = usePropertyType()
+  const { mode, setMode } = useMixedModeStore()
 
-  const isCommercial = type === 'commercial'
+  const isMixed = type === 'mixed'
+  const isCommercial = type === 'commercial' || (isMixed && mode === 'commercial')
   const nav = isCommercial ? COMMERCIAL_NAV : RESIDENTIAL_NAV
 
   function isActive(href: string) {
@@ -82,8 +85,34 @@ export default function Sidebar() {
         <OrgSwitcher />
       </div>
 
-      {/* Portfolio type badge */}
-      {!loading && (
+      {/* Mixed mode toggle — only for mixed portfolio */}
+      {!loading && isMixed && (
+        <div className="px-3 pt-2 pb-1">
+          <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-1">
+            <button
+              onClick={() => setMode('residential')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'residential'
+                  ? 'bg-white text-emerald-700 shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}>
+              <Home className="h-3 w-3" /> Residential
+            </button>
+            <button
+              onClick={() => setMode('commercial')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold transition-all ${
+                mode === 'commercial'
+                  ? 'bg-white text-blue-700 shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}>
+              <Briefcase className="h-3 w-3" /> Commercial
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Portfolio type badge — only for non-mixed */}
+      {!loading && !isMixed && (
         <div className="px-4 pt-2 pb-1">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
             isCommercial

@@ -1,14 +1,16 @@
 'use client'
+export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Plus, Search, Users } from 'lucide-react'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Plus, Search, Users } from 'lucide-react'
 import AddTenantDialog from '@/components/tenants/AddTenantDialog'
+import { usePropertyType } from '@/hooks/usePropertyType'
 import type { Tenant } from '@/types'
 
 type FilterTab = 'all' | 'active' | 'inactive' | 'due_soon' | 'overdue'
@@ -18,6 +20,7 @@ interface TenantRow extends Tenant {
     id: string
     unit_code: string
     building_name: string
+    building_type: string
     rent_amount: number
     lease_start: string
     lease_end: string | null
@@ -29,28 +32,29 @@ export default function TenantsPage() {
   const { orgId } = useAuth()
   const supabase = getSupabaseBrowserClient()
   const router = useRouter()
+  const { type } = usePropertyType()
 
   const [tenants, setTenants] = useState<TenantRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(''  )
   const [filter, setFilter] = useState<FilterTab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
   useEffect(() => {
     if (orgId) loadTenants()
-  }, [orgId])
+  }, [orgId, type])
 
   async function loadTenants() {
     setLoading(true)
     const { data } = await supabase
       .from('tenants')
       .select(`*, leases(id, rent_amount, lease_start, lease_end, status,
-        units(unit_code, buildings(name)),
+        units(unit_code, buildings(name, building_type)),
         rent_payments(payment_date, status, amount))`)
       .eq('organization_id', orgId!)
       .order('first_name')
 
-    const enriched: TenantRow[] = (data || []).map((t: any) => {
+    let enriched: TenantRow[] = (data || []).map((t: any) => {
       const activeLease = (t.leases || []).find((l: any) => l.status === 'active')
       const lastPayment = activeLease?.rent_payments
         ?.filter((p: any) => p.status === 'completed')
@@ -61,6 +65,7 @@ export default function TenantsPage() {
           id: activeLease.id,
           unit_code: activeLease.units?.unit_code,
           building_name: activeLease.units?.buildings?.name,
+          building_type: activeLease.units?.buildings?.building_type ?? 'residential',
           rent_amount: activeLease.rent_amount,
           lease_start: activeLease.lease_start,
           lease_end: activeLease.lease_end,
@@ -68,6 +73,14 @@ export default function TenantsPage() {
         } : undefined,
       }
     })
+
+    // In mixed mode, only show tenants in residential buildings
+    if (type === 'mixed') {
+      enriched = enriched.filter(t =>
+        !t.activeLease || t.activeLease.building_type !== 'commercial'
+      )
+    }
+
     setTenants(enriched)
     setLoading(false)
   }
@@ -127,6 +140,7 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Tenants</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {active} active · ${totalRev.toLocaleString()}/mo revenue
+            {type === 'mixed' && <span className="ml-2 text-emerald-500 font-medium">· Residential portfolio</span>}
           </p>
         </div>
         <Button onClick={() => setAddOpen(true)}

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Plus, Search, Receipt, CheckCircle2, Clock, AlertCircle, XCircle, Send } from 'lucide-react'
 import CreateInvoiceDialog from '@/components/invoices/CreateInvoiceDialog'
+import { usePropertyType } from '@/hooks/usePropertyType'
 import { format } from 'date-fns'
 
 type Tab = 'all' | 'draft' | 'sent' | 'paid' | 'overdue'
@@ -26,6 +27,7 @@ export default function InvoicesPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
+  const { type } = usePropertyType()
 
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,7 +35,7 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId])
+  useEffect(() => { if (orgId) load() }, [orgId, type])
 
   async function load() {
     setLoading(true)
@@ -41,10 +43,20 @@ export default function InvoicesPage() {
       .from('invoices')
       .select(`*, leases(rent_amount, service_charge, tenant_id, unit_id,
         tenants(company_name, contact_person, tenant_type),
-        units(unit_code, area_sqm, buildings(name)))`)
+        units(unit_code, area_sqm, buildings(name, building_type)))`)
       .eq('organization_id', orgId!)
       .order('invoice_date', { ascending: false })
-    setInvoices(data ?? [])
+
+    let result = data ?? []
+
+    // In mixed mode, only show invoices for commercial buildings
+    if (type === 'mixed') {
+      result = result.filter((inv: any) =>
+        inv.leases?.units?.buildings?.building_type === 'commercial'
+      )
+    }
+
+    setInvoices(result)
     setLoading(false)
   }
 
@@ -85,6 +97,7 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Invoices</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             ${totalPaid.toLocaleString()} collected · ${totalOverdue.toLocaleString()} overdue
+            {type === 'mixed' && <span className="ml-2 text-blue-500 font-medium">· Commercial portfolio</span>}
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}
@@ -93,7 +106,6 @@ export default function InvoicesPage() {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="px-6 grid grid-cols-4 gap-3 mb-5">
         {[
           { label: 'Total Invoiced', value: `$${totalInvoiced.toLocaleString()}`, color: 'text-gray-800' },
@@ -108,7 +120,6 @@ export default function InvoicesPage() {
         ))}
       </div>
 
-      {/* Tabs + search */}
       <div className="px-6 flex items-center justify-between border-b border-gray-200">
         <div className="flex items-center gap-1">
           {(['all', 'draft', 'sent', 'paid', 'overdue'] as Tab[]).map(t => (
@@ -131,7 +142,6 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="px-6 pb-8">
         <div className="bg-white rounded-b-xl border border-t-0 border-gray-100 shadow-sm overflow-hidden">
           {loading ? (
@@ -223,5 +233,3 @@ export default function InvoicesPage() {
     </div>
   )
 }
-
-
