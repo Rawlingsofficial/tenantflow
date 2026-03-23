@@ -4,12 +4,13 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Search, CheckCircle2, Download, CreditCard, Smartphone,
-  Building2, FileCheck, HelpCircle, X, Home, ArrowUpRight
+  Building2, FileCheck, HelpCircle, X, ArrowUpRight
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { format } from 'date-fns'
 import type { RentPayment } from '@/types'
+import { HouseIcon, BuildingIcon } from '@/components/ui/portfolio-icons'
 
 interface PaymentWithLease extends RentPayment {
   building_type?: string | null
@@ -37,10 +38,10 @@ interface Props {
   unpaidLeases: UnpaidLease[]
   onRecordPayment: () => void
   onRecordPaymentForLease: (leaseId: string) => void
-  showPortfolioFilter?: boolean  // only shown for mixed/commercial orgs
+  showPortfolioFilter?: boolean
 }
 
-type Tab      = 'all' | 'unpaid'
+type Tab       = 'all' | 'unpaid'
 type Portfolio = 'all' | 'residential' | 'commercial'
 
 const METHOD_ICONS: Record<string, any> = {
@@ -60,9 +61,32 @@ function PortfolioTag({ buildingType }: { buildingType?: string | null }) {
         ? 'bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20'
         : 'bg-teal-50 text-teal-700 border border-teal-200'
     }`}>
-      {isCommercial ? <Building2 className="h-2.5 w-2.5" /> : <Home className="h-2.5 w-2.5" />}
+      {isCommercial
+        ? <BuildingIcon className="w-2.5 h-2.5 text-[#1B3B6F]" />
+        : <HouseIcon className="w-2.5 h-2.5 text-teal-600" />}
       {isCommercial ? 'Commercial' : 'Residential'}
     </span>
+  )
+}
+
+function PortfolioFilterControl({ value, onChange }: { value: Portfolio; onChange: (v: Portfolio) => void }) {
+  return (
+    <div className="flex items-center gap-0.5 bg-slate-100 rounded-xl p-0.5">
+      {([
+        { v: 'all'         as Portfolio, icon: null,       label: 'All' },
+        { v: 'residential' as Portfolio, icon: 'house',    label: 'Res' },
+        { v: 'commercial'  as Portfolio, icon: 'building', label: 'Com' },
+      ]).map(opt => (
+        <button key={opt.v} onClick={() => onChange(opt.v)}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+            value === opt.v ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}>
+          {opt.icon === 'house'    && <HouseIcon    className="w-3 h-3" />}
+          {opt.icon === 'building' && <BuildingIcon className="w-3 h-3" />}
+          {opt.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -72,10 +96,8 @@ function exportToCSV(payments: PaymentWithLease[]) {
     const name = `${p.leases?.tenants?.first_name ?? ''} ${p.leases?.tenants?.last_name ?? ''}`.trim()
     const bt = p.leases?.units?.buildings?.building_type ?? p.building_type ?? ''
     return [
-      format(new Date(p.payment_date), 'dd MMM yyyy'),
-      name,
-      p.leases?.units?.unit_code ?? '',
-      p.leases?.units?.buildings?.name ?? '',
+      format(new Date(p.payment_date), 'dd MMM yyyy'), name,
+      p.leases?.units?.unit_code ?? '', p.leases?.units?.buildings?.name ?? '',
       bt === 'commercial' ? 'Commercial' : 'Residential',
       p.amount, p.method ?? '', p.reference ?? '', p.status,
     ]
@@ -98,8 +120,6 @@ export default function PaymentsTable({
   const [portfolioFilter, setPortfolioFilter] = useState<Portfolio>('all')
 
   const months = Array.from(new Set(payments.map(p => format(new Date(p.payment_date), 'yyyy-MM')))).sort((a, b) => b.localeCompare(a))
-
-  // Helper to get building_type from a payment
   const getBT = (p: PaymentWithLease) => p.leases?.units?.buildings?.building_type ?? p.building_type
 
   const filtered = payments.filter(p => {
@@ -108,14 +128,11 @@ export default function PaymentsTable({
     const unit = p.leases?.units?.unit_code?.toLowerCase() ?? ''
     const bldg = p.leases?.units?.buildings?.name?.toLowerCase() ?? ''
     const ref  = p.reference?.toLowerCase() ?? ''
-    const matchSearch   = !q || name.includes(q) || unit.includes(q) || bldg.includes(q) || ref.includes(q)
-    const matchMethod   = methodFilter === 'all' || p.method === methodFilter
-    const matchMonth    = monthFilter === 'all' || p.payment_date.startsWith(monthFilter)
-    const bt            = getBT(p)
-    const matchPortfolio =
-      portfolioFilter === 'all' ? true :
-      portfolioFilter === 'commercial' ? bt === 'commercial' :
-      bt !== 'commercial'
+    const bt   = getBT(p)
+    const matchSearch    = !q || name.includes(q) || unit.includes(q) || bldg.includes(q) || ref.includes(q)
+    const matchMethod    = methodFilter === 'all' || p.method === methodFilter
+    const matchMonth     = monthFilter  === 'all' || p.payment_date.startsWith(monthFilter)
+    const matchPortfolio = portfolioFilter === 'all' ? true : portfolioFilter === 'commercial' ? bt === 'commercial' : bt !== 'commercial'
     return matchSearch && matchMethod && matchMonth && matchPortfolio
   })
 
@@ -124,12 +141,9 @@ export default function PaymentsTable({
     const name = `${l.tenants?.first_name ?? ''} ${l.tenants?.last_name ?? ''}`.toLowerCase()
     const unit = l.units?.unit_code?.toLowerCase() ?? ''
     const bldg = l.units?.buildings?.name?.toLowerCase() ?? ''
-    const matchSearch = !q || name.includes(q) || unit.includes(q) || bldg.includes(q)
     const bt   = l.units?.buildings?.building_type ?? l.building_type
-    const matchPortfolio =
-      portfolioFilter === 'all' ? true :
-      portfolioFilter === 'commercial' ? bt === 'commercial' :
-      bt !== 'commercial'
+    const matchSearch    = !q || name.includes(q) || unit.includes(q) || bldg.includes(q)
+    const matchPortfolio = portfolioFilter === 'all' ? true : portfolioFilter === 'commercial' ? bt === 'commercial' : bt !== 'commercial'
     return matchSearch && matchPortfolio
   })
 
@@ -149,10 +163,10 @@ export default function PaymentsTable({
 
   return (
     <div className="space-y-4">
-      {/* ── Tabs ── */}
+      {/* Tabs */}
       <div className="flex gap-0.5 p-1 bg-slate-100 rounded-xl w-fit">
         {[
-          { key: 'all' as Tab, label: `All payments (${payments.length})` },
+          { key: 'all' as Tab,    label: `All payments (${payments.length})` },
           { key: 'unpaid' as Tab, label: 'Unpaid this month', count: unpaidLeases.length },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -167,45 +181,21 @@ export default function PaymentsTable({
         ))}
       </div>
 
-      {/* ── Filters ── */}
+      {/* All filters */}
       {tab === 'all' && (
         <div className="flex flex-wrap gap-2 items-center">
-          {/* Search */}
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <Input placeholder="Search tenant, unit, reference…" value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-9 h-9 text-sm rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-400/25" />
           </div>
-
-          {/* Portfolio filter — only for mixed/commercial */}
-          {showPortfolioFilter && (
-            <div className="flex items-center gap-0.5 bg-slate-100 rounded-xl p-1">
-              {([
-                { value: 'all' as Portfolio,         label: 'All' },
-                { value: 'residential' as Portfolio,  label: '🏠 Residential' },
-                { value: 'commercial' as Portfolio,   label: '🏢 Commercial' },
-              ]).map(opt => (
-                <button key={opt.value} onClick={() => setPortfolioFilter(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    portfolioFilter === opt.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Month */}
+          {showPortfolioFilter && <PortfolioFilterControl value={portfolioFilter} onChange={setPortfolioFilter} />}
           <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)}
             className="h-9 px-3 text-xs border border-slate-200 rounded-xl bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400/25">
             <option value="all">All months</option>
-            {months.map(m => (
-              <option key={m} value={m}>{format(new Date(m + '-01'), 'MMMM yyyy')}</option>
-            ))}
+            {months.map(m => <option key={m} value={m}>{format(new Date(m + '-01'), 'MMMM yyyy')}</option>)}
           </select>
-
-          {/* Method */}
           <select value={methodFilter} onChange={e => setMethodFilter(e.target.value)}
             className="h-9 px-3 text-xs border border-slate-200 rounded-xl bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400/25">
             <option value="all">All methods</option>
@@ -215,7 +205,6 @@ export default function PaymentsTable({
             <option value="cheque">Cheque</option>
             <option value="other">Other</option>
           </select>
-
           <Button variant="outline" onClick={() => exportToCSV(filtered)}
             className="h-9 text-xs rounded-xl border-slate-200 gap-1.5 px-3">
             <Download className="h-3.5 w-3.5" /> Export CSV
@@ -231,26 +220,11 @@ export default function PaymentsTable({
             <Input placeholder="Search tenant, unit…" value={search} onChange={e => setSearch(e.target.value)}
               className="pl-9 h-9 text-sm rounded-xl border-slate-200" />
           </div>
-          {showPortfolioFilter && (
-            <div className="flex items-center gap-0.5 bg-slate-100 rounded-xl p-1">
-              {([
-                { value: 'all' as Portfolio, label: 'All' },
-                { value: 'residential' as Portfolio, label: '🏠 Residential' },
-                { value: 'commercial' as Portfolio, label: '🏢 Commercial' },
-              ]).map(opt => (
-                <button key={opt.value} onClick={() => setPortfolioFilter(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                    portfolioFilter === opt.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {showPortfolioFilter && <PortfolioFilterControl value={portfolioFilter} onChange={setPortfolioFilter} />}
         </div>
       )}
 
-      {/* ── ALL PAYMENTS TABLE ── */}
+      {/* All payments table */}
       {tab === 'all' && (
         <>
           <p className="text-xs text-slate-400">
@@ -278,56 +252,40 @@ export default function PaymentsTable({
                   const diff       = Number(p.amount) - rent
                   const isPartial  = diff < 0 && rent > 0
                   const isOverpaid = diff > 0 && rent > 0
-
                   return (
                     <motion.tr key={p.id}
-                      initial={{ opacity: 0, y: 3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.02 }}
-                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors group"
-                    >
-                      {/* Tenant */}
+                      initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
+                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors group">
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1B3B6F] to-[#2a4f8f] flex items-center justify-center text-xs font-bold text-[#14b8a6] shrink-0">
-                            {initial}
-                          </div>
+                          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1B3B6F] to-[#2a4f8f] flex items-center justify-center text-xs font-bold text-[#14b8a6] shrink-0">{initial}</div>
                           <div>
                             <p className="text-sm font-semibold text-slate-900">{tenantName || '—'}</p>
                             <p className="text-[11px] text-slate-400">{p.leases?.tenants?.primary_phone ?? '—'}</p>
                           </div>
                         </div>
                       </td>
-                      {/* Unit */}
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-semibold text-slate-800 font-mono">{p.leases?.units?.unit_code ?? '—'}</p>
                         <p className="text-[11px] text-slate-400">{p.leases?.units?.buildings?.name ?? '—'}</p>
                       </td>
-                      {/* Portfolio type tag */}
-                      <td className="px-4 py-3.5">
-                        <PortfolioTag buildingType={bt} />
-                      </td>
-                      {/* Amount */}
+                      <td className="px-4 py-3.5"><PortfolioTag buildingType={bt} /></td>
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-bold text-slate-900 tabular-nums">${Number(p.amount).toLocaleString()}</p>
                         {isPartial  && <p className="text-[10px] text-amber-600 font-semibold">Partial · ${Math.abs(diff).toLocaleString()} short</p>}
                         {isOverpaid && <p className="text-[10px] text-teal-600 font-semibold">+${diff.toLocaleString()} over</p>}
                       </td>
-                      {/* Date */}
                       <td className="px-4 py-3.5">
                         <p className="text-sm text-slate-600">{format(new Date(p.payment_date), 'MMM d, yyyy')}</p>
                         <p className="text-[11px] text-slate-400">{format(new Date(p.payment_date), 'MMMM yyyy')}</p>
                       </td>
-                      {/* Method */}
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-1.5">
                           <MethodIcon className="h-3.5 w-3.5 text-slate-400" />
                           <span className="text-xs text-slate-600 capitalize">{METHOD_LABEL[p.method ?? ''] ?? p.method ?? '—'}</span>
                         </div>
                       </td>
-                      {/* Reference */}
                       <td className="px-4 py-3.5 text-xs text-slate-400 font-mono">{p.reference ?? '—'}</td>
-                      {/* Status */}
                       <td className="px-4 py-3.5">
                         {p.status === 'completed' && (
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
@@ -345,7 +303,6 @@ export default function PaymentsTable({
                           </span>
                         )}
                       </td>
-                      {/* Arrow */}
                       <td className="px-4 py-3.5">
                         <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-teal-500 transition-colors" />
                       </td>
@@ -356,9 +313,7 @@ export default function PaymentsTable({
               <tfoot>
                 <tr className="border-t border-slate-100 bg-slate-50/50">
                   <td className="px-5 py-2.5" colSpan={3}>
-                    <span className="text-xs text-slate-500">
-                      Showing <span className="font-bold text-slate-700">{filtered.length}</span> of {payments.length} payments
-                    </span>
+                    <span className="text-xs text-slate-500">Showing <span className="font-bold text-slate-700">{filtered.length}</span> of {payments.length} payments</span>
                   </td>
                   <td className="px-4 py-2.5" colSpan={6}>
                     <span className="text-xs font-bold text-teal-600">
@@ -372,7 +327,7 @@ export default function PaymentsTable({
         </>
       )}
 
-      {/* ── UNPAID THIS MONTH ── */}
+      {/* Unpaid table */}
       {tab === 'unpaid' && (
         <>
           <p className="text-xs text-slate-400">
@@ -404,12 +359,10 @@ export default function PaymentsTable({
                     const initial     = tenantName[0]?.toUpperCase() ?? '?'
                     const outstanding = Number(lease.rent_amount) - lease.paidThisMonth
                     const bt          = lease.units?.buildings?.building_type ?? lease.building_type
-
                     return (
                       <motion.tr key={lease.id}
                         initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.025 }}
-                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 group"
-                      >
+                        className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 group">
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2.5">
                             <div className="w-8 h-8 rounded-xl bg-red-100 flex items-center justify-center text-xs font-bold text-red-600 shrink-0">{initial}</div>
@@ -450,5 +403,3 @@ export default function PaymentsTable({
     </div>
   )
 }
-
-

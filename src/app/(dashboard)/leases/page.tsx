@@ -4,15 +4,14 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Plus, Search, TrendingUp, CreditCard, Clock,
-  ChevronRight, AlertTriangle, Home, Building2,
-  DollarSign, Receipt, Layers, ArrowRightLeft
+  ChevronRight, AlertTriangle, DollarSign, Receipt, ArrowRightLeft
 } from 'lucide-react'
 import LeasesTable from '@/components/leases/LeasesTable'
 import AssignTenantDialog from '@/components/tenants/AssignTenantDialog'
@@ -20,26 +19,27 @@ import { differenceInDays, format } from 'date-fns'
 import type { LeaseWithDetails } from '@/types'
 import { usePropertyType } from '@/hooks/usePropertyType'
 import { useMixedModeStore } from '@/store/mixedModeStore'
+import { HouseIcon, BuildingIcon } from '@/components/ui/portfolio-icons'
 
 type FilterTab = 'all' | 'active' | 'expiring_soon' | 'ended'
 type Portfolio  = 'residential' | 'commercial'
 
 export default function LeasesPage() {
   const { orgId } = useAuth()
-  const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const router    = useRouter()
+  const supabase  = getSupabaseBrowserClient()
   const { type, loading: typeLoading } = usePropertyType()
   const { mode, setMode } = useMixedModeStore()
 
-  const isMixed      = type === 'mixed'
-  const isCommercial = type === 'commercial' || (isMixed && mode === 'commercial')
-  const tableMode: Portfolio = isCommercial ? 'commercial' : 'residential'
+  const isMixed       = type === 'mixed'
+  const isCommercial  = type === 'commercial' || (isMixed && mode === 'commercial')
+  const tableMode: 'residential' | 'commercial' = isCommercial ? 'commercial' : 'residential'
 
-  const [allLeases, setAllLeases] = useState<LeaseWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
+  const [allLeases,    setAllLeases]    = useState<LeaseWithDetails[]>([])
+  const [loading,      setLoading]      = useState(true)
   const [newLeaseOpen, setNewLeaseOpen] = useState(false)
-  const [filter, setFilter] = useState<FilterTab>('all')
-  const [search, setSearch] = useState('')
+  const [filter,       setFilter]       = useState<FilterTab>('all')
+  const [search,       setSearch]       = useState('')
 
   useEffect(() => { if (orgId && !typeLoading) load() }, [orgId, typeLoading])
 
@@ -59,7 +59,6 @@ export default function LeasesPage() {
     setLoading(false)
   }
 
-  // ── Portfolio split ──────────────────────────────────────
   function splitByPortfolio(leases: LeaseWithDetails[]) {
     const commercial  = leases.filter(l => (l as any).units?.buildings?.building_type === 'commercial')
     const residential = leases.filter(l => (l as any).units?.buildings?.building_type !== 'commercial')
@@ -68,17 +67,15 @@ export default function LeasesPage() {
 
   const { commercial: commercialLeases, residential: residentialLeases } = splitByPortfolio(allLeases)
 
-  // Visible leases depend on portfolio type
   const visibleLeases = isMixed
     ? (mode === 'commercial' ? commercialLeases : residentialLeases)
     : isCommercial
       ? commercialLeases
       : allLeases
 
-  const now = new Date()
+  const now       = new Date()
   const thisMonth = format(now, 'yyyy-MM')
 
-  // ── Shared computed values ───────────────────────────────
   function computeKPIs(leases: LeaseWithDetails[]) {
     const active = leases.filter(l => l.status === 'active')
     const rent   = active.reduce((s, l) => s + Number(l.rent_amount), 0)
@@ -103,12 +100,11 @@ export default function LeasesPage() {
     return { active, rent, sc, total: rent + sc, collected, unpaid, expiring, expired }
   }
 
-  const kpi = computeKPIs(visibleLeases)
-  const resKPI = isMixed ? computeKPIs(residentialLeases) : null
-  const comKPI = isMixed ? computeKPIs(commercialLeases)  : null
+  const kpi     = computeKPIs(visibleLeases)
+  const resKPI  = isMixed ? computeKPIs(residentialLeases) : null
+  const comKPI  = isMixed ? computeKPIs(commercialLeases)  : null
 
-  // ── KPI card definitions ─────────────────────────────────
-  // Residential KPIs: rent collection focused
+  // KPI card definitions
   const residentialKPICards = [
     {
       metric: `$${kpi.total.toLocaleString()}`,
@@ -119,8 +115,7 @@ export default function LeasesPage() {
         : 'All paid this month ✓',
       subtitleColor: kpi.unpaid > 0 ? 'text-amber-600' : 'text-teal-600',
       gradient: 'from-[#1B3B6F] to-[#2a4f8f]',
-      icon: TrendingUp,
-      href: '/leases/rent-tracker',
+      icon: TrendingUp, href: '/leases/rent-tracker',
     },
     {
       metric: `$${kpi.collected.toLocaleString()}`,
@@ -131,8 +126,7 @@ export default function LeasesPage() {
         : 'Fully collected ✓',
       subtitleColor: kpi.total - kpi.collected > 0 ? 'text-amber-600' : 'text-teal-600',
       gradient: 'from-teal-500 to-teal-600',
-      icon: CreditCard,
-      href: '/leases/rent-tracker',
+      icon: CreditCard, href: '/leases/rent-tracker',
     },
     {
       metric: String(kpi.expiring.length),
@@ -143,12 +137,10 @@ export default function LeasesPage() {
         : `${kpi.expired.length > 0 ? `${kpi.expired.length} overdue · ` : ''}Action needed`,
       subtitleColor: kpi.expiring.length > 0 || kpi.expired.length > 0 ? 'text-amber-600' : 'text-teal-600',
       gradient: 'from-[#0d9488] to-teal-400',
-      icon: Clock,
-      href: '/leases',
+      icon: Clock, href: '/leases',
     },
   ]
 
-  // Commercial KPIs: revenue + charges focused
   const commercialKPICards = [
     {
       metric: `$${kpi.rent.toLocaleString()}`,
@@ -157,8 +149,7 @@ export default function LeasesPage() {
       subtitle: `${kpi.active.length} active commercial lease${kpi.active.length !== 1 ? 's' : ''}`,
       subtitleColor: 'text-slate-400',
       gradient: 'from-[#1B3B6F] to-[#2a4f8f]',
-      icon: DollarSign,
-      href: '/leases',
+      icon: DollarSign, href: '/leases',
     },
     {
       metric: `$${kpi.sc.toLocaleString()}`,
@@ -167,8 +158,7 @@ export default function LeasesPage() {
       subtitle: `Total monthly: $${kpi.total.toLocaleString()}`,
       subtitleColor: 'text-teal-600',
       gradient: 'from-teal-500 to-[#0d9488]',
-      icon: Receipt,
-      href: '/invoices',
+      icon: Receipt, href: '/invoices',
     },
     {
       metric: String(kpi.expiring.length),
@@ -179,14 +169,12 @@ export default function LeasesPage() {
         : 'Action needed',
       subtitleColor: kpi.expiring.length > 0 || kpi.expired.length > 0 ? 'text-amber-600' : 'text-teal-600',
       gradient: 'from-[#0d9488] to-teal-400',
-      icon: Clock,
-      href: '/leases',
+      icon: Clock, href: '/leases',
     },
   ]
 
   const kpiCards = isCommercial ? commercialKPICards : residentialKPICards
 
-  // ── Filtered leases for table ────────────────────────────
   const filtered = visibleLeases.filter(l => {
     const q  = search.toLowerCase()
     const t  = (l as any).tenants
@@ -220,11 +208,9 @@ export default function LeasesPage() {
   return (
     <div className="min-h-screen bg-slate-50/70">
 
-      {/* ── Header ── */}
+      {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
+        initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
         className="px-6 pt-6 pb-4 flex items-center justify-between"
       >
         <div>
@@ -233,42 +219,37 @@ export default function LeasesPage() {
             {kpi.active.length} active · ${kpi.total.toLocaleString()}/mo
             {isMixed && (
               <span className={`ml-2 font-semibold ${mode === 'commercial' ? 'text-[#1B3B6F]' : 'text-teal-600'}`}>
-                · {mode === 'commercial' ? '🏢 Commercial' : '🏠 Residential'} portfolio
+                · {mode === 'commercial' ? 'Commercial' : 'Residential'} portfolio
               </span>
             )}
             {!isMixed && type === 'commercial' && <span className="ml-2 text-[#1B3B6F] font-semibold">· Commercial</span>}
           </p>
         </div>
-        <Button
-          onClick={() => setNewLeaseOpen(true)}
-          className="h-9 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl gap-1.5 px-4 shadow-sm"
-        >
+        <Button onClick={() => setNewLeaseOpen(true)}
+          className="h-9 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl gap-1.5 px-4 shadow-sm">
           <Plus className="h-3.5 w-3.5" /> New Lease
         </Button>
       </motion.div>
 
-      {/* ── Mixed mode portfolio switcher ── */}
+      {/* Mixed portfolio switcher */}
       {isMixed && (
         <motion.div
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
+          initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
           className="px-6 mb-4"
         >
           <div className="flex items-center gap-1 bg-white border border-slate-200/80 rounded-2xl p-1 shadow-sm w-fit">
             {(['residential', 'commercial'] as Portfolio[]).map(p => (
-              <button
-                key={p}
-                onClick={() => setMode(p)}
+              <button key={p} onClick={() => setMode(p)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
                   mode === p
                     ? p === 'commercial'
                       ? 'bg-[#1B3B6F] text-white shadow-sm'
                       : 'bg-teal-600 text-white shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {p === 'residential' ? <Home className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
+                }`}>
+                {p === 'residential'
+                  ? <HouseIcon className="w-3.5 h-3.5" />
+                  : <BuildingIcon className="w-3.5 h-3.5" />}
                 {p.charAt(0).toUpperCase() + p.slice(1)}
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5 ${
                   mode === p ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
@@ -278,42 +259,52 @@ export default function LeasesPage() {
               </button>
             ))}
             <div className="mx-1 h-5 w-px bg-slate-200" />
-            <div className="px-3 py-1 text-xs text-slate-400">
-              <ArrowRightLeft className="h-3.5 w-3.5 inline mr-1" />
-              Mixed portfolio
+            <div className="px-3 py-1 flex items-center gap-1 text-xs text-slate-400">
+              <ArrowRightLeft className="h-3.5 w-3.5" /> Mixed portfolio
             </div>
           </div>
 
-          {/* Mixed overview strip */}
+          {/* Overview strip */}
           <div className="mt-3 grid grid-cols-2 gap-3">
             {[
               {
-                label: '🏠 Residential',
+                label: 'Residential',
+                icon: 'house',
                 active: resKPI!.active.length,
                 total: resKPI!.total,
                 unpaid: resKPI!.unpaid,
-                color: 'border-teal-200 bg-teal-50/50',
+                border: 'border-teal-200',
+                bg: 'bg-teal-50/50',
                 activeColor: 'text-teal-700',
+                iconBg: 'bg-teal-500/10',
               },
               {
-                label: '🏢 Commercial',
+                label: 'Commercial',
+                icon: 'building',
                 active: comKPI!.active.length,
                 total: comKPI!.total,
                 unpaid: comKPI!.unpaid,
-                color: 'border-[#1B3B6F]/20 bg-[#1B3B6F]/4',
+                border: 'border-[#1B3B6F]/20',
+                bg: 'bg-[#1B3B6F]/4',
                 activeColor: 'text-[#1B3B6F]',
+                iconBg: 'bg-[#1B3B6F]/8',
               },
             ].map(s => (
-              <div key={s.label} className={`rounded-xl border px-4 py-3 flex items-center justify-between ${s.color}`}>
-                <div>
-                  <p className="text-xs font-semibold text-slate-600">{s.label}</p>
-                  <p className={`text-lg font-bold tabular-nums ${s.activeColor}`}>{s.active} active</p>
+              <div key={s.label} className={`rounded-xl border ${s.border} ${s.bg} px-4 py-3 flex items-center justify-between`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-7 h-7 rounded-lg ${s.iconBg} flex items-center justify-center`}>
+                    {s.icon === 'house'
+                      ? <HouseIcon    className={`w-3.5 h-3.5 ${s.activeColor}`} />
+                      : <BuildingIcon className={`w-3.5 h-3.5 ${s.activeColor}`} />}
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-600">{s.label}</p>
+                    <p className={`text-lg font-bold tabular-nums ${s.activeColor}`}>{s.active} active</p>
+                  </div>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-slate-800 tabular-nums">${s.total.toLocaleString()}/mo</p>
-                  {s.unpaid > 0 && (
-                    <p className="text-[10px] text-amber-600 font-semibold">{s.unpaid} unpaid</p>
-                  )}
+                  {s.unpaid > 0 && <p className="text-[10px] text-amber-600 font-semibold">{s.unpaid} unpaid</p>}
                 </div>
               </div>
             ))}
@@ -321,11 +312,10 @@ export default function LeasesPage() {
         </motion.div>
       )}
 
-      {/* ── KPI cards ── */}
+      {/* KPI cards */}
       <div className="px-6 grid grid-cols-3 gap-4 mb-5">
         {kpiCards.map((card, i) => (
-          <motion.button
-            key={card.title}
+          <motion.button key={card.title}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: (isMixed ? 0.15 : 0) + i * 0.07, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
@@ -353,7 +343,7 @@ export default function LeasesPage() {
         ))}
       </div>
 
-      {/* ── Tabs + search ── */}
+      {/* Tabs + search */}
       <div className="px-6 flex items-center justify-between">
         <div className="flex items-center gap-0.5 border-b border-slate-200">
           {tabs.map(tab => (
@@ -380,37 +370,31 @@ export default function LeasesPage() {
         </div>
       </div>
 
-      {/* ── Alerts ── */}
+      {/* Alerts */}
       {(kpi.expired.length > 0 || kpi.expiring.length > 0) && filter !== 'expiring_soon' && (
         <div className="px-6 pt-3 space-y-2">
           {kpi.expired.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm"
-            >
+            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm">
               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
               <span className="text-red-800">
                 <strong>{kpi.expired.length}</strong> lease{kpi.expired.length > 1 ? 's' : ''} expired but still marked active
               </span>
-              <button onClick={() => setFilter('expiring_soon')}
-                className="ml-auto text-xs text-red-700 font-semibold underline">Resolve</button>
+              <button onClick={() => setFilter('expiring_soon')} className="ml-auto text-xs text-red-700 font-semibold underline">Resolve</button>
             </motion.div>
           )}
           {kpi.expiring.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
-              className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm"
-            >
+            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
+              className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
               <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
               <span className="text-amber-800"><strong>{kpi.expiring.length}</strong> expiring within 30 days</span>
-              <button onClick={() => setFilter('expiring_soon')}
-                className="ml-auto text-xs text-amber-700 font-semibold underline">View</button>
+              <button onClick={() => setFilter('expiring_soon')} className="ml-auto text-xs text-amber-700 font-semibold underline">View</button>
             </motion.div>
           )}
         </div>
       )}
 
-      {/* ── Table ── */}
+      {/* Table */}
       <div className="px-6 pb-8 mt-0">
         <div className="bg-white rounded-b-2xl border border-t-0 border-slate-200/80 shadow-sm overflow-hidden">
           {loading ? (

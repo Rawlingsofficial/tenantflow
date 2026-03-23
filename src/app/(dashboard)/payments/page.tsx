@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Plus, Search, CheckCircle2, Clock, X,
-  CreditCard, DollarSign, Home, Building2, ArrowUpRight
+  CreditCard, DollarSign, ArrowUpRight
 } from 'lucide-react'
 import { format, subMonths } from 'date-fns'
 import RecordPaymentDialog from '@/components/payments/RecordPaymentDialog'
 import { usePropertyType } from '@/hooks/usePropertyType'
+import { HouseIcon, BuildingIcon } from '@/components/ui/portfolio-icons'
 
 type FilterTab  = 'all' | 'completed' | 'pending' | 'failed'
 type Portfolio  = 'all' | 'residential' | 'commercial'
@@ -50,7 +51,9 @@ function PortfolioTag({ buildingType }: { buildingType?: string | null }) {
         ? 'bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20'
         : 'bg-teal-50 text-teal-700 border border-teal-200'
     }`}>
-      {isCommercial ? <Building2 className="h-2.5 w-2.5" /> : <Home className="h-2.5 w-2.5" />}
+      {isCommercial
+        ? <BuildingIcon className="w-2.5 h-2.5 text-[#1B3B6F]" />
+        : <HouseIcon className="w-2.5 h-2.5 text-teal-600" />}
       {isCommercial ? 'Commercial' : 'Residential'}
     </span>
   )
@@ -66,12 +69,12 @@ export default function PaymentsPage() {
   const isCommercial = type === 'commercial'
   const showPortfolioFilter = isMixed || isCommercial
 
-  const [payments,       setPayments]       = useState<Payment[]>([])
-  const [loading,        setLoading]        = useState(true)
-  const [filter,         setFilter]         = useState<FilterTab>('all')
-  const [search,         setSearch]         = useState('')
-  const [recordOpen,     setRecordOpen]     = useState(false)
-  const [selectedMonth,  setSelectedMonth]  = useState('all')
+  const [payments,        setPayments]        = useState<Payment[]>([])
+  const [loading,         setLoading]         = useState(true)
+  const [filter,          setFilter]          = useState<FilterTab>('all')
+  const [search,          setSearch]          = useState('')
+  const [recordOpen,      setRecordOpen]      = useState(false)
+  const [selectedMonth,   setSelectedMonth]   = useState('all')
   const [portfolioFilter, setPortfolioFilter] = useState<Portfolio>('all')
 
   useEffect(() => { if (orgId) load() }, [orgId])
@@ -109,16 +112,15 @@ export default function PaymentsPage() {
       const initials = isC
         ? (t?.company_name ?? 'C')[0].toUpperCase()
         : `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase()
-
       return {
         ...p,
-        tenant_name: name || 'Unknown',
-        tenant_initials: initials || '?',
-        tenant_photo: t?.photo_url ?? null,
-        tenant_phone: t?.primary_phone ?? null,
-        unit_code: u?.unit_code ?? '—',
-        building_name: u?.buildings?.name ?? '—',
-        building_type: u?.buildings?.building_type ?? null,
+        tenant_name:       name || 'Unknown',
+        tenant_initials:   initials || '?',
+        tenant_photo:      t?.photo_url ?? null,
+        tenant_phone:      t?.primary_phone ?? null,
+        unit_code:         u?.unit_code ?? '—',
+        building_name:     u?.buildings?.name ?? '—',
+        building_type:     u?.buildings?.building_type ?? null,
         lease_rent_amount: Number(lease?.rent_amount ?? 0),
       }
     })
@@ -135,12 +137,11 @@ export default function PaymentsPage() {
   const pending   = payments.filter(p => p.status === 'pending')
   const failed    = payments.filter(p => p.status === 'failed')
 
-  const totalAllTime    = completed.reduce((s, p) => s + Number(p.amount), 0)
-  const thisMonthTotal  = completed.filter(p => p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
-  const lastMonthTotal  = completed.filter(p => p.payment_date?.startsWith(lastMonth)).reduce((s, p) => s + Number(p.amount), 0)
-  const pendingTotal    = pending.reduce((s, p) => s + Number(p.amount), 0)
+  const totalAllTime   = completed.reduce((s, p) => s + Number(p.amount), 0)
+  const thisMonthTotal = completed.filter(p => p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
+  const lastMonthTotal = completed.filter(p => p.payment_date?.startsWith(lastMonth)).reduce((s, p) => s + Number(p.amount), 0)
+  const pendingTotal   = pending.reduce((s, p) => s + Number(p.amount), 0)
 
-  // Portfolio split for mixed
   const residentialTotal = completed.filter(p => p.payment_date?.startsWith(thisMonth) && p.building_type !== 'commercial').reduce((s, p) => s + Number(p.amount), 0)
   const commercialTotal  = completed.filter(p => p.payment_date?.startsWith(thisMonth) && p.building_type === 'commercial').reduce((s, p) => s + Number(p.amount), 0)
 
@@ -167,7 +168,7 @@ export default function PaymentsPage() {
     if (filter === 'failed')    return p.status === 'failed'
     if (selectedMonth !== 'all') return p.payment_date?.startsWith(selectedMonth)
     const matchPortfolio =
-      portfolioFilter === 'all' ? true :
+      portfolioFilter === 'all'        ? true :
       portfolioFilter === 'commercial' ? p.building_type === 'commercial' :
       p.building_type !== 'commercial'
     return matchPortfolio
@@ -266,26 +267,30 @@ export default function PaymentsPage() {
           <div className="bg-white border border-teal-200/80 rounded-2xl px-4 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-teal-500/10 flex items-center justify-center">
-                <Home className="h-4 w-4 text-teal-600" />
+                <HouseIcon className="w-4 h-4 text-teal-600" />
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Residential this month</p>
                 <p className="text-lg font-bold text-teal-700 tabular-nums">${residentialTotal.toLocaleString()}</p>
               </div>
             </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">🏠 Residential</span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+              <HouseIcon className="w-3 h-3 text-teal-600" /> Residential
+            </span>
           </div>
           <div className="bg-white border border-[#1B3B6F]/20 rounded-2xl px-4 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-[#1B3B6F]/8 flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-[#1B3B6F]" />
+                <BuildingIcon className="w-4 h-4 text-[#1B3B6F]" />
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Commercial this month</p>
                 <p className="text-lg font-bold text-[#1B3B6F] tabular-nums">${commercialTotal.toLocaleString()}</p>
               </div>
             </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20">🏢 Commercial</span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20">
+              <BuildingIcon className="w-3 h-3 text-[#1B3B6F]" /> Commercial
+            </span>
           </div>
         </div>
       )}
@@ -342,15 +347,16 @@ export default function PaymentsPage() {
           {showPortfolioFilter && (
             <div className="flex items-center gap-0.5 bg-slate-100 rounded-xl p-0.5">
               {([
-                { value: 'all' as Portfolio, label: 'All' },
-                { value: 'residential' as Portfolio, label: '🏠' },
-                { value: 'commercial' as Portfolio, label: '🏢' },
+                { value: 'all' as Portfolio,         icon: null,       label: 'All' },
+                { value: 'residential' as Portfolio,  icon: 'house',    label: 'Res' },
+                { value: 'commercial' as Portfolio,   icon: 'building', label: 'Com' },
               ]).map(opt => (
                 <button key={opt.value} onClick={() => setPortfolioFilter(opt.value)}
-                  title={opt.value === 'residential' ? 'Residential' : opt.value === 'commercial' ? 'Commercial' : 'All portfolios'}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                     portfolioFilter === opt.value ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                   }`}>
+                  {opt.icon === 'house'    && <HouseIcon    className="w-3 h-3" />}
+                  {opt.icon === 'building' && <BuildingIcon className="w-3 h-3" />}
                   {opt.label}
                 </button>
               ))}
@@ -361,9 +367,7 @@ export default function PaymentsPage() {
             <select value={selectedMonth} onChange={e => { setSelectedMonth(e.target.value); setFilter('all') }}
               className="h-8 px-2 text-xs border border-slate-200 rounded-xl bg-white text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400/25">
               <option value="all">All months</option>
-              {allMonths.map(m => (
-                <option key={m} value={m}>{format(new Date(m + '-01'), 'MMMM yyyy')}</option>
-              ))}
+              {allMonths.map(m => <option key={m} value={m}>{format(new Date(m + '-01'), 'MMMM yyyy')}</option>)}
             </select>
           )}
           {/* Search */}
@@ -402,16 +406,12 @@ export default function PaymentsPage() {
                   const diff       = Number(p.amount) - p.lease_rent_amount
                   const isPartial  = diff < 0 && p.lease_rent_amount > 0
                   const isOverpaid = diff > 0 && p.lease_rent_amount > 0
-
                   return (
                     <motion.tr key={p.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.02 }}
+                      initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}
                       onClick={() => router.push(`/leases/${p.lease_id}`)}
                       className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer group"
                     >
-                      {/* Tenant */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
                           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1B3B6F] to-[#2a4f8f] flex items-center justify-center text-xs font-bold text-[#14b8a6] shrink-0 overflow-hidden">
@@ -425,38 +425,30 @@ export default function PaymentsPage() {
                           </div>
                         </div>
                       </td>
-                      {/* Unit */}
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-semibold text-slate-800 font-mono">{p.unit_code}</p>
                         <p className="text-[11px] text-slate-400">{p.building_name}</p>
                       </td>
-                      {/* Portfolio tag */}
                       <td className="px-4 py-3.5">
                         <PortfolioTag buildingType={p.building_type} />
                       </td>
-                      {/* Amount */}
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-bold text-slate-900 tabular-nums">${Number(p.amount).toLocaleString()}</p>
                         {isPartial  && <p className="text-[10px] text-amber-600 font-semibold">Partial · ${Math.abs(diff).toLocaleString()} short</p>}
                         {isOverpaid && <p className="text-[10px] text-teal-600 font-semibold">+${diff.toLocaleString()} over</p>}
                       </td>
-                      {/* For month */}
                       <td className="px-4 py-3.5 text-xs text-slate-500 font-medium">
                         {p.payment_date ? format(new Date(p.payment_date), 'MMM yyyy') : '—'}
                       </td>
-                      {/* Date paid */}
                       <td className="px-4 py-3.5 text-sm text-slate-600">
                         {format(new Date(p.payment_date), 'MMM d, yyyy')}
                       </td>
-                      {/* Method */}
                       <td className="px-4 py-3.5">
                         <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
                           {METHOD_LABEL[p.method ?? ''] ?? p.method ?? '—'}
                         </span>
                       </td>
-                      {/* Reference */}
                       <td className="px-4 py-3.5 text-xs text-slate-400 font-mono">{p.reference ?? '—'}</td>
-                      {/* Status */}
                       <td className="px-4 py-3.5">
                         {p.status === 'completed' && (
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">

@@ -1,8 +1,9 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { DollarSign, TrendingUp, AlertCircle, CheckCircle2, Home, Building2 } from 'lucide-react'
+import { DollarSign, TrendingUp, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { HouseIcon, BuildingIcon } from '@/components/ui/portfolio-icons'
 
 interface Props {
   expectedMonthly: number
@@ -121,26 +122,30 @@ export default function PaymentsSummary({
           <div className="bg-white border border-teal-200/80 rounded-2xl px-4 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-teal-500/10 flex items-center justify-center">
-                <Home className="h-4 w-4 text-teal-600" />
+                <HouseIcon className="w-4 h-4 text-teal-600" />
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Residential</p>
                 <p className="text-lg font-bold text-teal-700 tabular-nums">${(residentialTotal ?? 0).toLocaleString()}</p>
               </div>
             </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">🏠 Residential</span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+              <HouseIcon className="w-3 h-3 text-teal-600" /> Residential
+            </span>
           </div>
           <div className="bg-white border border-[#1B3B6F]/20 rounded-2xl px-4 py-3.5 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-[#1B3B6F]/8 flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-[#1B3B6F]" />
+                <BuildingIcon className="w-4 h-4 text-[#1B3B6F]" />
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Commercial</p>
                 <p className="text-lg font-bold text-[#1B3B6F] tabular-nums">${(commercialTotal ?? 0).toLocaleString()}</p>
               </div>
             </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20">🏢 Commercial</span>
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20">
+              <BuildingIcon className="w-3 h-3 text-[#1B3B6F]" /> Commercial
+            </span>
           </div>
         </div>
       )}
@@ -181,5 +186,3 @@ export default function PaymentsSummary({
     </div>
   )
 }
-
-

@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, X, CreditCard, Search, Building2, Home } from 'lucide-react'
+import { Loader2, X, CreditCard, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { HouseIcon, BuildingIcon } from '@/components/ui/portfolio-icons'
 
 interface Props {
   open: boolean
@@ -133,12 +134,13 @@ export default function RecordPaymentDialog({ open, onClose, onSaved, organizati
                 {filteredLeases.length === 0 ? (
                   <div className="text-center py-6 text-xs text-slate-400">No active leases found</div>
                 ) : filteredLeases.map(l => {
-                  const t  = l.tenants
+                  const t   = l.tenants
                   const isC = t?.tenant_type === 'company'
-                  const name  = isC ? (t?.company_name ?? '—') : `${t?.first_name ?? ''} ${t?.last_name ?? ''}`.trim()
-                  const init  = isC ? (t?.company_name ?? 'C')[0].toUpperCase() : `${t?.first_name?.[0] ?? ''}${t?.last_name?.[0] ?? ''}`.toUpperCase()
-                  const bt    = l.units?.buildings?.building_type
+                  const name = isC ? (t?.company_name ?? '—') : `${t?.first_name ?? ''} ${t?.last_name ?? ''}`.trim()
+                  const init = isC ? (t?.company_name ?? 'C')[0].toUpperCase() : `${t?.first_name?.[0] ?? ''}${t?.last_name?.[0] ?? ''}`.toUpperCase()
+                  const bt   = l.units?.buildings?.building_type
                   const isSelected = selectedLeaseId === l.id
+                  const isCommercial = bt === 'commercial'
 
                   return (
                     <button key={l.id}
@@ -153,13 +155,18 @@ export default function RecordPaymentDialog({ open, onClose, onSaved, organizati
                         <p className="text-sm font-semibold text-slate-900">{name}</p>
                         <p className="text-xs text-slate-400">{l.units?.unit_code} · {l.units?.buildings?.name}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
+                      <div className="flex flex-col items-end gap-1 shrink-0">
                         <span className="text-xs font-bold text-teal-600">${Number(l.rent_amount).toLocaleString()}/mo</span>
                         {bt && (
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                            bt === 'commercial' ? 'bg-[#1B3B6F]/8 text-[#1B3B6F]' : 'bg-teal-50 text-teal-700'
+                          <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                            isCommercial
+                              ? 'bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/15'
+                              : 'bg-teal-50 text-teal-700 border border-teal-200'
                           }`}>
-                            {bt === 'commercial' ? '🏢' : '🏠'} {bt === 'commercial' ? 'Commercial' : 'Residential'}
+                            {isCommercial
+                              ? <BuildingIcon className="w-2.5 h-2.5 text-[#1B3B6F]" />
+                              : <HouseIcon className="w-2.5 h-2.5 text-teal-600" />}
+                            {isCommercial ? 'Commercial' : 'Residential'}
                           </span>
                         )}
                       </div>
@@ -175,7 +182,8 @@ export default function RecordPaymentDialog({ open, onClose, onSaved, organizati
             const t   = selectedLease.tenants
             const isC = t?.tenant_type === 'company'
             const name = isC ? (t?.company_name ?? '—') : `${t?.first_name ?? ''} ${t?.last_name ?? ''}`.trim()
-            const bt  = selectedLease.units?.buildings?.building_type
+            const bt   = selectedLease.units?.buildings?.building_type
+            const isCommercial = bt === 'commercial'
             return (
               <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
                 <div>
@@ -183,10 +191,15 @@ export default function RecordPaymentDialog({ open, onClose, onSaved, organizati
                   <p className="text-xs text-teal-600 mt-0.5">Expected: <span className="font-bold">${Number(selectedLease.rent_amount).toLocaleString()}/mo</span></p>
                 </div>
                 {bt && (
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    bt === 'commercial' ? 'bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20' : 'bg-teal-100 text-teal-700 border border-teal-200'
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    isCommercial
+                      ? 'bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20'
+                      : 'bg-teal-100 text-teal-700 border border-teal-200'
                   }`}>
-                    {bt === 'commercial' ? '🏢 Commercial' : '🏠 Residential'}
+                    {isCommercial
+                      ? <BuildingIcon className="w-3 h-3 text-[#1B3B6F]" />
+                      : <HouseIcon className="w-3 h-3 text-teal-600" />}
+                    {isCommercial ? 'Commercial' : 'Residential'}
                   </span>
                 )}
               </div>
