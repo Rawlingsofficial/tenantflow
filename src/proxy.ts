@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
@@ -11,6 +12,13 @@ const isOnboardingRoute = createRouteMatcher([
   '/onboarding',
   '/onboarding/setup',
 ])
+
+// Helper to get Supabase client with service role key for server-side
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+)
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId, orgId } = await auth()
@@ -28,8 +36,22 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL('/onboarding', req.url))
   }
 
-  // 3. Has org but trying to access /onboarding (create org step) → go to dashboard
-  //    Note: /onboarding/setup is allowed even with an org (for property_type config)
+  // 3. Has org → check if property_type is set
+  if (orgId && !isOnboardingRoute(req)) {
+    // Query Supabase to get the organization's property_type
+    const { data: org, error } = await supabase
+      .from('organizations')
+      .select('property_type')
+      .eq('id', orgId)
+      .single()
+
+    // If error or property_type is null, redirect to onboarding setup
+    if (error || !org?.property_type) {
+      return NextResponse.redirect(new URL('/onboarding/setup', req.url))
+    }
+  }
+
+  // 4. Has org but trying to access /onboarding (create org step) → go to dashboard
   if (orgId && req.nextUrl.pathname === '/onboarding') {
     return NextResponse.redirect(new URL('/dashboard', req.url))
   }
