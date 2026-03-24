@@ -33,7 +33,7 @@ export default function TenantsPage() {
   const { orgId } = useAuth()
   const supabase = getSupabaseBrowserClient()
   const router = useRouter()
-  const { type } = usePropertyType()
+  const { propertyType: type } = usePropertyType() // ✅ Renamed propertyType to type
 
   const [tenants, setTenants] = useState<TenantRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,7 +43,7 @@ export default function TenantsPage() {
 
   useEffect(() => {
     if (orgId) loadTenants()
-  }, [orgId, type])
+  }, [orgId, type]) // ✅ type is now defined
 
   async function loadTenants() {
     setLoading(true)
@@ -75,7 +75,7 @@ export default function TenantsPage() {
       }
     })
 
-    if (type === 'mixed') {
+    if (type === 'mixed') { // ✅ type now defined
       enriched = enriched.filter(t => !t.activeLease || t.activeLease.building_type !== 'commercial')
     }
 
@@ -229,7 +229,7 @@ export default function TenantsPage() {
                   {['Tenant', 'Unit', 'Start Date', 'Lease End', 'Rent', 'Balance', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider first:px-5">{h}</th>
                   ))}
-                </tr>
+                  </tr>
               </thead>
               <tbody>
                 {filtered.map((tenant, i) => (
