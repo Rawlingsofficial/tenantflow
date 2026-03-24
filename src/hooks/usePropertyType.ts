@@ -5,6 +5,15 @@ import { useAuth } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useOrgStore, type PropertyType, type OrgData } from '@/store/orgStore'
 
+// Define the shape of the organization row returned from Supabase
+interface OrgRow {
+  id: string
+  name: string
+  property_type: string
+  country: string | null
+  plan_type: string | null
+}
+
 export function usePropertyType(): { propertyType: PropertyType; loading: boolean } {
   const { orgId, userId } = useAuth()
   const currentOrg = useOrgStore((s) => s.currentOrg)
@@ -19,6 +28,7 @@ export function usePropertyType(): { propertyType: PropertyType; loading: boolea
 
     const supabase = getSupabaseBrowserClient()
 
+    // Fetch organization details
     supabase
       .from('organizations')
       .select('id, name, property_type, country, plan_type')
@@ -26,16 +36,22 @@ export function usePropertyType(): { propertyType: PropertyType; loading: boolea
       .single()
       .then(({ data }) => {
         if (!data) return
+        // Cast the data to the expected shape
+        const row = data as OrgRow
         const org: OrgData = {
-          id: data.id,
-          name: data.name,
-          property_type: (data.property_type as PropertyType) ?? 'residential',
-          country: data.country ?? null,
-          plan_type: data.plan_type ?? null,
+          id: row.id,
+          name: row.name,
+          property_type: (row.property_type as PropertyType) ?? 'residential',
+          country: row.country ?? null,
+          plan_type: row.plan_type ?? null,
         }
         setCurrentOrg(org)
       })
+      .catch((error) => {
+        console.error('Error loading organization:', error)
+      })
 
+    // Fetch user role
     if (userId) {
       supabase
         .from('users')
@@ -56,11 +72,15 @@ export function usePropertyType(): { propertyType: PropertyType; loading: boolea
               }
             })
         })
+        .catch((error) => {
+          console.error('Error loading user or membership:', error)
+        })
     }
-  }, [orgId, userId])
+  }, [orgId, userId, currentOrg?.id, setCurrentOrg, setUserRole])
 
   return {
     propertyType: currentOrg?.property_type ?? null,
     loading,
   }
 }
+
