@@ -23,10 +23,10 @@ export default function RentTrackerPage() {
   const { orgId } = useAuth()
   const router    = useRouter()
   const supabase  = getSupabaseBrowserClient()
-  const { type }  = usePropertyType()
+  const { propertyType } = usePropertyType() // renamed from 'type'
 
-  const isCommercial = type === 'commercial'
-  const isMixed      = type === 'mixed'
+  const isCommercial = propertyType === 'commercial'
+  const isMixed      = propertyType === 'mixed'
 
   const [leases,          setLeases]          = useState<any[]>([])
   const [loading,         setLoading]         = useState(true)
@@ -35,7 +35,7 @@ export default function RentTrackerPage() {
   const [selectedLeaseId, setSelectedLeaseId] = useState<string | undefined>()
   const [paymentOpen,     setPaymentOpen]     = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId])
+  useEffect(() => { if (orgId) load() }, [orgId, propertyType]) // added propertyType dependency
 
   async function load() {
     setLoading(true)
@@ -241,7 +241,7 @@ export default function RentTrackerPage() {
                   {['Tenant', 'Unit', 'Monthly Rent', 'This Month', 'Last Payment', 'Status', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider first:px-5">{h}</th>
                   ))}
-                </tr>
+                  </tr>
               </thead>
               <tbody>
                 {filtered.map((lease, i) => {
@@ -357,3 +357,4 @@ export default function RentTrackerPage() {
     </div>
   )
 }
+
