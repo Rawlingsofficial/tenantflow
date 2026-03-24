@@ -67,39 +67,27 @@ export default function OnboardingSetupPage() {
   const [completed, setCompleted] = useState(false)
 
   async function handleSave() {
-  if (!selected || !orgId) return
-  setSaving(true); setError('')
-  try {
-    console.log('Updating organization', orgId, 'with property_type:', selected)
-    const { data, error: e } = await supabase
-      .from('organizations')
-      .update(dbVal({ property_type: selected }))   // ← use dbVal here
-      .eq('id', orgId)
-      .select()
-
-    if (e) {
-      console.error('Supabase update error:', e)
-      throw new Error(e.message)
+    if (!selected || !orgId) return
+    setSaving(true); setError('')
+    try {
+      const { error: e } = await supabase
+        .from('organizations')
+        .update(dbVal({ property_type: selected }))
+        .eq('id', orgId)
+      if (e) throw new Error(e.message)
+      setCompleted(true)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setSaving(false)
     }
-    console.log('Update successful:', data)
-
-    setCompleted(true)
-    setTimeout(() => {
-      window.location.href = '/dashboard'
-    }, 1500)
-  } catch (err: unknown) {
-    console.error('Caught error:', err)
-    setError(err instanceof Error ? err.message : 'Something went wrong')
-    setSaving(false)
   }
-}
 
   const selectedType = PROPERTY_TYPES.find(p => p.type === selected)
 
   return (
     <OnboardingLayout>
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header with step indicator */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="relative h-10 w-10">
@@ -120,7 +108,7 @@ export default function OnboardingSetupPage() {
           <p className="text-slate-500 mt-1">Choose your property type to continue</p>
         </div>
 
-        {/* Step indicator */}
+        {/* Step indicator (just for visual) */}
         <div className="flex items-center justify-center gap-2">
           <div className="w-8 h-8 rounded-full bg-[#2BBE9A] text-white flex items-center justify-center text-xs font-bold">
             <Check className="h-3.5 w-3.5" />
@@ -160,15 +148,52 @@ export default function OnboardingSetupPage() {
         ) : (
           // Confirmation view
           selectedType && (
-            <div className="text-center space-y-4">
-              <div className={`w-16 h-16 rounded-2xl ${selectedType.bg} border-2 ${selectedType.border} flex items-center justify-center mx-auto`}>
-                <selectedType.icon className={`h-8 w-8 ${selectedType.color}`} />
-              </div>
-              <div>
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className={`w-16 h-16 rounded-2xl ${selectedType.bg} border-2 ${selectedType.border} flex items-center justify-center mx-auto mb-4`}>
+                  <selectedType.icon className={`h-8 w-8 ${selectedType.color}`} />
+                </div>
                 <h2 className="text-2xl font-bold text-slate-900">Ready to go! 🎉</h2>
-                <p className="text-slate-500 mt-1">Redirecting to dashboard...</p>
+                <p className="text-slate-500 mt-1">Your portfolio is configured for {selectedType.title.toLowerCase()} management.</p>
               </div>
-              <Loader2 className="h-6 w-6 animate-spin mx-auto text-[#2BBE9A]" />
+
+              <div className="space-y-3">
+                {[
+                  { label: 'Organization', value: orgId },
+                  { label: 'Portfolio type', value: selectedType.title },
+                  {
+                    label: 'Tenants section',
+                    value: selectedType.type === 'commercial' ? 'Companies' :
+                      selectedType.type === 'mixed' ? 'Tenants & Companies (toggle in sidebar)' : 'Tenants',
+                  },
+                  {
+                    label: 'Units section',
+                    value: selectedType.type === 'commercial' ? 'Spaces' : 'Units',
+                  },
+                  {
+                    label: 'Payments',
+                    value: selectedType.type === 'commercial' ? 'Invoices' :
+                      selectedType.type === 'mixed' ? 'Payments & Invoices' : 'Payments',
+                  },
+                ].map(item => (
+                  <div key={item.label} className={`flex items-start gap-3 p-3 rounded-xl ${selectedType.bg}`}>
+                    <div className={`w-5 h-5 rounded-full ${selectedType.check} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                      <Check className="h-2.5 w-2.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">{item.label}</p>
+                      <p className={`text-sm font-bold ${selectedType.color}`}>{item.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                onClick={() => window.location.href = '/dashboard'}
+                className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2"
+              >
+                Go to Dashboard <ArrowRight className="h-4 w-4" />
+              </Button>
             </div>
           )
         )}
@@ -176,3 +201,4 @@ export default function OnboardingSetupPage() {
     </OnboardingLayout>
   )
 }
+
