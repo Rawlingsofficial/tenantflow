@@ -5,11 +5,11 @@ import { useAuth } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useOrgStore, type PropertyType, type OrgData } from '@/store/orgStore'
 
-// Define the shape of the organization row returned from Supabase
+// Shape of the organization row (matches your DB schema)
 interface OrgRow {
   id: string
   name: string
-  property_type: string
+  property_type: string | null
   country: string | null
   plan_type: string | null
 }
@@ -24,20 +24,23 @@ export function usePropertyType(): { propertyType: PropertyType; loading: boolea
 
   useEffect(() => {
     if (!orgId) return
-    if (currentOrg?.id === orgId) return // already loaded
+    if (currentOrg?.id === orgId) return
 
     const supabase = getSupabaseBrowserClient()
 
-    // Fetch organization details
-    supabase
-      .from('organizations')
-      .select('id, name, property_type, country, plan_type')
-      .eq('id', orgId)
-      .single()
-      .then(({ data }) => {
-        if (!data) return
-        // Cast the data to the expected shape
-        const row = data as OrgRow
+    const loadData = async () => {
+      try {
+        // Fetch organization
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('id, name, property_type, country, plan_type')
+          .eq('id', orgId)
+          .single()
+
+        if (orgError) throw orgError
+        if (!orgData) return
+
+        const row = orgData as OrgRow
         const org: OrgData = {
           id: row.id,
           name: row.name,
@@ -46,36 +49,36 @@ export function usePropertyType(): { propertyType: PropertyType; loading: boolea
           plan_type: row.plan_type ?? null,
         }
         setCurrentOrg(org)
-      })
-      .catch((error) => {
-        console.error('Error loading organization:', error)
-      })
 
-    // Fetch user role
-    if (userId) {
-      supabase
-        .from('users')
-        .select('id')
-        .eq('clerk_user_id', userId)
-        .single()
-        .then(({ data: userData }) => {
-          if (!userData) return
-          supabase
-            .from('organization_memberships')
-            .select('role')
-            .eq('organization_id', orgId)
-            .eq('user_id', userData.id)
+        // Fetch user role if userId exists
+        if (userId) {
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('clerk_user_id', userId)
             .single()
-            .then(({ data: membership }) => {
-              if (membership?.role) {
-                setUserRole(membership.role as 'owner' | 'admin' | 'manager' | 'viewer')
-              }
-            })
-        })
-        .catch((error) => {
-          console.error('Error loading user or membership:', error)
-        })
+
+          if (userError) throw userError
+          if (userData) {
+            const { data: membership, error: membershipError } = await supabase
+              .from('organization_memberships')
+              .select('role')
+              .eq('organization_id', orgId)
+              .eq('user_id', userData.id)
+              .single()
+
+            if (membershipError) throw membershipError
+            if (membership?.role) {
+              setUserRole(membership.role as 'owner' | 'admin' | 'manager' | 'viewer')
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading organization or membership:', error)
+      }
     }
+
+    loadData()
   }, [orgId, userId, currentOrg?.id, setCurrentOrg, setUserRole])
 
   return {
