@@ -28,11 +28,11 @@ export default function LeasesPage() {
   const { orgId } = useAuth()
   const router    = useRouter()
   const supabase  = getSupabaseBrowserClient()
-  const { type, loading: typeLoading } = usePropertyType()
+  const { propertyType, loading: typeLoading } = usePropertyType() // renamed from 'type'
   const { mode, setMode } = useMixedModeStore()
 
-  const isMixed       = type === 'mixed'
-  const isCommercial  = type === 'commercial' || (isMixed && mode === 'commercial')
+  const isMixed       = propertyType === 'mixed'
+  const isCommercial  = propertyType === 'commercial' || (isMixed && mode === 'commercial')
   const tableMode: 'residential' | 'commercial' = isCommercial ? 'commercial' : 'residential'
 
   const [allLeases,    setAllLeases]    = useState<LeaseWithDetails[]>([])
@@ -222,7 +222,7 @@ export default function LeasesPage() {
                 · {mode === 'commercial' ? 'Commercial' : 'Residential'} portfolio
               </span>
             )}
-            {!isMixed && type === 'commercial' && <span className="ml-2 text-[#1B3B6F] font-semibold">· Commercial</span>}
+            {!isMixed && propertyType === 'commercial' && <span className="ml-2 text-[#1B3B6F] font-semibold">· Commercial</span>}
           </p>
         </div>
         <Button onClick={() => setNewLeaseOpen(true)}
