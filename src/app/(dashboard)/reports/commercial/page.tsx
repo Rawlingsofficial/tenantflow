@@ -114,8 +114,10 @@ export default function CommercialReportsPage() {
 
   // NNN / Base Rent separation using service_charge as proxy for CAM/NNN
   const totalBaseRent = activeLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
+  // Cast l to any to access service_charge (present in DB but not in ReportLease)
   const totalNNN = activeLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0)
-  const grossLeasableArea = data.units.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
+  // Cast u to any to access area_sqm (present in DB but not in ReportUnit)
+  const grossLeasableArea = data.units.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
 
   // Rent per sqm (PSM) — commercial equivalent of PSF
   const rentPSM = grossLeasableArea > 0 ? Math.round((totalBaseRent / grossLeasableArea) * 10) / 10 : 0
@@ -159,7 +161,7 @@ export default function CommercialReportsPage() {
   const topTenantRent = topTenantId ? tenantRentMap[topTenantId] : 0
   const topTenantPct = totalBaseRent > 0 ? Math.round((topTenantRent / totalBaseRent) * 100) : 0
   const topTenant = data.tenants.find(t => t.id === topTenantId)
-  const topTenantName = topTenant?.company_name ?? `${topTenant?.first_name ?? ''} ${topTenant?.last_name ?? ''}`.trim()
+  const topTenantName = (topTenant as any)?.company_name ?? `${topTenant?.first_name ?? ''} ${topTenant?.last_name ?? ''}`.trim()
 
   // 12-month revenue
   const months12 = Array.from({ length: 12 }, (_, i) => {
@@ -192,8 +194,8 @@ export default function CommercialReportsPage() {
     const bLeases = activeLeases.filter(l => bUnits.some(u => u.id === l.unit_id))
     const bOccupied = bUnits.filter(u => u.status === 'occupied').length
     const bRent = bLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
-    const bNNN = bLeases.reduce((s, l) => s + Number(l.service_charge ?? 0), 0)
-    const bArea = bUnits.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
+    const bNNN = bLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0) // cast
+    const bArea = bUnits.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0) // cast
     const bLeaseIds = bLeases.map(l => l.id)
     const bCollected = completedPayments
       .filter(p => bLeaseIds.includes(p.lease_id) && p.payment_date?.startsWith(thisMonth))
@@ -447,7 +449,7 @@ export default function CommercialReportsPage() {
                 {['Asset', 'GLA (m²)', 'Occupancy', 'Base Rent', 'NNN', 'PSM', 'WALT', 'Collection'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                 ))}
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {buildingStats.map((b, i) => (
@@ -576,7 +578,7 @@ export default function CommercialReportsPage() {
                   const tenant = data.tenants.find(t => t.id === lease.tenant_id)
                   const unit = data.units.find(u => u.id === lease.unit_id)
                   const building = data.buildings.find(b => b.id === unit?.building_id)
-                  const name = tenant?.company_name ?? `${tenant?.first_name ?? ''} ${tenant?.last_name ?? ''}`.trim()
+                  const name = (tenant as any)?.company_name ?? `${tenant?.first_name ?? ''} ${tenant?.last_name ?? ''}`.trim()
                   const pct = totalBaseRent > 0 ? Math.round((Number(lease.rent_amount) / totalBaseRent) * 100) : 0
                   const isExpiringSoon = lease.lease_end && differenceInDays(new Date(lease.lease_end), now) <= 90 && differenceInDays(new Date(lease.lease_end), now) >= 0
                   return (
@@ -585,12 +587,14 @@ export default function CommercialReportsPage() {
                       <td className="px-6 py-3.5 text-sm font-bold text-gray-600">#{i + 1}</td>
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-semibold text-gray-200">{name || '—'}</p>
-                        {tenant?.industry && <p className="text-[10px] text-gray-600">{tenant.company_reg_number ?? ''}</p>}
+                        {tenant?.industry && <p className="text-[10px] text-gray-600">{(tenant as any).company_reg_number ?? ''}</p>}
                       </td>
                       <td className="px-4 py-3.5 text-xs text-gray-500 capitalize">{tenant?.industry ?? tenant?.occupation ?? '—'}</td>
                       <td className="px-4 py-3.5 text-xs text-gray-400">{unit?.unit_code ?? '—'} · {building?.name ?? '—'}</td>
                       <td className="px-4 py-3.5 text-sm font-bold text-gray-200">${Number(lease.rent_amount).toLocaleString()}</td>
-                      <td className="px-4 py-3.5 text-sm text-sky-400">{Number(lease.service_charge ?? 0) > 0 ? `$${Number(lease.service_charge).toLocaleString()}` : '—'}</td>
+                      <td className="px-4 py-3.5 text-sm text-sky-400">
+                        {Number((lease as any).service_charge ?? 0) > 0 ? `$${Number((lease as any).service_charge).toLocaleString()}` : '—'}
+                      </td>
                       <td className="px-4 py-3.5">
                         {lease.lease_end ? (
                           <span className={`text-xs ${isExpiringSoon ? 'text-rose-400 font-semibold' : 'text-gray-500'}`}>
@@ -618,5 +622,3 @@ export default function CommercialReportsPage() {
     </div>
   )
 }
-
-
