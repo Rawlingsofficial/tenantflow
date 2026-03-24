@@ -15,6 +15,7 @@ export interface ReportUnit {
   default_rent?: number | null
   building_id: string
   buildings?: ReportBuilding | null
+  area_sqm?: number   // ✅ Added for GLA calculations
 }
 
 export interface ReportTenant {
