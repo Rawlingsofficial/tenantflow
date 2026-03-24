@@ -7,17 +7,14 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Home, Building2, Layers, Check, ArrowRight } from 'lucide-react'
-
-// Supabase strict-type bypass — same pattern used throughout the app
-function dbVal<T>(v: T): never { return v as never }
-
-type PropertyType = 'residential' | 'commercial' | 'mixed'
-type Step = 1 | 2 | 3
+import { Loader2, ArrowRight, Home, Building2, Layers, Check } from 'lucide-react'
+import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout'
+import { StepIndicator } from '@/components/onboarding/StepIndicator'
+import { PropertyTypeCard } from '@/components/onboarding/PropertyTypeCard'
 
 const PROPERTY_TYPES = [
   {
-    type: 'residential' as PropertyType,
+    type: 'residential' as const,
     icon: Home,
     title: 'Residential',
     subtitle: 'Apartments, Houses & Flats',
@@ -32,7 +29,7 @@ const PROPERTY_TYPES = [
     check: 'bg-emerald-600',
   },
   {
-    type: 'commercial' as PropertyType,
+    type: 'commercial' as const,
     icon: Building2,
     title: 'Commercial',
     subtitle: 'Offices, Retail & Warehouses',
@@ -47,7 +44,7 @@ const PROPERTY_TYPES = [
     check: 'bg-blue-600',
   },
   {
-    type: 'mixed' as PropertyType,
+    type: 'mixed' as const,
     icon: Layers,
     title: 'Mixed Portfolio',
     subtitle: 'Residential & Commercial',
@@ -63,6 +60,10 @@ const PROPERTY_TYPES = [
   },
 ]
 
+function dbVal<T>(v: T): never { return v as never }
+
+type Step = 1 | 2 | 3
+
 export default function OnboardingPage() {
   const router = useRouter()
   const { createOrganization, setActive } = useOrganizationList()
@@ -70,13 +71,12 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState<Step>(1)
   const [orgName, setOrgName] = useState('')
-  const [selectedType, setSelectedType] = useState<PropertyType | null>(null)
+  const [selectedType, setSelectedType] = useState<typeof PROPERTY_TYPES[number]['type'] | null>(null)
   const [createdOrgId, setCreatedOrgId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1: create org via Clerk + insert into Supabase
-  async function handleStep1() {
+  const handleStep1 = async () => {
     if (!orgName.trim()) { setError('Organization name is required'); return }
     if (!createOrganization || !setActive) { setError('Please refresh and try again'); return }
     setLoading(true); setError('')
@@ -84,10 +84,9 @@ export default function OnboardingPage() {
       const org = await createOrganization({ name: orgName.trim() })
       await setActive({ organization: org.id })
       const { error: e } = await supabase.from('organizations').insert(dbVal({
-  id: org.id,
-  name: orgName.trim(),
-  // property_type intentionally omitted — set in step 2
-}))
+        id: org.id,
+        name: orgName.trim(),
+      }))
       if (e) throw new Error(e.message)
       setCreatedOrgId(org.id)
       setStep(2)
@@ -96,8 +95,7 @@ export default function OnboardingPage() {
     } finally { setLoading(false) }
   }
 
-  // Step 2: update property_type on the org we just created
-  async function handleStep2() {
+  const handleStep2 = async () => {
     if (!selectedType || !createdOrgId) return
     setLoading(true); setError('')
     try {
@@ -112,156 +110,110 @@ export default function OnboardingPage() {
     } finally { setLoading(false) }
   }
 
-  function handleFinish() {
+  const handleFinish = () => {
     window.location.href = '/dashboard'
   }
 
   const selected = PROPERTY_TYPES.find(p => p.type === selectedType)
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-md space-y-6">
-
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2">
-          <div className="relative h-9 w-9 shrink-0">
-            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 15L16 4L29 15" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M6 13V27H26V13" stroke="#1B3B6F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <rect x="10" y="16" width="12" height="2.5" rx="1" fill="#1B3B6F"/>
-              <rect x="14.5" y="16" width="3" height="10" rx="1" fill="#1B3B6F"/>
-              <rect x="20" y="4" width="3.5" height="6" rx="1" fill="#14b8a6"/>
-            </svg>
-          </div>
-          <div className="flex items-baseline gap-0">
-            <span className="text-[#1B3B6F] font-bold text-xl leading-none tracking-tight">Tenant</span>
-            <span className="text-[#14b8a6] font-bold text-xl leading-none tracking-tight">Flow</span>
-          </div>
-        </div>
-
-        {/* Step progress */}
-        <div className="flex items-center justify-center gap-2">
-          {[1,2,3].map(s => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                step > s ? 'bg-[#14b8a6] text-white' :
-                step === s ? 'bg-[#1B3B6F] text-white ring-4 ring-slate-200' :
-                'bg-slate-100 text-slate-400'
-              }`}>
-                {step > s ? <Check className="h-3.5 w-3.5" /> : s}
-              </div>
-              {s < 3 && <div className={`w-10 h-0.5 ${step > s ? 'bg-[#14b8a6]' : 'bg-slate-200'}`} />}
+    <OnboardingLayout>
+      <div className="space-y-6">
+        {/* Logo and title */}
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <div className="relative h-10 w-10">
+              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 15L16 4L29 15" stroke="#2BBE9A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M6 13V27H26V13" stroke="#1F3A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="10" y="16" width="12" height="2.5" rx="1" fill="#1F3A5F"/>
+                <rect x="14.5" y="16" width="3" height="10" rx="1" fill="#1F3A5F"/>
+                <rect x="20" y="4" width="3.5" height="6" rx="1" fill="#2BBE9A"/>
+              </svg>
             </div>
-          ))}
-        </div>
-
-        {/* ── STEP 1: Create org ── */}
-        {step === 1 && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 space-y-5">
             <div>
-              <h1 className="text-xl font-bold text-slate-900">Create your organization</h1>
-              <p className="text-sm text-slate-500 mt-1">Set up your property management workspace.</p>
+              <span className="text-[#1F3A5F] font-bold text-2xl">Tenant</span>
+              <span className="text-[#2BBE9A] font-bold text-2xl">Flow</span>
             </div>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Get started with TenantFlow</h1>
+          <p className="text-slate-500 mt-1">Set up your organization and portfolio in minutes</p>
+        </div>
+
+        {/* Step indicator */}
+        <StepIndicator steps={[1, 2, 3]} currentStep={step} />
+
+        {/* Step 1 */}
+        {step === 1 && (
+          <div className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-slate-700">Organization name *</Label>
-              <Input placeholder="e.g. Acme Properties" value={orgName}
+              <Label className="text-sm font-medium text-slate-700">Organization name</Label>
+              <Input
+                placeholder="e.g., Acme Properties"
+                value={orgName}
                 onChange={e => setOrgName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleStep1()}
-                className="h-10 rounded-xl border-slate-200" />
+                className="h-11 rounded-xl border-slate-200 focus:ring-[#2BBE9A]/20"
+                autoFocus
+              />
+              <p className="text-xs text-slate-400">This will be your workspace name.</p>
             </div>
             {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-            <Button onClick={handleStep1} disabled={loading}
-              className="w-full h-11 bg-[#1B3B6F] hover:bg-[#152e56] text-white rounded-xl font-semibold gap-2">
+            <Button
+              onClick={handleStep1}
+              disabled={loading}
+              className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-semibold gap-2"
+            >
               {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating...</> : <>Continue <ArrowRight className="h-4 w-4" /></>}
             </Button>
-            <p className="text-center text-xs text-slate-400">You'll be set as the owner with full access.</p>
           </div>
         )}
 
-        {/* ── STEP 2: Property type ── */}
+        {/* Step 2 */}
         {step === 2 && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-slate-900">What do you manage?</h2>
-              <p className="text-sm text-slate-500 mt-1">
-                This shapes your entire experience — labels, forms, and features adapt to your answer.
-              </p>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">What type of properties do you manage?</h2>
+              <p className="text-sm text-slate-500 mt-1">This shapes your entire experience — labels, forms, and features adapt to your answer.</p>
             </div>
-            <div className="space-y-3 mb-5">
-              {PROPERTY_TYPES.map(pt => {
-                const isSelected = selectedType === pt.type
-                return (
-                  <button key={pt.type} onClick={() => setSelectedType(pt.type)}
-                    className={`w-full text-left rounded-2xl border-2 transition-all overflow-hidden ${
-                      isSelected ? `${pt.border} ${pt.bg}` : 'border-slate-100 bg-white hover:border-slate-200'
-                    }`}>
-                    <div className="p-4 flex items-start gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        isSelected ? 'bg-white/70' : 'bg-slate-100'
-                      }`}>
-                        <pt.icon className={`h-5 w-5 ${isSelected ? pt.color : 'text-slate-400'}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-0.5">
-                          <p className={`text-sm font-bold ${isSelected ? pt.color : 'text-slate-900'}`}>{pt.title}</p>
-                          <p className="text-xs text-slate-400">{pt.subtitle}</p>
-                        </div>
-                        <p className="text-xs text-slate-500">{pt.description}</p>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {pt.examples.map(ex => (
-                            <span key={ex} className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${
-                              isSelected ? `${pt.bg} ${pt.color} border-current/20` : 'bg-slate-50 text-slate-500 border-slate-200'
-                            }`}>{ex}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                        isSelected ? `${pt.check} border-transparent` : 'border-slate-200'
-                      }`}>
-                        {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <div className="px-4 pb-4 grid grid-cols-3 gap-2">
-                        {[
-                          { label: 'Tenants', value: pt.tenantLabel },
-                          { label: 'Units', value: pt.unitLabel },
-                          { label: 'Payments', value: pt.paymentLabel },
-                        ].map(row => (
-                          <div key={row.label} className="bg-white/60 rounded-xl p-2 border border-white">
-                            <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{row.label}</p>
-                            <p className={`text-[11px] font-semibold ${pt.color} leading-tight`}>{row.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
+            <div className="space-y-3">
+              {PROPERTY_TYPES.map(pt => (
+                <PropertyTypeCard
+                  key={pt.type}
+                  {...pt}
+                  selected={selectedType === pt.type}
+                  onSelect={() => setSelectedType(pt.type)}
+                />
+              ))}
             </div>
-            {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg mb-4">{error}</p>}
+            {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep(1)}
-                className="h-10 rounded-xl px-5 text-sm border-slate-200">Back</Button>
-              <Button onClick={handleStep2} disabled={!selectedType || loading}
-                className="flex-1 h-10 bg-[#1B3B6F] hover:bg-[#152e56] text-white rounded-xl font-semibold gap-2">
+              <Button variant="outline" onClick={() => setStep(1)} className="h-10 rounded-xl px-5 text-sm border-slate-200">
+                Back
+              </Button>
+              <Button
+                onClick={handleStep2}
+                disabled={!selectedType || loading}
+                className="flex-1 h-10 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-semibold gap-2"
+              >
                 {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : <>Continue <ArrowRight className="h-4 w-4" /></>}
               </Button>
             </div>
           </div>
         )}
 
-        {/* ── STEP 3: Confirmation ── */}
+        {/* Step 3 */}
         {step === 3 && selected && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8">
-            <div className="text-center mb-6">
-              <div className={`w-14 h-14 rounded-2xl ${selected.bg} border-2 ${selected.border} flex items-center justify-center mx-auto mb-4`}>
-                <selected.icon className={`h-7 w-7 ${selected.color}`} />
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className={`w-16 h-16 rounded-2xl ${selected.bg} border-2 ${selected.border} flex items-center justify-center mx-auto mb-4`}>
+                <selected.icon className={`h-8 w-8 ${selected.color}`} />
               </div>
-              <h2 className="text-xl font-bold text-slate-900">{orgName} is ready 🎉</h2>
-              <p className="text-sm text-slate-400 mt-1">Here's how TenantFlow is configured</p>
+              <h2 className="text-2xl font-bold text-slate-900">{orgName} is ready 🎉</h2>
+              <p className="text-slate-500 mt-1">Your portfolio is configured for {selected.title.toLowerCase()} management.</p>
             </div>
-            <div className="space-y-2.5 mb-6">
+
+            <div className="space-y-3">
               {[
                 { label: 'Organization', value: orgName },
                 { label: 'Portfolio type', value: selected.title },
@@ -291,13 +243,17 @@ export default function OnboardingPage() {
                 </div>
               ))}
             </div>
-            <Button onClick={handleFinish}
-              className="w-full h-11 bg-[#1B3B6F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2">
+
+            <Button
+              onClick={handleFinish}
+              className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2"
+            >
               Launch TenantFlow <ArrowRight className="h-4 w-4" />
             </Button>
           </div>
         )}
       </div>
-    </div>
+    </OnboardingLayout>
   )
 }
+
