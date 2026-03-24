@@ -10,8 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Plus, Search, Users, UserCheck, UserX, Calendar,
-  Building2, Mail, Phone, MoreVertical, ArrowUpRight
+  Plus, Search, Users, UserCheck, Calendar, ArrowUpRight,
 } from 'lucide-react'
 import AddTenantDialog from '@/components/tenants/AddTenantDialog'
 import { usePropertyType } from '@/hooks/usePropertyType'
@@ -23,7 +22,9 @@ export default function TenantsPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { propertyType: type } = usePropertyType()
+
+  // FIX: hook returns `propertyType`, not `type`
+  const { propertyType } = usePropertyType()
   const { mode } = useMixedModeStore()
 
   const [tenants, setTenants] = useState<any[]>([])
@@ -32,7 +33,7 @@ export default function TenantsPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, mode, type])
+  useEffect(() => { if (orgId) load() }, [orgId, mode, propertyType])
 
   async function load() {
     setLoading(true)
@@ -44,14 +45,16 @@ export default function TenantsPage() {
       .order('first_name', { ascending: true })
 
     let result = data ?? []
-    if (type === 'mixed') {
+
+    // For mixed orgs, filter tenants by the active segment (mode)
+    if (propertyType === 'mixed') {
       result = result.filter((t: any) => {
-        if (t.tenant_type === 'company') {
-          const activeLease = (t.leases ?? []).find((l: any) => l.status === 'active')
-          if (!activeLease) return true
-          return activeLease.units?.buildings?.building_type !== 'commercial'
-        }
-        return true
+        const activeLease = (t.leases ?? []).find((l: any) => l.status === 'active')
+        if (!activeLease) return true // unassigned tenants always show
+        const buildingType = activeLease.units?.buildings?.building_type ?? 'residential'
+        return mode === 'commercial'
+          ? buildingType === 'commercial'
+          : buildingType !== 'commercial'
       })
     }
 
@@ -77,10 +80,15 @@ export default function TenantsPage() {
   const withLeaseCount = tenants.filter(t => (t.leases ?? []).some((l: any) => l.status === 'active')).length
 
   const tabs = [
-    { label: 'All', value: 'all' as Tab, count: tenants.length },
-    { label: 'Active', value: 'active' as Tab, count: activeCount },
+    { label: 'All',      value: 'all'      as Tab, count: tenants.length },
+    { label: 'Active',   value: 'active'   as Tab, count: activeCount },
     { label: 'Inactive', value: 'inactive' as Tab, count: tenants.length - activeCount },
   ]
+
+  const isMixed = propertyType === 'mixed'
+  const segmentLabel = isMixed
+    ? mode === 'commercial' ? 'Commercial portfolio' : 'Residential portfolio'
+    : null
 
   return (
     <div className="min-h-screen bg-slate-50/70">
@@ -95,11 +103,15 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tenants</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {activeCount} active · {withLeaseCount} with active lease
-            {type === 'mixed' && <span className="ml-2 text-[#14b8a6] font-medium">· Residential portfolio</span>}
+            {segmentLabel && (
+              <span className="ml-2 text-teal-600 font-medium">· {segmentLabel}</span>
+            )}
           </p>
         </div>
-        <Button onClick={() => setAddOpen(true)}
-          className="h-9 bg-[#1B3B6F] hover:bg-[#162d52] text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 px-4 shadow-sm">
+        <Button
+          onClick={() => setAddOpen(true)}
+          className="h-9 bg-[#1B3B6F] hover:bg-[#162d52] text-white text-sm font-semibold rounded-xl flex items-center gap-1.5 px-4 shadow-sm"
+        >
           <Plus className="h-4 w-4" /> Add Tenant
         </Button>
       </motion.div>
@@ -107,9 +119,9 @@ export default function TenantsPage() {
       {/* Stats */}
       <div className="px-6 grid grid-cols-3 gap-3 mb-5">
         {[
-          { label: 'Total Tenants', value: tenants.length, color: 'text-slate-800', icon: Users, bg: 'bg-[#1B3B6F]', iconColor: 'text-[#14b8a6]', accentFrom: 'from-[#1B3B6F]/6' },
-          { label: 'Active', value: activeCount, color: 'text-teal-600', icon: UserCheck, bg: 'bg-teal-500/10', iconColor: 'text-teal-600', accentFrom: 'from-teal-500/5' },
-          { label: 'With Active Lease', value: withLeaseCount, color: 'text-teal-600', icon: Calendar, bg: 'bg-teal-500/10', iconColor: 'text-teal-600', accentFrom: 'from-teal-500/5' },
+          { label: 'Total Tenants',    value: tenants.length,   color: 'text-slate-800', icon: Users,      bg: 'bg-[#1B3B6F]',       iconColor: 'text-[#14b8a6]', accentFrom: 'from-[#1B3B6F]/6' },
+          { label: 'Active',           value: activeCount,      color: 'text-teal-600',  icon: UserCheck,  bg: 'bg-teal-500/10',     iconColor: 'text-teal-600',  accentFrom: 'from-teal-500/5' },
+          { label: 'With Active Lease', value: withLeaseCount,  color: 'text-teal-600',  icon: Calendar,   bg: 'bg-teal-500/10',     iconColor: 'text-teal-600',  accentFrom: 'from-teal-500/5' },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -206,7 +218,10 @@ export default function TenantsPage() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1B3B6F] to-[#2a4f8f] flex items-center justify-center flex-shrink-0 shadow-sm">
-                            <span className="text-sm font-bold text-[#14b8a6]">{initials}</span>
+                            {tenant.photo_url
+                              ? <img src={tenant.photo_url} alt="" className="w-full h-full object-cover rounded-xl" />
+                              : <span className="text-sm font-bold text-[#14b8a6]">{initials}</span>
+                            }
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">{name || '—'}</p>
@@ -220,9 +235,7 @@ export default function TenantsPage() {
                             <p className="text-sm text-slate-700">{tenant.primary_phone}</p>
                             {tenant.secondary_phone && <p className="text-[11px] text-slate-400">{tenant.secondary_phone}</p>}
                           </div>
-                        ) : (
-                          <span className="text-sm text-slate-400">—</span>
-                        )}
+                        ) : <span className="text-sm text-slate-400">—</span>}
                       </td>
                       <td className="px-4 py-3.5">
                         {activeLease ? (
@@ -241,16 +254,12 @@ export default function TenantsPage() {
                             <p className="text-sm font-semibold text-slate-800 font-mono">{activeLease.units?.unit_code}</p>
                             <p className="text-[11px] text-slate-400">{activeLease.units?.buildings?.name}</p>
                           </div>
-                        ) : (
-                          <span className="text-sm text-slate-400">—</span>
-                        )}
+                        ) : <span className="text-sm text-slate-400">—</span>}
                       </td>
                       <td className="px-4 py-3.5">
-                        {activeLease ? (
-                          <span className="text-sm font-bold text-slate-900 tabular-nums">${monthlyTotal.toLocaleString()}</span>
-                        ) : (
-                          <span className="text-sm text-slate-400">—</span>
-                        )}
+                        {activeLease
+                          ? <span className="text-sm font-bold text-slate-900 tabular-nums">${monthlyTotal.toLocaleString()}</span>
+                          : <span className="text-sm text-slate-400">—</span>}
                       </td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${
@@ -263,7 +272,7 @@ export default function TenantsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
-                        <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-teal-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
+                        <ArrowUpRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-teal-500 transition-colors" />
                       </td>
                     </motion.tr>
                   )
@@ -277,10 +286,7 @@ export default function TenantsPage() {
       <AddTenantDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onSaved={(tenant) => {
-          setAddOpen(false);
-          load();
-        }}
+        onSaved={() => { setAddOpen(false); load() }}
         organizationId={orgId ?? ''}
       />
     </div>
