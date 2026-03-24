@@ -63,10 +63,10 @@ export default function PaymentsPage() {
   const { orgId } = useAuth()
   const router    = useRouter()
   const supabase  = getSupabaseBrowserClient()
-  const { type }  = usePropertyType()
+  const { propertyType } = usePropertyType() // renamed from 'type'
 
-  const isMixed      = type === 'mixed'
-  const isCommercial = type === 'commercial'
+  const isMixed      = propertyType === 'mixed'
+  const isCommercial = propertyType === 'commercial'
   const showPortfolioFilter = isMixed || isCommercial
 
   const [payments,        setPayments]        = useState<Payment[]>([])
@@ -77,7 +77,7 @@ export default function PaymentsPage() {
   const [selectedMonth,   setSelectedMonth]   = useState('all')
   const [portfolioFilter, setPortfolioFilter] = useState<Portfolio>('all')
 
-  useEffect(() => { if (orgId) load() }, [orgId])
+  useEffect(() => { if (orgId) load() }, [orgId, propertyType]) // added propertyType
 
   async function load() {
     setLoading(true)
@@ -399,7 +399,7 @@ export default function PaymentsPage() {
                   {['Tenant', 'Unit · Building', 'Type', 'Amount', 'For Month', 'Date Paid', 'Method', 'Reference', 'Status'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider first:px-5">{h}</th>
                   ))}
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 {displayed.map((p, i) => {
@@ -498,3 +498,4 @@ export default function PaymentsPage() {
     </div>
   )
 }
+
