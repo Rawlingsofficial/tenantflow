@@ -114,7 +114,7 @@ export default function CommercialReportsPage() {
 
   // NNN / Base Rent separation using service_charge as proxy for CAM/NNN
   const totalBaseRent = activeLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
-  const totalNNN = activeLeases.reduce((s, l) => s + Number(l.service_charge ?? 0), 0)
+  const totalNNN = activeLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0)
   const grossLeasableArea = data.units.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
 
   // Rent per sqm (PSM) — commercial equivalent of PSF
