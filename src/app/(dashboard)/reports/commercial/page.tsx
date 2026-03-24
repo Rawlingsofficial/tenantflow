@@ -114,15 +114,11 @@ export default function CommercialReportsPage() {
 
   // NNN / Base Rent separation using service_charge as proxy for CAM/NNN
   const totalBaseRent = activeLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
-  // Cast l to any to access service_charge (present in DB but not in ReportLease)
   const totalNNN = activeLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0)
-  // Cast u to any to access area_sqm (present in DB but not in ReportUnit)
   const grossLeasableArea = data.units.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
 
-  // Rent per sqm (PSM) — commercial equivalent of PSF
   const rentPSM = grossLeasableArea > 0 ? Math.round((totalBaseRent / grossLeasableArea) * 10) / 10 : 0
 
-  // Collections
   const collectedThisMonth = completedPayments
     .filter(p => p.payment_date?.startsWith(thisMonth))
     .reduce((s, p) => s + Number(p.amount), 0)
@@ -136,7 +132,6 @@ export default function CommercialReportsPage() {
   const monthlyRunRate = totalBaseRent + totalNNN
   const collectionRate = monthlyRunRate > 0 ? Math.round((collectedThisMonth / monthlyRunRate) * 100) : 0
 
-  // Weighted Average Lease Term (WALT) in months
   const walt = activeLeases.length > 0
     ? Math.round(
         activeLeases.reduce((s, l) => {
@@ -146,13 +141,11 @@ export default function CommercialReportsPage() {
       )
     : 0
 
-  // Expiry exposure — leases ending in <12 months as % of income
   const expiryExposureRent = activeLeases
     .filter(l => l.lease_end && differenceInDays(new Date(l.lease_end), now) <= 365 && differenceInDays(new Date(l.lease_end), now) >= 0)
     .reduce((s, l) => s + Number(l.rent_amount), 0)
   const expiryExposurePct = totalBaseRent > 0 ? Math.round((expiryExposureRent / totalBaseRent) * 100) : 0
 
-  // Tenant concentration — top tenant by rent
   const tenantRentMap = activeLeases.reduce((acc: Record<string, number>, l) => {
     acc[l.tenant_id] = (acc[l.tenant_id] ?? 0) + Number(l.rent_amount)
     return acc
@@ -163,7 +156,6 @@ export default function CommercialReportsPage() {
   const topTenant = data.tenants.find(t => t.id === topTenantId)
   const topTenantName = (topTenant as any)?.company_name ?? `${topTenant?.first_name ?? ''} ${topTenant?.last_name ?? ''}`.trim()
 
-  // 12-month revenue
   const months12 = Array.from({ length: 12 }, (_, i) => {
     const m = subMonths(now, 11 - i)
     const ms = format(m, 'yyyy-MM')
@@ -174,9 +166,8 @@ export default function CommercialReportsPage() {
   })
   const maxRevenue = Math.max(...months12.map(m => m.collected), 1)
 
-  // Industry / tenant mix
   const industries = data.tenants.reduce((acc: Record<string, { count: number; rent: number }>, t) => {
-    const industry = (t as any).industry ?? (t as any).occupation ?? 'Other' // cast t to any
+    const industry = (t as any).industry ?? (t as any).occupation ?? 'Other'
     const tLeases = activeLeases.filter(l => l.tenant_id === t.id)
     const tRent = tLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
     if (!acc[industry]) acc[industry] = { count: 0, rent: 0 }
@@ -188,14 +179,13 @@ export default function CommercialReportsPage() {
     .sort((a, b) => b[1].rent - a[1].rent)
     .slice(0, 6)
 
-  // Building performance
   const buildingStats = data.buildings.map(b => {
     const bUnits = data.units.filter(u => u.building_id === b.id)
     const bLeases = activeLeases.filter(l => bUnits.some(u => u.id === l.unit_id))
     const bOccupied = bUnits.filter(u => u.status === 'occupied').length
     const bRent = bLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
-    const bNNN = bLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0) // cast
-    const bArea = bUnits.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0) // cast
+    const bNNN = bLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0)
+    const bArea = bUnits.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
     const bLeaseIds = bLeases.map(l => l.id)
     const bCollected = completedPayments
       .filter(p => bLeaseIds.includes(p.lease_id) && p.payment_date?.startsWith(thisMonth))
@@ -218,7 +208,6 @@ export default function CommercialReportsPage() {
     }
   }).sort((a, b) => b.rent - a.rent)
 
-  // Expiry schedule
   const expirySchedule = Array.from({ length: 6 }, (_, i) => {
     const m = subMonths(now, -i)
     const ms = format(m, 'yyyy-MM')
@@ -227,9 +216,7 @@ export default function CommercialReportsPage() {
     return { label: format(m, 'MMM yy'), ms, count: expiring.length, rent: expiringRent }
   })
 
-  // Alert: high tenant concentration
   const concentrationAlert = topTenantPct >= 25
-  // Alert: high expiry exposure
   const expiryAlert = expiryExposurePct >= 30
 
   const reportNav = [
@@ -255,7 +242,7 @@ export default function CommercialReportsPage() {
 
   return (
     <div className="min-h-screen bg-[#080a0f] pb-16 font-sans">
-      {/* ── Header ── */}
+      {/* Header */}
       <div className="px-6 pt-8 pb-6 border-b border-white/[0.05]">
         <div className="flex items-end justify-between">
           <div>
@@ -276,7 +263,7 @@ export default function CommercialReportsPage() {
         </div>
       </div>
 
-      {/* ── Alert Strip ── */}
+      {/* Alerts */}
       {(concentrationAlert || expiryAlert) && (
         <div className="px-6 pt-4 space-y-2">
           {concentrationAlert && (
@@ -298,7 +285,7 @@ export default function CommercialReportsPage() {
         </div>
       )}
 
-      {/* ── Core KPIs ── */}
+      {/* Core KPIs */}
       <div className="px-6 pt-5 grid grid-cols-4 gap-3 mb-6">
         <MetricCard
           label="Gross Rent Collected"
@@ -331,7 +318,7 @@ export default function CommercialReportsPage() {
         />
       </div>
 
-      {/* ── Secondary KPIs ── */}
+      {/* Secondary KPIs */}
       <div className="px-6 grid grid-cols-4 gap-3 mb-6">
         <MetricCard
           label="Rent PSM"
@@ -363,7 +350,7 @@ export default function CommercialReportsPage() {
         />
       </div>
 
-      {/* ── Report Nav Cards ── */}
+      {/* Report Nav Cards */}
       <div className="px-6 grid grid-cols-2 gap-3 mb-6">
         {reportNav.map(card => (
           <button key={card.title} onClick={() => router.push(card.href)}
@@ -394,7 +381,7 @@ export default function CommercialReportsPage() {
         ))}
       </div>
 
-      {/* ── Revenue Chart ── */}
+      {/* Revenue Chart */}
       <div className="px-6 mb-6">
         <div className="rounded-2xl bg-[#0f1117] border border-white/[0.06] p-6">
           <SectionHeader
@@ -434,7 +421,7 @@ export default function CommercialReportsPage() {
         </div>
       </div>
 
-      {/* ── Building Performance ── */}
+      {/* Building Performance */}
       <div className="px-6 mb-6">
         <div className="rounded-2xl bg-[#0f1117] border border-white/[0.06] overflow-hidden">
           <div className="px-6 py-4 border-b border-white/[0.05]">
@@ -449,7 +436,7 @@ export default function CommercialReportsPage() {
                 {['Asset', 'GLA (m²)', 'Occupancy', 'Base Rent', 'NNN', 'PSM', 'WALT', 'Collection'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                 ))}
-                </tr>
+                 </tr>
             </thead>
             <tbody>
               {buildingStats.map((b, i) => (
@@ -501,9 +488,8 @@ export default function CommercialReportsPage() {
         </div>
       </div>
 
-      {/* ── Tenant Mix + Expiry ── */}
+      {/* Tenant Mix + Expiry */}
       <div className="px-6 grid grid-cols-2 gap-4 mb-6">
-        {/* Tenant Mix by Industry */}
         <div className="rounded-2xl bg-[#0f1117] border border-white/[0.06] p-6">
           <SectionHeader title="Tenant Mix" sub="By industry / sector" />
           <div className="space-y-3">
@@ -528,7 +514,6 @@ export default function CommercialReportsPage() {
           </div>
         </div>
 
-        {/* Lease Expiry Schedule */}
         <div className="rounded-2xl bg-[#0f1117] border border-white/[0.06] p-6">
           <SectionHeader title="Lease Expiry Schedule" sub="Next 6 months" />
           <div className="space-y-2">
@@ -556,7 +541,7 @@ export default function CommercialReportsPage() {
         </div>
       </div>
 
-      {/* ── Top Tenants ── */}
+      {/* Top Tenants */}
       <div className="px-6 mb-6">
         <div className="rounded-2xl bg-[#0f1117] border border-white/[0.06] overflow-hidden">
           <div className="px-6 py-4 border-b border-white/[0.05]">
@@ -568,7 +553,7 @@ export default function CommercialReportsPage() {
                 {['#', 'Tenant', 'Industry', 'Unit', 'Base Rent', 'NNN', 'Lease End', 'Concentration'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                 ))}
-                </tr>
+              </tr>
             </thead>
             <tbody>
               {activeLeases
@@ -587,7 +572,7 @@ export default function CommercialReportsPage() {
                       <td className="px-6 py-3.5 text-sm font-bold text-gray-600">#{i + 1}</td>
                       <td className="px-4 py-3.5">
                         <p className="text-sm font-semibold text-gray-200">{name || '—'}</p>
-                        {tenant?.industry && <p className="text-[10px] text-gray-600">{(tenant as any).company_reg_number ?? ''}</p>}
+                        {(tenant as any)?.industry && <p className="text-[10px] text-gray-600">{(tenant as any).company_reg_number ?? ''}</p>}
                       </td>
                       <td className="px-4 py-3.5 text-xs text-gray-500 capitalize">{(tenant as any)?.industry ?? (tenant as any)?.occupation ?? '—'}</td>
                       <td className="px-4 py-3.5 text-xs text-gray-400">{unit?.unit_code ?? '—'} · {building?.name ?? '—'}</td>
@@ -622,4 +607,3 @@ export default function CommercialReportsPage() {
     </div>
   )
 }
-
