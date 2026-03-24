@@ -11,6 +11,7 @@ import { RevenueChart } from '@/components/reports/RevenueChart'
 import {
   DollarSign, Building2, Users, Layers, Clock,
   AlertCircle, ChevronRight, MapPin, Activity, TrendingUp,
+  FileText   
 } from 'lucide-react'
 import { format, subMonths, differenceInDays, differenceInMonths } from 'date-fns'
 import type { PortfolioData } from '@/types/reports'
@@ -282,7 +283,7 @@ export default function CommercialReportsOverview() {
                 {['Asset', 'GLA (m²)', 'Occ.', 'Base Rent', 'NNN', 'PSM', 'WALT', 'Coll.'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                 ))}
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {buildingStats.map(b => (
@@ -385,5 +386,3 @@ export default function CommercialReportsOverview() {
   )
 }
 
-// Fix missing import
-import { FileText } from 'lucide-react'
