@@ -51,6 +51,7 @@ export interface ReportLease {
   lease_end?: string | null
   renewal_date?: string | null
   status: string
+  service_charge?: number | null   // ADD THIS
   // joined
   tenants?: ReportTenant | null
   units?: (ReportUnit & { buildings?: ReportBuilding | null }) | null
