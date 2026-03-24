@@ -23,7 +23,7 @@ export default function TenantsPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { propertyType: type } = usePropertyType() // ✅ alias propertyType to type
+  const { propertyType } = usePropertyType() // --------------
   const { mode } = useMixedModeStore()
 
   const [tenants, setTenants] = useState<any[]>([])
@@ -32,7 +32,7 @@ export default function TenantsPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, mode, type]) // ✅ use 'type'
+  useEffect(() => { if (orgId) load() }, [orgId, mode, type]) // ---------------
 
   async function load() {
     setLoading(true)
@@ -290,4 +290,4 @@ export default function TenantsPage() {
 
 
 
-//aaaasssddffgghhjkkll
+//------------------- RECENTLY EDITED FILES ------------------
