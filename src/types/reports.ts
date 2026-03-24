@@ -15,7 +15,7 @@ export interface ReportUnit {
   default_rent?: number | null
   building_id: string
   buildings?: ReportBuilding | null
-  area_sqm?: number   // ✅ Added for GLA calculations
+  area_sqm?: number   // ✅ added for GLA calculations
 }
 
 export interface ReportTenant {
@@ -29,6 +29,8 @@ export interface ReportTenant {
   country?: string | null
   date_of_birth?: string | null
   status: string
+  company_name?: string | null   // ✅ added for commercial tenants
+  industry?: string | null       // ✅ added for industry analysis
 }
 
 export interface ReportPayment {
@@ -51,7 +53,7 @@ export interface ReportLease {
   lease_end?: string | null
   renewal_date?: string | null
   status: string
-  service_charge?: number | null   // ADD THIS
+  service_charge?: number | null   // ✅ added for NNN/CAM
   // joined
   tenants?: ReportTenant | null
   units?: (ReportUnit & { buildings?: ReportBuilding | null }) | null
