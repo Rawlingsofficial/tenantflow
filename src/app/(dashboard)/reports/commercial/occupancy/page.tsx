@@ -34,7 +34,8 @@ export default function CommercialRevenueReport() {
   const completed = data.payments.filter(p => p.status === 'completed')
 
   const totalBaseRent = activeLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
-  const totalNNN = activeLeases.reduce((s, l) => s + Number(l.service_charge ?? 0), 0)
+  // Cast to any to access service_charge (exists in DB but not in ReportLease type)
+  const totalNNN = activeLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0)
   const totalRunRate = totalBaseRent + totalNNN
 
   const collectedThisMonth = completed.filter(p => p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
@@ -56,7 +57,7 @@ export default function CommercialRevenueReport() {
     const unit = data.units.find(u => u.id === l.unit_id)
     const building = data.buildings.find(b => b.id === unit?.building_id)
     const thisPaid = completed.filter(p => p.lease_id === l.id && p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
-    const total = Number(l.rent_amount) + Number(l.service_charge ?? 0)
+    const total = Number(l.rent_amount) + Number((l as any).service_charge ?? 0)
     const owes = Math.max(0, total - thisPaid)
     return {
       id: l.id,
@@ -64,7 +65,7 @@ export default function CommercialRevenueReport() {
       unit: unit?.unit_code ?? '—',
       building: building?.name ?? '—',
       baseRent: Number(l.rent_amount),
-      nnn: Number(l.service_charge ?? 0),
+      nnn: Number((l as any).service_charge ?? 0),
       total,
       paid: thisPaid,
       owes,
@@ -159,7 +160,7 @@ export default function CommercialRevenueReport() {
                 {['Tenant', 'Unit', 'Base Rent', 'NNN/CAM', 'Total Due', 'Paid', 'Owes'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-5">{h}</th>
                 ))}
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {leaseBreakdown.map(l => (
