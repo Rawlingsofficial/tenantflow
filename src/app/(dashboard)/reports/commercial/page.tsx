@@ -176,7 +176,7 @@ export default function CommercialReportsPage() {
 
   // Industry / tenant mix
   const industries = data.tenants.reduce((acc: Record<string, { count: number; rent: number }>, t) => {
-    const industry = t.industry ?? t.occupation ?? 'Other'
+    const industry = (t as any).industry ?? (t as any).occupation ?? 'Other' // cast t to any
     const tLeases = activeLeases.filter(l => l.tenant_id === t.id)
     const tRent = tLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
     if (!acc[industry]) acc[industry] = { count: 0, rent: 0 }
@@ -449,7 +449,7 @@ export default function CommercialReportsPage() {
                 {['Asset', 'GLA (m²)', 'Occupancy', 'Base Rent', 'NNN', 'PSM', 'WALT', 'Collection'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                 ))}
-               </tr>
+                </tr>
             </thead>
             <tbody>
               {buildingStats.map((b, i) => (
@@ -568,7 +568,7 @@ export default function CommercialReportsPage() {
                 {['#', 'Tenant', 'Industry', 'Unit', 'Base Rent', 'NNN', 'Lease End', 'Concentration'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                 ))}
-              </tr>
+                </tr>
             </thead>
             <tbody>
               {activeLeases
@@ -589,7 +589,7 @@ export default function CommercialReportsPage() {
                         <p className="text-sm font-semibold text-gray-200">{name || '—'}</p>
                         {tenant?.industry && <p className="text-[10px] text-gray-600">{(tenant as any).company_reg_number ?? ''}</p>}
                       </td>
-                      <td className="px-4 py-3.5 text-xs text-gray-500 capitalize">{tenant?.industry ?? tenant?.occupation ?? '—'}</td>
+                      <td className="px-4 py-3.5 text-xs text-gray-500 capitalize">{(tenant as any)?.industry ?? (tenant as any)?.occupation ?? '—'}</td>
                       <td className="px-4 py-3.5 text-xs text-gray-400">{unit?.unit_code ?? '—'} · {building?.name ?? '—'}</td>
                       <td className="px-4 py-3.5 text-sm font-bold text-gray-200">${Number(lease.rent_amount).toLocaleString()}</td>
                       <td className="px-4 py-3.5 text-sm text-sky-400">
@@ -622,3 +622,4 @@ export default function CommercialReportsPage() {
     </div>
   )
 }
+
