@@ -23,7 +23,7 @@ export default function TenantsPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { propertyType } = usePropertyType() // ✅ fixed – use propertyType instead of type
+  const { propertyType: type } = usePropertyType() // ✅ alias propertyType to type
   const { mode } = useMixedModeStore()
 
   const [tenants, setTenants] = useState<any[]>([])
@@ -32,7 +32,7 @@ export default function TenantsPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, mode, propertyType])
+  useEffect(() => { if (orgId) load() }, [orgId, mode, type]) // ✅ use 'type'
 
   async function load() {
     setLoading(true)
@@ -44,16 +44,13 @@ export default function TenantsPage() {
       .order('first_name', { ascending: true })
 
     let result = data ?? []
-    // In mixed mode, filter to residential tenants only
-    if (propertyType === 'mixed') {
+    if (type === 'mixed') { // ✅ use 'type'
       result = result.filter((t: any) => {
-        // If tenant is a company, check if they have an active commercial lease
         if (t.tenant_type === 'company') {
           const activeLease = (t.leases ?? []).find((l: any) => l.status === 'active')
-          if (!activeLease) return true // company without active lease? include? decide
+          if (!activeLease) return true
           return activeLease.units?.buildings?.building_type !== 'commercial'
         }
-        // Individual tenants are residential by default
         return true
       })
     }
@@ -98,7 +95,7 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tenants</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {activeCount} active · {withLeaseCount} with active lease
-            {propertyType === 'mixed' && <span className="ml-2 text-[#14b8a6] font-medium">· Residential portfolio</span>}
+            {type === 'mixed' && <span className="ml-2 text-[#14b8a6] font-medium">· Residential portfolio</span>}
           </p>
         </div>
         <Button onClick={() => setAddOpen(true)}
@@ -277,7 +274,6 @@ export default function TenantsPage() {
         </div>
       </div>
 
-      {/* AddTenantDialog with all required props */}
       <AddTenantDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
@@ -290,4 +286,3 @@ export default function TenantsPage() {
     </div>
   )
 }
-
