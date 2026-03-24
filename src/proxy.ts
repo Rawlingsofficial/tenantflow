@@ -13,7 +13,6 @@ const isOnboardingRoute = createRouteMatcher([
   '/onboarding/setup',
 ])
 
-// Helper to get Supabase client with service role key for server-side
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -23,7 +22,7 @@ const supabase = createClient(
 export default clerkMiddleware(async (auth, req) => {
   const { userId, orgId } = await auth()
 
-  // 1. Not logged in → redirect to sign-in
+  // Not logged in → redirect to sign-in
   if (!userId) {
     if (!isPublicRoute(req)) {
       return (await auth()).redirectToSignIn()
@@ -31,29 +30,28 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next()
   }
 
-  // 2. Logged in, no org yet → must create one at /onboarding
+  // Logged in, no org yet → redirect to /onboarding (org creation)
   if (!orgId && !isOnboardingRoute(req)) {
     return NextResponse.redirect(new URL('/onboarding', req.url))
   }
 
-  // 3. Has org → check if property_type is set
-  if (orgId && !isOnboardingRoute(req)) {
-    // Query Supabase to get the organization's property_type
+  // Has org → check property_type
+  if (orgId) {
     const { data: org, error } = await supabase
       .from('organizations')
       .select('property_type')
       .eq('id', orgId)
       .single()
 
-    // If error or property_type is null, redirect to onboarding setup
-    if (error || !org?.property_type) {
+    // If property_type is missing and not already on onboarding setup route, redirect
+    if ((error || !org?.property_type) && !isOnboardingRoute(req)) {
       return NextResponse.redirect(new URL('/onboarding/setup', req.url))
     }
-  }
 
-  // 4. Has org but trying to access /onboarding (create org step) → go to dashboard
-  if (orgId && req.nextUrl.pathname === '/onboarding') {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+    // If property_type exists and user tries to access onboarding routes, redirect to dashboard
+    if (org?.property_type && isOnboardingRoute(req)) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
   }
 
   return NextResponse.next()
@@ -65,3 +63,5 @@ export const config = {
     '/(api|trpc)(.*)',
   ],
 }
+
+

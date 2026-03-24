@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import { Home, Building2, Layers, Loader2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Home, Building2, Layers, Loader2, ArrowRight, Check } from 'lucide-react'
 import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout'
 import { PropertyTypeCard } from '@/components/onboarding/PropertyTypeCard'
 
@@ -64,6 +64,7 @@ export default function OnboardingSetupPage() {
   const [selected, setSelected] = useState<typeof PROPERTY_TYPES[number]['type'] | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [completed, setCompleted] = useState(false)
 
   async function handleSave() {
     if (!selected || !orgId) return
@@ -74,7 +75,7 @@ export default function OnboardingSetupPage() {
         .update(dbVal({ property_type: selected }))
         .eq('id', orgId)
       if (e) throw new Error(e.message)
-      window.location.href = '/dashboard'
+      setCompleted(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setSaving(false)
@@ -86,6 +87,7 @@ export default function OnboardingSetupPage() {
   return (
     <OnboardingLayout>
       <div className="space-y-6">
+        {/* Header with step indicator */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="relative h-10 w-10">
@@ -102,36 +104,99 @@ export default function OnboardingSetupPage() {
               <span className="text-[#2BBE9A] font-bold text-2xl">Flow</span>
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">One last step</h1>
-          <p className="text-slate-500 mt-1">Tell us what type of properties you manage.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Complete your setup</h1>
+          <p className="text-slate-500 mt-1">Choose your property type to continue</p>
         </div>
 
-        <div className="space-y-3">
-          {PROPERTY_TYPES.map(pt => (
-            <PropertyTypeCard
-              key={pt.type}
-              {...pt}
-              selected={selected === pt.type}
-              onSelect={() => setSelected(pt.type)}
-            />
-          ))}
+        {/* Step indicator (just for visual) */}
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-[#2BBE9A] text-white flex items-center justify-center text-xs font-bold">
+            <Check className="h-3.5 w-3.5" />
+          </div>
+          <div className="w-16 h-0.5 bg-[#2BBE9A]" />
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${!completed ? 'bg-[#1F3A5F] text-white ring-4 ring-[#1F3A5F]/20' : 'bg-[#2BBE9A] text-white'}`}>
+            {completed ? <Check className="h-3.5 w-3.5" /> : '2'}
+          </div>
         </div>
 
-        {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+        {!completed ? (
+          <>
+            <div className="space-y-3">
+              {PROPERTY_TYPES.map(pt => (
+                <PropertyTypeCard
+                  key={pt.type}
+                  {...pt}
+                  selected={selected === pt.type}
+                  onSelect={() => setSelected(pt.type)}
+                />
+              ))}
+            </div>
+            {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+            <Button
+              onClick={handleSave}
+              disabled={!selected || saving}
+              className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2"
+            >
+              {saving
+                ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
+                : <>Continue to Dashboard <ArrowRight className="h-4 w-4" /></>}
+            </Button>
+            <p className="text-center text-xs text-slate-400">
+              This can only be changed by contacting support.
+            </p>
+          </>
+        ) : (
+          // Confirmation view
+          selectedType && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className={`w-16 h-16 rounded-2xl ${selectedType.bg} border-2 ${selectedType.border} flex items-center justify-center mx-auto mb-4`}>
+                  <selectedType.icon className={`h-8 w-8 ${selectedType.color}`} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">Ready to go! 🎉</h2>
+                <p className="text-slate-500 mt-1">Your portfolio is configured for {selectedType.title.toLowerCase()} management.</p>
+              </div>
 
-        <Button
-          onClick={handleSave}
-          disabled={!selected || saving}
-          className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2"
-        >
-          {saving
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
-            : <>Continue to Dashboard <ArrowRight className="h-4 w-4" /></>}
-        </Button>
+              <div className="space-y-3">
+                {[
+                  { label: 'Organization', value: orgId },
+                  { label: 'Portfolio type', value: selectedType.title },
+                  {
+                    label: 'Tenants section',
+                    value: selectedType.type === 'commercial' ? 'Companies' :
+                      selectedType.type === 'mixed' ? 'Tenants & Companies (toggle in sidebar)' : 'Tenants',
+                  },
+                  {
+                    label: 'Units section',
+                    value: selectedType.type === 'commercial' ? 'Spaces' : 'Units',
+                  },
+                  {
+                    label: 'Payments',
+                    value: selectedType.type === 'commercial' ? 'Invoices' :
+                      selectedType.type === 'mixed' ? 'Payments & Invoices' : 'Payments',
+                  },
+                ].map(item => (
+                  <div key={item.label} className={`flex items-start gap-3 p-3 rounded-xl ${selectedType.bg}`}>
+                    <div className={`w-5 h-5 rounded-full ${selectedType.check} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                      <Check className="h-2.5 w-2.5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">{item.label}</p>
+                      <p className={`text-sm font-bold ${selectedType.color}`}>{item.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-        <p className="text-center text-xs text-slate-400">
-          This can only be changed by contacting support.
-        </p>
+              <Button
+                onClick={() => window.location.href = '/dashboard'}
+                className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2"
+              >
+                Go to Dashboard <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )
+        )}
       </div>
     </OnboardingLayout>
   )
