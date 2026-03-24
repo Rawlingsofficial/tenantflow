@@ -82,10 +82,10 @@ export default function CommercialOccupancyReport() {
     return { ...u, buildingName: b?.name ?? '—', vacantSince, daysVacant, lostRev }
   }).sort((a, b) => (b.daysVacant ?? 0) - (a.daysVacant ?? 0))
 
-  // Unit type / purpose breakdown
-  const purposes = Array.from(new Set(data.units.map(u => u.unit_purpose ?? u.unit_type ?? 'Unknown')))
+  // Unit type / purpose breakdown – cast u to any for unit_purpose and unit_type
+  const purposes = Array.from(new Set(data.units.map(u => (u as any).unit_purpose ?? (u as any).unit_type ?? 'Unknown')))
   const byPurpose = purposes.map(p => {
-    const pUnits = data.units.filter(u => (u.unit_purpose ?? u.unit_type ?? 'Unknown') === p)
+    const pUnits = data.units.filter(u => ((u as any).unit_purpose ?? (u as any).unit_type ?? 'Unknown') === p)
     const pOcc = pUnits.filter(u => u.status === 'occupied').length
     const pArea = pUnits.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
     return { purpose: p, total: pUnits.length, occupied: pOcc, area: pArea, rate: pUnits.length > 0 ? Math.round((pOcc / pUnits.length) * 100) : 0 }
@@ -228,7 +228,7 @@ export default function CommercialOccupancyReport() {
                   <tr key={u.id} className="border-b border-white/[0.03] hover:bg-white/[0.02]">
                     <td className="px-5 py-3 text-sm font-semibold text-gray-200">{u.unit_code}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{u.buildingName}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500 capitalize">{u.unit_purpose ?? u.unit_type ?? '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 capitalize">{(u as any).unit_purpose ?? (u as any).unit_type ?? '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-400">{(u as any).area_sqm ? Number((u as any).area_sqm).toLocaleString() : '—'}</td>
                     <td className="px-4 py-3 text-sm text-gray-300">{(u as any).default_rent ? `$${Number((u as any).default_rent).toLocaleString()}` : '—'}</td>
                     <td className="px-4 py-3">
@@ -251,5 +251,4 @@ export default function CommercialOccupancyReport() {
     </div>
   )
 }
-
 
