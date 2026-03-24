@@ -23,7 +23,7 @@ export default function CompaniesPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { type } = usePropertyType()
+  const { propertyType } = usePropertyType() // renamed from 'type'
   const { mode } = useMixedModeStore()
 
   const [companies, setCompanies] = useState<any[]>([])
@@ -32,7 +32,7 @@ export default function CompaniesPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, mode, type])
+  useEffect(() => { if (orgId) load() }, [orgId, mode, propertyType]) // updated dependency
 
   async function load() {
     setLoading(true)
@@ -45,7 +45,8 @@ export default function CompaniesPage() {
       .order('company_name')
 
     let result = data ?? []
-    if (type === 'mixed') {
+    // use propertyType instead of type
+    if (propertyType === 'mixed') {
       result = result.filter((c: any) => {
         const activeLease = (c.leases ?? []).find((l: any) => l.status === 'active')
         if (!activeLease) return true
@@ -95,7 +96,7 @@ export default function CompaniesPage() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Companies</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {activeCount} active · {withLease} with lease · ${monthlyRev.toLocaleString()}/mo
-            {type === 'mixed' && <span className="ml-2 text-[#14b8a6] font-medium">· Commercial portfolio</span>}
+            {propertyType === 'mixed' && <span className="ml-2 text-[#14b8a6] font-medium">· Commercial portfolio</span>}
           </p>
         </div>
         <Button onClick={() => setAddOpen(true)}
@@ -278,5 +279,3 @@ export default function CompaniesPage() {
     </div>
   )
 }
-
-
