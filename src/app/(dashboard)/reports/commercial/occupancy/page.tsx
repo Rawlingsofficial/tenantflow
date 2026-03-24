@@ -52,25 +52,26 @@ export default function CommercialRevenueReport() {
   const maxVal = Math.max(...months12.map(m => m.val), 1)
 
   // Lease-by-lease breakdown
-  const leaseBreakdown = activeLeases.map(l => {
-    const tenant = data.tenants.find(t => t.id === l.tenant_id)
-    const unit = data.units.find(u => u.id === l.unit_id)
-    const building = data.buildings.find(b => b.id === unit?.building_id)
-    const thisPaid = completed.filter(p => p.lease_id === l.id && p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
-    const total = Number(l.rent_amount) + Number((l as any).service_charge ?? 0)
-    const owes = Math.max(0, total - thisPaid)
-    return {
-      id: l.id,
-      tenant: tenant?.company_name ?? `${tenant?.first_name ?? ''} ${tenant?.last_name ?? ''}`.trim(),
-      unit: unit?.unit_code ?? '—',
-      building: building?.name ?? '—',
-      baseRent: Number(l.rent_amount),
-      nnn: Number((l as any).service_charge ?? 0),
-      total,
-      paid: thisPaid,
-      owes,
-    }
-  }).sort((a, b) => b.total - a.total)
+  // Lease-by-lease breakdown
+const leaseBreakdown = activeLeases.map(l => {
+  const tenant = data.tenants.find(t => t.id === l.tenant_id)
+  const unit = data.units.find(u => u.id === l.unit_id)
+  const building = data.buildings.find(b => b.id === unit?.building_id)
+  const thisPaid = completed.filter(p => p.lease_id === l.id && p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
+  const total = Number(l.rent_amount) + Number((l as any).service_charge ?? 0)
+  const owes = Math.max(0, total - thisPaid)
+  return {
+    id: l.id,
+    tenant: (tenant as any)?.company_name ?? `${tenant?.first_name ?? ''} ${tenant?.last_name ?? ''}`.trim(),
+    unit: unit?.unit_code ?? '—',
+    building: building?.name ?? '—',
+    baseRent: Number(l.rent_amount),
+    nnn: Number((l as any).service_charge ?? 0),
+    total,
+    paid: thisPaid,
+    owes,
+  }
+}).sort((a, b) => b.total - a.total)
 
   return (
     <div className="min-h-screen bg-[#080a0f] pb-12 font-sans">
