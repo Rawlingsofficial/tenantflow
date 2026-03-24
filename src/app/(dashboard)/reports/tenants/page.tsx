@@ -23,7 +23,7 @@ export default function TenantsPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { propertyType } = usePropertyType() // ✅ fixed: changed from 'type' to 'propertyType'
+  const { propertyType } = usePropertyType() // ✅ fixed – use propertyType instead of type
   const { mode } = useMixedModeStore()
 
   const [tenants, setTenants] = useState<any[]>([])
@@ -181,7 +181,7 @@ export default function TenantsPage() {
                   {['Tenant', 'Contact', 'Lease Status', 'Current Unit', 'Monthly Rent', 'Status', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider first:px-5">{h}</th>
                   ))}
-                 </tr>
+                  </tr>
               </thead>
               <tbody>
                 {filtered.map((tenant, i) => {
@@ -277,7 +277,7 @@ export default function TenantsPage() {
         </div>
       </div>
 
-      {/* ✅ Fixed AddTenantDialog usage */}
+      {/* AddTenantDialog with all required props */}
       <AddTenantDialog
         open={addOpen}
         onClose={() => setAddOpen(false)}
@@ -290,3 +290,4 @@ export default function TenantsPage() {
     </div>
   )
 }
+
