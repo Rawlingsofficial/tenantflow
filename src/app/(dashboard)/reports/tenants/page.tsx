@@ -23,7 +23,7 @@ export default function TenantsPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { propertyType } = usePropertyType() // --------------
+  const { propertyType: type } = usePropertyType() // renamed here
   const { mode } = useMixedModeStore()
 
   const [tenants, setTenants] = useState<any[]>([])
