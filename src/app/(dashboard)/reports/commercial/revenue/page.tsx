@@ -146,12 +146,12 @@ export default function MixedReportsPage() {
   // residential = building_type is residential; commercial = office/retail/warehouse/industrial
   const residentialBuildingIds = new Set(
     data.buildings
-      .filter(b => !b.building_type || b.building_type === 'residential')
+      .filter(b => !(b as any).building_type || (b as any).building_type === 'residential')
       .map(b => b.id)
   )
   const commercialBuildingIds = new Set(
     data.buildings
-      .filter(b => b.building_type && b.building_type !== 'residential')
+      .filter(b => (b as any).building_type && (b as any).building_type !== 'residential')
       .map(b => b.id)
   )
 
@@ -176,7 +176,7 @@ export default function MixedReportsPage() {
   const commOccupied = commUnits.filter(u => u.status === 'occupied').length
   const commOccRate = commUnits.length > 0 ? Math.round((commOccupied / commUnits.length) * 100) : 0
   const commBaseRent = commLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
-  const commNNN = commLeases.reduce((s, l) => s + Number(l.service_charge ?? 0), 0)
+  const commNNN = commLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0) // cast
   const commRunRate = commBaseRent + commNNN
   const commCollected = completedPayments
     .filter(p => commLeases.some(l => l.id === p.lease_id) && p.payment_date?.startsWith(thisMonth))
@@ -223,7 +223,7 @@ export default function MixedReportsPage() {
     const bOcc = bUnits.filter(u => u.status === 'occupied').length
     const bLeases = data.leases.filter(l => bUnits.some(u => u.id === l.unit_id) && l.status === 'active')
     const bRent = bLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
-    const bNNN = bLeases.reduce((s, l) => s + Number(l.service_charge ?? 0), 0)
+    const bNNN = bLeases.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0) // cast
     const bLeaseIds = bLeases.map(l => l.id)
     const bCollected = completedPayments
       .filter(p => bLeaseIds.includes(p.lease_id) && p.payment_date?.startsWith(thisMonth))
@@ -432,7 +432,7 @@ export default function MixedReportsPage() {
                   {['Asset', 'Segment', 'Units', 'Occupancy', 'Run Rate', 'Collected', 'Coll. Rate'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                   ))}
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 {buildingsSummary.map(b => (
@@ -591,5 +591,4 @@ export default function MixedReportsPage() {
     </div>
   )
 }
-
 
