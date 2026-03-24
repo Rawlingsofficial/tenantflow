@@ -35,15 +35,15 @@ export default function CommercialOccupancyReport() {
   const maintenance = data.units.filter(u => u.status === 'maintenance').length
   const rate = total > 0 ? Math.round((occupied / total) * 100) : 0
 
-  // GLA metrics
-  const totalGLA = data.units.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
-  const occupiedGLA = data.units.filter(u => u.status === 'occupied').reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
-  const vacantGLA = data.units.filter(u => u.status === 'vacant').reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
+  // GLA metrics – cast u to any to access area_sqm (present in DB but not in ReportUnit)
+  const totalGLA = data.units.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
+  const occupiedGLA = data.units.filter(u => u.status === 'occupied').reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
+  const vacantGLA = data.units.filter(u => u.status === 'vacant').reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
   const glaOccRate = totalGLA > 0 ? Math.round((occupiedGLA / totalGLA) * 100) : 0
 
-  // Revenue at risk from vacant units
+  // Revenue at risk from vacant units – cast u to any for default_rent
   const revenueAtRisk = data.units
-    .filter(u => u.status === 'vacant' && u.default_rent)
+    .filter(u => u.status === 'vacant' && (u as any).default_rent)
     .reduce((s, u) => {
       const lastLease = data.leases
         .filter(l => l.unit_id === u.id && (l.status === 'ended' || l.status === 'terminated'))
@@ -51,15 +51,15 @@ export default function CommercialOccupancyReport() {
       const vacantSince = lastLease?.lease_end ? new Date(lastLease.lease_end) : null
       const daysVacant = vacantSince ? differenceInDays(now, vacantSince) : 0
       const monthsVacant = Math.max(1, Math.round(daysVacant / 30))
-      return s + (Number(u.default_rent) * monthsVacant)
+      return s + (Number((u as any).default_rent) * monthsVacant)
     }, 0)
 
   // Per-building
   const byBuilding = data.buildings.map(b => {
     const bUnits = data.units.filter(u => u.building_id === b.id)
     const bOccupied = bUnits.filter(u => u.status === 'occupied').length
-    const bArea = bUnits.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
-    const bOccArea = bUnits.filter(u => u.status === 'occupied').reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
+    const bArea = bUnits.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
+    const bOccArea = bUnits.filter(u => u.status === 'occupied').reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
     return {
       ...b, total: bUnits.length, occupied: bOccupied,
       vacant: bUnits.filter(u => u.status === 'vacant').length,
@@ -78,7 +78,7 @@ export default function CommercialOccupancyReport() {
       .sort((a, b) => new Date(b.lease_end ?? b.lease_start).getTime() - new Date(a.lease_end ?? a.lease_start).getTime())[0]
     const vacantSince = lastLease?.lease_end ? new Date(lastLease.lease_end) : null
     const daysVacant = vacantSince ? differenceInDays(now, vacantSince) : null
-    const lostRev = daysVacant && u.default_rent ? Math.round((Number(u.default_rent) / 30) * daysVacant) : 0
+    const lostRev = daysVacant && (u as any).default_rent ? Math.round((Number((u as any).default_rent) / 30) * daysVacant) : 0
     return { ...u, buildingName: b?.name ?? '—', vacantSince, daysVacant, lostRev }
   }).sort((a, b) => (b.daysVacant ?? 0) - (a.daysVacant ?? 0))
 
@@ -87,7 +87,7 @@ export default function CommercialOccupancyReport() {
   const byPurpose = purposes.map(p => {
     const pUnits = data.units.filter(u => (u.unit_purpose ?? u.unit_type ?? 'Unknown') === p)
     const pOcc = pUnits.filter(u => u.status === 'occupied').length
-    const pArea = pUnits.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
+    const pArea = pUnits.reduce((s, u) => s + Number((u as any).area_sqm ?? 0), 0)
     return { purpose: p, total: pUnits.length, occupied: pOcc, area: pArea, rate: pUnits.length > 0 ? Math.round((pOcc / pUnits.length) * 100) : 0 }
   }).sort((a, b) => b.total - a.total)
 
@@ -221,7 +221,7 @@ export default function CommercialOccupancyReport() {
                   {['Unit', 'Building', 'Type', 'Area (m²)', 'Asking Rent', 'Days Empty', 'Est. Lost'].map(h => (
                     <th key={h} className="px-4 py-2.5 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-5">{h}</th>
                   ))}
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 {vacantUnits.map(u => (
@@ -229,8 +229,8 @@ export default function CommercialOccupancyReport() {
                     <td className="px-5 py-3 text-sm font-semibold text-gray-200">{u.unit_code}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{u.buildingName}</td>
                     <td className="px-4 py-3 text-sm text-gray-500 capitalize">{u.unit_purpose ?? u.unit_type ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-400">{u.area_sqm ? Number(u.area_sqm).toLocaleString() : '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-300">{u.default_rent ? `$${Number(u.default_rent).toLocaleString()}` : '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-400">{(u as any).area_sqm ? Number((u as any).area_sqm).toLocaleString() : '—'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-300">{(u as any).default_rent ? `$${Number((u as any).default_rent).toLocaleString()}` : '—'}</td>
                     <td className="px-4 py-3">
                       {u.daysVacant !== null ? (
                         <span className={`text-sm font-bold ${u.daysVacant > 60 ? 'text-rose-400' : u.daysVacant > 30 ? 'text-amber-400' : 'text-gray-400'}`}>
@@ -251,3 +251,5 @@ export default function CommercialOccupancyReport() {
     </div>
   )
 }
+
+
