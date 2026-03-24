@@ -5,6 +5,7 @@ export interface ReportBuilding {
   id: string
   name: string
   address?: string | null
+  building_type?: string | null   // ✅ added for segment classification
 }
 
 export interface ReportUnit {
@@ -15,7 +16,7 @@ export interface ReportUnit {
   default_rent?: number | null
   building_id: string
   buildings?: ReportBuilding | null
-  area_sqm?: number   // ✅ added for GLA calculations
+  area_sqm?: number
 }
 
 export interface ReportTenant {
@@ -29,8 +30,8 @@ export interface ReportTenant {
   country?: string | null
   date_of_birth?: string | null
   status: string
-  company_name?: string | null   // ✅ added for commercial tenants
-  industry?: string | null       // ✅ added for industry analysis
+  company_name?: string | null
+  industry?: string | null
 }
 
 export interface ReportPayment {
