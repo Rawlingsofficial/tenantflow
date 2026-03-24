@@ -1,62 +1,71 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useOrganization } from '@clerk/nextjs'
+import { useEffect } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useOrgStore, type PropertyType } from '@/store/orgStore'
 
-export type PropertyType = 'residential' | 'commercial' | 'mixed'
+/**
+ * Resolves the current organization's property_type and populates orgStore.
+ * Also fetches the current user's role in the org.
+ *
+ * Returns { propertyType, loading } — stable API used across the app.
+ */
+export function usePropertyType(): { propertyType: PropertyType; loading: boolean } {
+  const { orgId, userId } = useAuth()
+  const { currentOrg, setCurrentOrg, setUserRole } = useOrgStore()
 
-// Module-level cache: orgId → type
-const cache: Record<string, PropertyType> = {}
-
-export function usePropertyType() {
-  const { organization } = useOrganization()
-  const orgId = organization?.id
-  const [type, setType] = useState<PropertyType>('residential')
-  const [loading, setLoading] = useState(true)
+  const loading = !currentOrg && !!orgId
 
   useEffect(() => {
     if (!orgId) return
-    // Return from cache immediately if available
-    if (cache[orgId]) {
-      setType(cache[orgId])
-      setLoading(false)
-      return
-    }
+    if (currentOrg?.id === orgId) return  // already loaded for this org
+
     const supabase = getSupabaseBrowserClient()
+
+    // Load org data
     supabase
       .from('organizations')
-      .select('property_type')
+      .select('id, name, property_type, country, plan_type')
       .eq('id', orgId)
       .single()
       .then(({ data }) => {
-        const t = ((data as any)?.property_type as PropertyType) ?? 'residential'
-        cache[orgId] = t
-        setType(t)
-        setLoading(false)
+        if (!data) return
+        setCurrentOrg({
+          id: data.id,
+          name: data.name,
+          property_type: (data.property_type as PropertyType) ?? 'residential',
+          country: data.country ?? null,
+          plan_type: data.plan_type ?? null,
+        })
       })
-  }, [orgId])
 
-  // Call after updating property_type to bust cache
-  function invalidate() {
-    if (orgId) delete cache[orgId]
+    // Load user role
+    if (userId) {
+      supabase
+        .from('users')
+        .select('id')
+        .eq('clerk_user_id', userId)
+        .single()
+        .then(({ data: userData }) => {
+          if (!userData) return
+          supabase
+            .from('organization_memberships')
+            .select('role')
+            .eq('organization_id', orgId)
+            .eq('user_id', userData.id)
+            .single()
+            .then(({ data: membership }) => {
+              if (membership?.role) {
+                setUserRole(membership.role as any)
+              }
+            })
+        })
+    }
+  }, [orgId, userId])
+
+  return {
+    propertyType: currentOrg?.property_type ?? null,
+    loading,
   }
-
-  const isResidential = type === 'residential'
-  const isCommercial = type === 'commercial'
-  const isMixed = type === 'mixed'
-
-  // Adaptive labels — use these everywhere instead of hardcoding
-  const labels = {
-    tenants: isCommercial ? 'Companies' : isMixed ? 'Tenants & Companies' : 'Tenants',
-    tenant: isCommercial ? 'Company' : 'Tenant',
-    addTenant: isCommercial ? 'Add Company' : isMixed ? 'Add Tenant / Company' : 'Add Tenant',
-    units: isCommercial ? 'Spaces' : 'Units',
-    unit: isCommercial ? 'Space' : 'Unit',
-    payments: isCommercial ? 'Invoices' : 'Payments',
-    unitType: isCommercial ? 'Space Type' : 'Unit Type',
-    vacant: isCommercial ? 'Available' : 'Vacant',
-  }
-
-  return { type, loading, isResidential, isCommercial, isMixed, labels, invalidate }
 }
