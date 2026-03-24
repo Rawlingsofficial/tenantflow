@@ -27,7 +27,7 @@ export default function InvoicesPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { type } = usePropertyType()
+  const { propertyType } = usePropertyType() // renamed from 'type'
 
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,7 +35,7 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, type])
+  useEffect(() => { if (orgId) load() }, [orgId, propertyType]) // updated dependency
 
   async function load() {
     setLoading(true)
@@ -50,7 +50,7 @@ export default function InvoicesPage() {
     let result = data ?? []
 
     // In mixed mode, only show invoices for commercial buildings
-    if (type === 'mixed') {
+    if (propertyType === 'mixed') { // changed type to propertyType
       result = result.filter((inv: any) =>
         inv.leases?.units?.buildings?.building_type === 'commercial'
       )
@@ -97,7 +97,7 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Invoices</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             ${totalPaid.toLocaleString()} collected · ${totalOverdue.toLocaleString()} overdue
-            {type === 'mixed' && <span className="ml-2 text-blue-500 font-medium">· Commercial portfolio</span>}
+            {propertyType === 'mixed' && <span className="ml-2 text-blue-500 font-medium">· Commercial portfolio</span>}
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}
@@ -159,7 +159,7 @@ export default function InvoicesPage() {
                   {['Invoice #', 'Company', 'Space', 'Amount', 'Invoice Date', 'Due Date', 'Status', 'Actions'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-gray-400 uppercase tracking-wide first:px-5">{h}</th>
                   ))}
-                </tr>
+                 </tr>
               </thead>
               <tbody>
                 {filtered.map(inv => {
