@@ -9,32 +9,34 @@ export async function loadPortfolioData(
   orgId: string
 ): Promise<PortfolioData> {
 
-  // Step 1 — all buildings for this org
+  // Step 1 — all buildings for this org (include building_type)
   const { data: buildings } = await supabase
     .from('buildings')
-    .select('id, name, address, status')
+    .select('id, name, address, status, building_type')   // ✅ added building_type
     .eq('organization_id', orgId)
     .eq('status', 'active')
   const buildingIds = (buildings ?? []).map((b: any) => b.id)
 
-  // Step 2 — all units in those buildings
+  // Step 2 — all units in those buildings (include area_sqm)
   const { data: units } = buildingIds.length > 0
     ? await supabase
         .from('units')
-        .select('id, unit_code, unit_type, status, default_rent, building_id')
+        .select('id, unit_code, unit_type, status, default_rent, building_id, area_sqm')   // ✅ added area_sqm
         .in('building_id', buildingIds)
     : { data: [] }
 
-  // Step 3 — all leases for this org (plain eq, no join filter)
+  // Step 3 — all leases for this org (include service_charge, and fetch tenant/unit details)
   const { data: leases } = await supabase
     .from('leases')
     .select(`
       id, organization_id, tenant_id, unit_id,
       rent_amount, lease_start, lease_end, renewal_date, status,
+      service_charge,   // ✅ added service_charge
       tenants(id, first_name, last_name, photo_url, primary_phone,
-              occupation, employment_type, country, date_of_birth, status),
-      units(id, unit_code, unit_type, status, default_rent, building_id,
-            buildings(id, name, address))
+              occupation, employment_type, country, date_of_birth, status,
+              company_name, industry),   // ✅ added company_name, industry
+      units(id, unit_code, unit_type, status, default_rent, building_id, area_sqm,
+            buildings(id, name, address, building_type))   // ✅ include area_sqm and building_type
     `)
     .eq('organization_id', orgId)
     .order('lease_start', { ascending: false })
@@ -50,10 +52,10 @@ export async function loadPortfolioData(
         .order('payment_date', { ascending: false })
     : { data: [] }
 
-  // Step 5 — all tenants for this org
+  // Step 5 — all tenants for this org (include company_name and industry)
   const { data: tenants } = await supabase
     .from('tenants')
-    .select('id, first_name, last_name, photo_url, primary_phone, occupation, employment_type, country, date_of_birth, status')
+    .select('id, first_name, last_name, photo_url, primary_phone, occupation, employment_type, country, date_of_birth, status, company_name, industry')   // ✅ added company_name, industry
     .eq('organization_id', orgId)
 
   // Attach building info to units
