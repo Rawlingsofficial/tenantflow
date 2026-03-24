@@ -5,13 +5,20 @@ import { useAuth } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { useOrgStore, type PropertyType, type OrgData } from '@/store/orgStore'
 
-// Shape of the organization row (matches your DB schema)
 interface OrgRow {
   id: string
   name: string
   property_type: string | null
   country: string | null
   plan_type: string | null
+}
+
+interface UserRow {
+  id: string
+}
+
+interface MembershipRow {
+  role: string
 }
 
 export function usePropertyType(): { propertyType: PropertyType; loading: boolean } {
@@ -60,15 +67,17 @@ export function usePropertyType(): { propertyType: PropertyType; loading: boolea
 
           if (userError) throw userError
           if (userData) {
-            const { data: membership, error: membershipError } = await supabase
+            const userRow = userData as UserRow
+            const { data: membershipData, error: membershipError } = await supabase
               .from('organization_memberships')
               .select('role')
               .eq('organization_id', orgId)
-              .eq('user_id', userData.id)
+              .eq('user_id', userRow.id)
               .single()
 
             if (membershipError) throw membershipError
-            if (membership?.role) {
+            if (membershipData) {
+              const membership = membershipData as MembershipRow
               setUserRole(membership.role as 'owner' | 'admin' | 'manager' | 'viewer')
             }
           }
@@ -86,4 +95,3 @@ export function usePropertyType(): { propertyType: PropertyType; loading: boolea
     loading,
   }
 }
-
