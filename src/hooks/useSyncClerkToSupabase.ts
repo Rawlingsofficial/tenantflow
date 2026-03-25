@@ -84,10 +84,10 @@ export function useSyncClerkToSupabase() {
 
       // ✅ 2. Get user UUID
       const { data: userData, error: userError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("clerk_user_id", userId!)
-        .single();
+  .from("users")
+  .select("id")
+  .eq("clerk_user_id", userId!)
+  .single<{ id: string }>();
 
       if (userError || !userData) {
         console.error("❌ User not found");
