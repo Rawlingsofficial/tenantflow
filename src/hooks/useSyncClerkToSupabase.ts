@@ -20,15 +20,21 @@ export function useSyncClerkToSupabase() {
     syncOrg();
   }, [orgId, organization, membership, userId]);
 
+  // =========================
+  // USER SYNC
+  // =========================
   async function syncUser() {
     try {
       const email = user?.primaryEmailAddress?.emailAddress;
+
       if (!email) {
         console.error("❌ No email from Clerk");
         return;
       }
 
-      const full_name = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || null;
+      const full_name =
+        [user?.firstName, user?.lastName].filter(Boolean).join(" ") || null;
+
       const phone = user?.primaryPhoneNumber?.phoneNumber ?? null;
 
       const { error } = await supabase.from("users").upsert(
@@ -38,23 +44,29 @@ export function useSyncClerkToSupabase() {
           full_name,
           phone,
           status: "active",
-        },
+        } as any,
         { onConflict: "clerk_user_id" }
       );
 
       if (error) throw error;
+
     } catch (err) {
       console.error("❌ Failed to sync user:", err);
     }
   }
 
+  // =========================
+  // ORG SYNC
+  // =========================
   async function syncOrg() {
     try {
-      if (!organization) return;
+      if (!organization) return; // ✅ EXTRA SAFETY (fixes TS)
 
-      const orgName = organization.name ?? "Unnamed Org";
+      console.log("🔄 Syncing org:", orgId);
 
-      // 1. Ensure organization exists
+      const orgName = organization.name ?? "Unnamed Org"; // ✅ SAFE ACCESS
+
+      // ✅ 1. Ensure organization exists
       const { error: orgError } = await supabase
         .from("organizations")
         .upsert(
@@ -64,17 +76,17 @@ export function useSyncClerkToSupabase() {
             plan_type: "free",
             status: "active",
             property_type: null,
-          },
+          } as any,
           { onConflict: "id" }
         );
 
       if (orgError) throw orgError;
 
-      // 2. Get user UUID
+      // ✅ 2. Get user UUID
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("id")
-        .eq("clerk_user_id", userId)
+        .eq("clerk_user_id", userId!)
         .single();
 
       if (userError || !userData) {
@@ -82,32 +94,39 @@ export function useSyncClerkToSupabase() {
         return;
       }
 
-      // 3. Normalize role
-      const clerkRole = membership?.role ?? "org:member";
+      // ✅ 3. Normalize role
+      const clerkRole = (membership?.role as string) ?? "org:member";
       const role = normalizeRole(clerkRole);
 
-      // 4. Insert membership
+      // ✅ 4. Insert membership
       const { error: memberError } = await supabase
         .from("organization_memberships")
         .insert({
-          user_id: userData.id,  // ✅ Fixed type error
+          user_id: userData.id,
           organization_id: orgId,
           role,
           status: "active",
-        });
+        } as any);
 
+      // ignore duplicates
       if (memberError && !memberError.message.includes("duplicate")) {
         throw memberError;
       }
 
       console.log("✅ Org sync complete");
+
     } catch (err) {
       console.error("❌ Failed to sync org:", err);
     }
   }
 }
 
-function normalizeRole(clerkRole: string): "owner" | "admin" | "manager" | "viewer" {
+// =========================
+// ROLE NORMALIZER
+// =========================
+function normalizeRole(
+  clerkRole: string
+): "owner" | "admin" | "manager" | "viewer" {
   if (clerkRole === "org:admin") return "admin";
   if (clerkRole === "org:member") return "manager";
   if (clerkRole === "basic_member") return "manager";
