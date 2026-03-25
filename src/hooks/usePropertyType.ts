@@ -3,11 +3,14 @@
 import { useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useOrgStore, type PropertyType, type OrgData } from "@/store/orgStore";
+import { useOrgStore, type OrgData } from "@/store/orgStore";
 import {
   isFeatureAllowedForPropertyType,
   getAllowedReportSections,
 } from "@/lib/permissions";
+
+// ONLY residential or commercial
+export type PropertyType = "residential" | "commercial";
 
 interface OrgRow {
   id: string;
@@ -25,18 +28,14 @@ interface MembershipRow {
   role: string;
 }
 
-/**
- * Fetches the current org's property type + user role and keeps orgStore in sync.
- * Returns { propertyType, loading } plus convenience helpers.
- */
 export function usePropertyType(): {
   propertyType: PropertyType;
   loading: boolean;
   isResidential: boolean;
   isCommercial: boolean;
 
-  canView: (feature: "residential" | "commercial") => boolean;
-  allowedSections: ("residential" | "commercial")[];
+  canView: (feature: PropertyType) => boolean;
+  allowedSections: PropertyType[];
 } {
   const { orgId, userId } = useAuth();
   const currentOrg = useOrgStore((s) => s.currentOrg);
@@ -64,7 +63,7 @@ export function usePropertyType(): {
 
         const row = orgData as OrgRow;
 
-        // Ensure property_type is only 'residential' or 'commercial'
+        // sanitize property type to only residential or commercial
         const propType: PropertyType =
           row.property_type === "commercial" ? "commercial" : "residential";
 
@@ -111,10 +110,11 @@ export function usePropertyType(): {
     loadData();
   }, [orgId, userId, currentOrg?.id, setCurrentOrg, setUserRole]);
 
-  // default to 'residential' if not yet loaded
-  const propertyType: PropertyType = currentOrg?.property_type ?? "residential";
+  // default to residential
+  const propertyType: PropertyType =
+    currentOrg?.property_type === "commercial" ? "commercial" : "residential";
 
-  function canView(feature: "residential" | "commercial"): boolean {
+  function canView(feature: PropertyType): boolean {
     return isFeatureAllowedForPropertyType(propertyType, feature);
   }
 
@@ -124,6 +124,6 @@ export function usePropertyType(): {
     isResidential: propertyType === "residential",
     isCommercial: propertyType === "commercial",
     canView,
-    allowedSections: getAllowedReportSections(propertyType),
+    allowedSections: getAllowedReportSections(propertyType) as PropertyType[],
   };
 }
