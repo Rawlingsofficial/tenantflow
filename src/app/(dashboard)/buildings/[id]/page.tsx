@@ -11,36 +11,46 @@ import { EditBuildingDialog } from "@/components/buildings/EditBuildingDialog";
 import { EditUnitDialog } from "@/components/buildings/EditUnitDialog";
 import { Button } from "@/components/ui/button";
 import { usePropertyType } from "@/hooks/usePropertyType";
-import {
-  ArrowLeft, Plus, ChevronRight, Pencil, Home, Briefcase,
-} from "lucide-react";
-import {
-  Input
-} from "@/components/ui/input";
+import { ArrowLeft, Plus, Briefcase, Home } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-
-function val<T>(v: T): never { return v as never; }
 
 type UnitView = "all" | "occupied" | "vacant" | "unavailable";
 
 interface Building {
-  id: string; name: string; address: string | null;
-  status: string; photo_url: string | null; organization_id: string;
+  id: string;
+  name: string;
+  address: string | null;
+  status: string;
+  photo_url: string | null;
+  organization_id: string;
   building_type?: string;
 }
 
 interface Unit {
-  id: string; unit_code: string; unit_type: string | null;
-  bedrooms: number | null; bathrooms: number | null;
-  default_rent: number | null; status: string; building_id: string;
-  area_sqm?: number | null; unit_purpose?: string | null;
+  id: string;
+  unit_code: string;
+  unit_type: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  default_rent: number | null;
+  status: string;
+  building_id: string;
+  area_sqm?: number | null;
+  unit_purpose?: string | null;
   activeLease?: {
-    id: string; tenant_id: string; lease_start: string;
-    lease_end: string | null; rent_amount: number; status: string;
+    id: string;
+    tenant_id: string;
+    lease_start: string;
+    lease_end: string | null;
+    rent_amount: number;
+    status: string;
     tenant: {
-      id: string; first_name: string | null; last_name: string | null;
-      primary_phone: string | null; photo_url: string | null;
+      id: string;
+      first_name: string | null;
+      last_name: string | null;
+      primary_phone: string | null;
+      photo_url: string | null;
     } | null;
   };
 }
@@ -65,7 +75,9 @@ export default function BuildingDetailPage() {
   const { orgId } = useAuth();
   const supabase = createBrowserClient();
   const { propertyType } = usePropertyType();
-  const isMixed = propertyType === "mixed";
+
+  const isResidential = propertyType === "residential";
+  const isCommercial = propertyType === "commercial";
 
   const [building, setBuilding] = useState<Building | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -83,13 +95,20 @@ export default function BuildingDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const { data: bData } = await supabase.from("buildings").select("*").eq("id", id).single();
+      const { data: bData } = await supabase
+        .from("buildings")
+        .select("*")
+        .eq("id", id)
+        .single();
       setBuilding(bData || null);
 
       const { data: uData } = await supabase
         .from("units")
-        .select("id, unit_code, unit_type, bedrooms, bathrooms, default_rent, status, building_id, area_sqm, unit_purpose")
-        .eq("building_id", id).order("unit_code");
+        .select(
+          "id, unit_code, unit_type, bedrooms, bathrooms, default_rent, status, building_id, area_sqm, unit_purpose"
+        )
+        .eq("building_id", id)
+        .order("unit_code");
 
       setUnits(uData || []);
     } finally {
@@ -97,7 +116,9 @@ export default function BuildingDetailPage() {
     }
   }, [id, supabase]);
 
-  useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, refreshKey]);
 
   if (loading) return <div>Loading building...</div>;
   if (!building) return <div>Building not found.</div>;
@@ -109,11 +130,17 @@ export default function BuildingDetailPage() {
           <ArrowLeft className="h-4 w-4" />
         </button>
         <h1>{building.name}</h1>
-        <Button onClick={() => setAddUnitOpen(true)}><Plus /> Add Unit</Button>
+        <Button onClick={() => setAddUnitOpen(true)}>
+          <Plus /> Add Unit
+        </Button>
       </div>
+
+      {/* Segment badge */}
+      <SegmentBadge buildingType={propertyType ?? "residential"} />
 
       {/* Render Tabs, Units, Overview, Settings here */}
       {/* Add dialogs: AddUnitDialog, EditUnitDialog, EditBuildingDialog, UnitHistoryDialog */}
     </div>
   );
 }
+
