@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import { hasPermission } from "@/lib/permissions";
 import { toast } from "sonner";
 import { Trash2, UserPlus, Crown, Shield, Eye, Briefcase } from "lucide-react";
-import { Section, Field, SaveButton, inputCls, SettingsSkeleton } from "./AccountSettings";
+import { Section, Field, inputCls, SettingsSkeleton } from "./AccountSettings";
 import type { Role } from "@/types";
 
 type Member = {
@@ -36,9 +36,16 @@ const ROLE_COLORS: Record<Role, string> = {
   viewer: "bg-gray-100 text-gray-600",
 };
 
+const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  owner: "Full access to everything including billing and destructive actions. Cannot be changed.",
+  admin: "Full access except billing management. Can manage team members and permissions.",
+  manager: "Can manage tenants, units, leases, and payments. Cannot access billing or team settings.",
+  viewer: "Read-only access to all data. Cannot create, edit, or delete anything.",
+};
+
 export default function TeamSettings() {
   const { orgId, userId } = useAuth();
-  const supabase = createBrowserClient();
+  const supabase = getSupabaseBrowserClient();
   const { role: myRole } = useRole();
 
   const canManage = myRole ? hasPermission(myRole, "settings.manage_team") : false;
@@ -46,7 +53,6 @@ export default function TeamSettings() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Invite form
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("viewer");
   const [inviteFullName, setInviteFullName] = useState("");
@@ -55,24 +61,15 @@ export default function TeamSettings() {
   const fetchMembers = useCallback(async () => {
     if (!orgId) return;
     setLoading(true);
-    const { data, error } = await supabase
+
+    const result = await (supabase as any)
       .from("organization_memberships")
-      .select(`
-        id,
-        user_id,
-        role,
-        status,
-        users (
-          full_name,
-          email,
-          phone
-        )
-      `)
+      .select(`id, user_id, role, status, users ( full_name, email, phone )`)
       .eq("organization_id", orgId)
       .eq("status", "active")
-      .order("role");
+      .order("role") as { data: Member[] | null; error: any };
 
-    if (!error && data) setMembers(data as any);
+    if (!result.error && result.data) setMembers(result.data);
     setLoading(false);
   }, [orgId]);
 
@@ -85,28 +82,32 @@ export default function TeamSettings() {
     setInviting(true);
     try {
       // 1. Upsert the user record
-      const { data: userData, error: upsertErr } = await supabase
+      const upsertResult = await (supabase as any)
         .from("users")
         .upsert(
           { email: inviteEmail.trim(), full_name: inviteFullName.trim() || null },
           { onConflict: "email" }
         )
         .select("id")
-        .single<{ id: string }>();
+        .single() as { data: { id: string } | null; error: any };
 
-      if (upsertErr || !userData) throw upsertErr ?? new Error("Failed to create user");
+      if (upsertResult.error || !upsertResult.data) {
+        throw upsertResult.error ?? new Error("Failed to create user");
+      }
 
-      // 2. Insert membership (ignore duplicate)
-      const { error: memberErr } = await supabase
+      // 2. Insert membership
+      const insertResult = await (supabase as any)
         .from("organization_memberships")
         .insert({
-          user_id: userData.id,
+          user_id: upsertResult.data.id,
           organization_id: orgId,
           role: inviteRole,
           status: "active",
-        } as any);
+        }) as { error: { message: string } | null };
 
-      if (memberErr && !memberErr.message.includes("duplicate")) throw memberErr;
+      if (insertResult.error && !insertResult.error.message.includes("duplicate")) {
+        throw new Error(insertResult.error.message);
+      }
 
       toast.success(`${inviteEmail} added as ${inviteRole}`);
       setInviteEmail("");
@@ -121,12 +122,12 @@ export default function TeamSettings() {
   }
 
   async function handleRoleChange(memberId: string, newRole: Role) {
-    const { error } = await supabase
+    const result = await (supabase as any)
       .from("organization_memberships")
       .update({ role: newRole })
-      .eq("id", memberId);
+      .eq("id", memberId) as { error: any };
 
-    if (error) {
+    if (result.error) {
       toast.error("Failed to update role");
     } else {
       toast.success("Role updated");
@@ -138,12 +139,13 @@ export default function TeamSettings() {
 
   async function handleRemove(memberId: string) {
     if (!confirm("Remove this member from the organization?")) return;
-    const { error } = await supabase
+
+    const result = await (supabase as any)
       .from("organization_memberships")
       .update({ status: "inactive" })
-      .eq("id", memberId);
+      .eq("id", memberId) as { error: any };
 
-    if (error) {
+    if (result.error) {
       toast.error("Failed to remove member");
     } else {
       toast.success("Member removed");
@@ -168,12 +170,10 @@ export default function TeamSettings() {
 
             return (
               <div key={m.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                {/* Avatar */}
                 <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-600 shrink-0">
                   {(m.users?.full_name ?? m.users?.email ?? "?")[0].toUpperCase()}
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
                     {m.users?.full_name ?? m.users?.email}
@@ -182,7 +182,6 @@ export default function TeamSettings() {
                   <p className="text-xs text-gray-400 truncate">{m.users?.email}</p>
                 </div>
 
-                {/* Role badge / selector */}
                 {canEdit ? (
                   <select
                     value={m.role}
@@ -196,14 +195,11 @@ export default function TeamSettings() {
                     ))}
                   </select>
                 ) : (
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_COLORS[m.role]}`}
-                  >
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_COLORS[m.role]}`}>
                     {m.role}
                   </span>
                 )}
 
-                {/* Remove */}
                 {canEdit && (
                   <button
                     onClick={() => handleRemove(m.id)}
@@ -219,7 +215,7 @@ export default function TeamSettings() {
         </div>
       </Section>
 
-      {/* Invite new member */}
+      {/* Add member */}
       {canManage && (
         <Section
           title="Add Team Member"
@@ -256,7 +252,7 @@ export default function TeamSettings() {
                   </option>
                 ))}
               </select>
-              <RoleHint role={inviteRole} />
+              <p className="mt-1 text-xs text-gray-400">{ROLE_DESCRIPTIONS[inviteRole]}</p>
             </Field>
           </div>
 
@@ -295,15 +291,4 @@ export default function TeamSettings() {
   );
 }
 
-const ROLE_DESCRIPTIONS: Record<Role, string> = {
-  owner: "Full access to everything including billing and destructive actions. Cannot be changed.",
-  admin: "Full access except billing management. Can manage team members and permissions.",
-  manager: "Can manage tenants, units, leases, and payments. Cannot access billing or team settings.",
-  viewer: "Read-only access to all data. Cannot create, edit, or delete anything.",
-};
 
-function RoleHint({ role }: { role: Role }) {
-  return (
-    <p className="mt-1 text-xs text-gray-400">{ROLE_DESCRIPTIONS[role]}</p>
-  );
-}
