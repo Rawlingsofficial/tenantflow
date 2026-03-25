@@ -102,3 +102,5 @@ export function PropertyTypeCard({
     </button>
   )
 }
+
+

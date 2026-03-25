@@ -1,3 +1,5 @@
+"use server";
+
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { createServerClient } from "@/lib/supabase/server";
@@ -84,8 +86,6 @@ export async function POST(req: NextRequest) {
     // ── organization.created ──────────────────────────────────────────────────
     if (eventType === "organization.created") {
       const { id, name } = data;
-      // NOTE: We intentionally do NOT set property_type here.
-      // The user sets it during onboarding. We only set it once via onboarding/setup.
       const { error } = await supabase.from("organizations").upsert(
         val({ id, name, plan_type: "free", status: "active" }),
         { onConflict: "id" }
@@ -100,7 +100,6 @@ export async function POST(req: NextRequest) {
     // ── organization.updated ──────────────────────────────────────────────────
     if (eventType === "organization.updated") {
       const { id, name } = data;
-      // Only update name — never overwrite property_type from Clerk
       const { error } = await supabase
         .from("organizations")
         .update(val({ name }))
@@ -131,12 +130,9 @@ export async function POST(req: NextRequest) {
 
       if (userError || !userData) {
         console.error("[webhook] user not found for membership:", public_user_data.user_id);
-        // Return 200 so Clerk doesn't retry — user may not exist yet, client sync handles it
         return NextResponse.json({ received: true, warning: "User not found" });
       }
 
-      // Check if this is the first active member of the org
-      // → if so, they become owner regardless of what Clerk says
       const { data: existingMembers } = await supabase
         .from("organization_memberships")
         .select("id")
@@ -146,8 +142,6 @@ export async function POST(req: NextRequest) {
       const isFirst = !existingMembers || existingMembers.length === 0;
       const normalizedRole = isFirst ? "owner" : normalizeClerkRole(clerkRole);
 
-      // Use INSERT ... ON CONFLICT DO UPDATE instead of upsert to avoid
-      // overwriting a manually-set role with a stale Clerk role on re-sync
       const { error: memberError } = await supabase
         .from("organization_memberships")
         .upsert(
@@ -181,14 +175,12 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (userData) {
-        // IMPORTANT: Only sync the Clerk role if the Supabase role is NOT "owner".
-        // Owner role is managed in-app and should not be overwritten by Clerk.
         const { data: currentMember } = await supabase
           .from("organization_memberships")
           .select("role")
           .eq("user_id", userData.id)
           .eq("organization_id", organization.id)
-          .maybeSingle();
+          .maybeSingle<{ role: string }>(); // <-- FIXED
 
         if (currentMember?.role !== "owner") {
           const normalizedRole = normalizeClerkRole(clerkRole);
@@ -240,3 +232,4 @@ function normalizeClerkRole(
   if (clerkRole === "org:member" || clerkRole === "basic_member") return "manager";
   return "viewer";
 }
+
