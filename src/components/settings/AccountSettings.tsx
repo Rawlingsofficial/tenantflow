@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -9,49 +9,39 @@ export default function AccountSettings() {
   const { user, isLoaded } = useUser();
   const supabase = getSupabaseBrowserClient();
 
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [fullName, setFullName] = useState(
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
+  );
+  const [phone, setPhone] = useState(
+    user?.primaryPhoneNumber?.phoneNumber ?? ""
+  );
   const [saving, setSaving] = useState(false);
-
-  // Initialize state once user is loaded
-  useEffect(() => {
-    if (!isLoaded || !user) return;
-
-    setFullName([user.firstName, user.lastName].filter(Boolean).join(" "));
-    setPhone(user.primaryPhoneNumber?.phoneNumber ?? "");
-  }, [isLoaded, user]);
 
   if (!isLoaded) return <SettingsSkeleton />;
 
   async function handleSave() {
     setSaving(true);
     try {
-      const parts = fullName.trim().split(" ");
+      const parts     = fullName.trim().split(" ");
       const firstName = parts[0] ?? "";
-      const lastName = parts.slice(1).join(" ") || undefined;
+      const lastName  = parts.slice(1).join(" ") || undefined;
 
-      // Update Clerk user
       await user?.update({ firstName, lastName });
 
-      // Update Supabase profile
       const { error } = await (supabase as any)
         .from("users")
         .update({ full_name: fullName.trim(), phone: phone || null })
         .eq("clerk_user_id", user?.id ?? "");
 
       if (error) throw error;
-
       toast.success("Account updated successfully");
     } catch (err: any) {
-      toast.error(err?.errors?.[0]?.message ?? err?.message ?? "Failed to update account");
+      toast.error(
+        err?.errors?.[0]?.message ?? err?.message ?? "Failed to update account"
+      );
     } finally {
       setSaving(false);
     }
-  }
-
-  function handleChangePassword() {
-    // Clerk password flow
-    window.open(`${window.location.origin}/user/password/change`, "_blank");
   }
 
   return (
@@ -66,7 +56,6 @@ export default function AccountSettings() {
               className={inputCls}
             />
           </Field>
-
           <Field label="Email">
             <input
               type="email"
@@ -78,7 +67,6 @@ export default function AccountSettings() {
               Managed by your sign-in provider.
             </p>
           </Field>
-
           <Field label="Phone">
             <input
               type="tel"
@@ -89,7 +77,6 @@ export default function AccountSettings() {
             />
           </Field>
         </div>
-
         <div className="pt-4 flex justify-end">
           <SaveButton onClick={handleSave} loading={saving} />
         </div>
@@ -98,11 +85,12 @@ export default function AccountSettings() {
       <Section title="Password" description="Change your sign-in password.">
         <p className="text-sm text-gray-500">
           Password management is handled through{" "}
-          <span className="font-medium text-gray-700">Clerk</span>.
+          <span className="font-medium text-gray-700">Clerk</span>. Click below
+          to open the password update flow.
         </p>
         <div className="pt-4">
           <button
-            onClick={handleChangePassword}
+            onClick={() => user?.update({})}
             className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Change Password
@@ -113,7 +101,7 @@ export default function AccountSettings() {
   );
 }
 
-// ─── Shared primitives ────────────────────────────────────────────────
+// ── Shared primitives (exported for use in other settings components) ──────────
 
 export function Section({
   title,
@@ -128,7 +116,9 @@ export function Section({
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <div className="mb-5">
         <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-        {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
+        {description && (
+          <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+        )}
       </div>
       {children}
     </div>
@@ -144,7 +134,9 @@ export function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+      </label>
       {children}
     </div>
   );
@@ -189,5 +181,3 @@ export function SettingsSkeleton() {
     </div>
   );
 }
-
-

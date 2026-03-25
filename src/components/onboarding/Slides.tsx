@@ -1,3 +1,4 @@
+// components/onboarding/Slides.tsx
 'use client'
 
 import { useState } from 'react'

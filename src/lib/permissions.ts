@@ -1,3 +1,4 @@
+//lib/permissions.ts
 import type { Role } from '@/types'
 
 // ─── Permission definitions ───────────────────────────────────────────

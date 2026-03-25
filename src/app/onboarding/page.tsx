@@ -3,20 +3,16 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOrganizationList, useUser } from '@clerk/nextjs'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, ArrowRight } from 'lucide-react'
 import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout'
 
-function dbVal<T>(v: T): never { return v as never }
-
 export default function OnboardingPage() {
   const router = useRouter()
   const { user } = useUser()
   const { createOrganization, setActive } = useOrganizationList()
-  const supabase = getSupabaseBrowserClient()
 
   const [orgName, setOrgName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -29,30 +25,20 @@ export default function OnboardingPage() {
 
     setLoading(true)
     setError('')
+
     try {
-      // 1. Create organization in Clerk
+      // 1. Create org in Clerk — webhook fires automatically and syncs to Supabase
       const org = await createOrganization({ name: orgName.trim() })
+
+      // 2. Set as active org in Clerk session
       await setActive({ organization: org.id })
 
-      // 2. Insert organization into Supabase
-      console.log('Inserting organization into Supabase:', org.id, orgName.trim())
-      const { error: insertError } = await supabase
-        .from('organizations')
-        .insert(dbVal({
-          id: org.id,
-          name: orgName.trim(),
-        }))
-
-      if (insertError) {
-        console.error('Supabase insert error:', insertError)
-        throw new Error(`Failed to save organization: ${insertError.message}`)
-      }
-      console.log('Organization inserted successfully')
-
-      // 3. Redirect to setup
+      // 3. Go to property type setup
+      // DO NOT insert into Supabase here — the webhook handles org + membership sync
       router.push('/onboarding/setup')
+
     } catch (err: unknown) {
-      console.error('Onboarding error:', err)
+      console.error('[onboarding] create org error:', err)
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
     }
@@ -69,6 +55,7 @@ export default function OnboardingPage() {
                 <path d="M6 13V27H26V13" stroke="#1F3A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 <rect x="10" y="16" width="12" height="2.5" rx="1" fill="#1F3A5F"/>
                 <rect x="14.5" y="16" width="3" height="10" rx="1" fill="#1F3A5F"/>
+                <rect x="20" y="4" width="3.5" height="6" rx="1" fill="#2BBE9A"/>
                 <rect x="20" y="4" width="3.5" height="6" rx="1" fill="#2BBE9A"/>
               </svg>
             </div>
@@ -94,17 +81,23 @@ export default function OnboardingPage() {
             />
             <p className="text-xs text-slate-400">This will be your workspace name.</p>
           </div>
-          {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+          {error && (
+            <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+          )}
+
           <Button
             onClick={handleCreate}
-            disabled={loading}
+            disabled={loading || !orgName.trim()}
             className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-semibold gap-2"
           >
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating...</> : <>Continue <ArrowRight className="h-4 w-4" /></>}
+            {loading
+              ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating...</>
+              : <>Continue <ArrowRight className="h-4 w-4" /></>
+            }
           </Button>
         </div>
       </div>
     </OnboardingLayout>
   )
 }
-

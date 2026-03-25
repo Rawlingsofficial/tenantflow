@@ -1,3 +1,4 @@
+// components/onboarding/OnboardingLayout.tsx
 'use client'
 
 import { ReactNode } from 'react'

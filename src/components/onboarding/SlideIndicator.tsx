@@ -1,3 +1,4 @@
+// components/onboarding/SlideIndicator.tsx
 export function SlideIndicator({ total, current }: { total: number; current: number }) {
   return (
     <div className="flex items-center gap-2">

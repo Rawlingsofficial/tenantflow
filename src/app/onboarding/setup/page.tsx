@@ -46,7 +46,6 @@ export default function OnboardingSetupPage() {
   const supabase = getSupabaseBrowserClient()
 
   const [selected, setSelected] = useState<'residential' | 'commercial' | null>(null)
-
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(false)
@@ -61,24 +60,24 @@ export default function OnboardingSetupPage() {
     setError('')
 
     try {
-      const { error } = await supabase
+      // Only update property_type — do NOT overwrite name or other fields
+      // that were already set by the webhook when the org was created.
+      const { error: updateError } = await (supabase as any)
         .from('organizations')
-        .upsert({
-          id: orgId,
-          name: 'Temp Org', // temporary fallback
-          property_type: selected,
-        } as any)
+        .update({ property_type: selected })
+        .eq('id', orgId)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       setCompleted(true)
 
+      // Small delay so user sees the success state before redirect
       setTimeout(() => {
         window.location.href = '/dashboard'
       }, 1200)
 
     } catch (err: unknown) {
-      console.error(err)
+      console.error('[onboarding/setup] save error:', err)
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setSaving(false)
     }
@@ -89,13 +88,13 @@ export default function OnboardingSetupPage() {
   return (
     <OnboardingLayout>
       <div className="space-y-6">
-        
+
         <div className="text-center">
           <h1 className="text-2xl font-bold text-slate-900">
             Complete your setup
           </h1>
           <p className="text-slate-500 mt-1">
-            Choose your property type
+            Choose your property type to unlock the right features
           </p>
         </div>
 
@@ -121,26 +120,24 @@ export default function OnboardingSetupPage() {
             <Button
               onClick={handleSave}
               disabled={!selected || saving}
-              className="w-full"
+              className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-semibold"
             >
               {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Saving...</>
               ) : (
-                <>
-                  Continue to Dashboard
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </>
+                <>Continue to Dashboard <ArrowRight className="h-4 w-4 ml-2" /></>
               )}
             </Button>
           </>
         ) : (
           selectedType && (
-            <div className="text-center space-y-4">
-              <h2 className="text-xl font-bold">Ready 🎉</h2>
-              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+            <div className="text-center space-y-4 py-8">
+              <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center ${selectedType.bg}`}>
+                <selectedType.icon className={`h-8 w-8 ${selectedType.color}`} />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900">You&apos;re all set! 🎉</h2>
+              <p className="text-slate-500 text-sm">Taking you to your dashboard...</p>
+              <Loader2 className="h-5 w-5 animate-spin mx-auto text-slate-400" />
             </div>
           )
         )}
@@ -148,4 +145,3 @@ export default function OnboardingSetupPage() {
     </OnboardingLayout>
   )
 }
-

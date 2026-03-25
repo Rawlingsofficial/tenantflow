@@ -1,3 +1,4 @@
+// components/onboarding/StepIndicator.tsx
 'use client'
 
 import { Check } from 'lucide-react'

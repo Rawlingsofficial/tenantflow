@@ -1,3 +1,4 @@
+// components/onboarding/SlideCard.tsx
 import Image from 'next/image'
 import { Card } from '@/components/ui/card'
 

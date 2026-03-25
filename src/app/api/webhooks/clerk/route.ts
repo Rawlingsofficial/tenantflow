@@ -2,17 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { createServerClient } from "@/lib/supabase/server";
 
-// Helper to bypass strict Supabase Database types
 function val<T>(v: T): never { return v as never; }
 
 export async function POST(req: NextRequest) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
-
   if (!WEBHOOK_SECRET) {
     return NextResponse.json({ error: "CLERK_WEBHOOK_SECRET not set" }, { status: 500 });
   }
 
-  const svix_id = req.headers.get("svix-id");
+  const svix_id        = req.headers.get("svix-id");
   const svix_timestamp = req.headers.get("svix-timestamp");
   const svix_signature = req.headers.get("svix-signature");
 
@@ -21,7 +19,6 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.text();
-
   let evt: any;
   try {
     const wh = new Webhook(WEBHOOK_SECRET);
@@ -31,23 +28,22 @@ export async function POST(req: NextRequest) {
       "svix-signature": svix_signature,
     });
   } catch (err) {
-    console.error("Webhook verification failed:", err);
+    console.error("[webhook] verification failed:", err);
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
   }
 
-  const supabase = createServerClient();
+  const supabase   = createServerClient();
   const eventType: string = evt.type;
-  const data = evt.data;
+  const data       = evt.data;
 
-  console.log(`Clerk webhook received: ${eventType}`);
+  console.log(`[webhook] received: ${eventType}`);
 
   try {
-
-    // ── User Created ──────────────────────────────────────────────
+    // ── user.created ──────────────────────────────────────────────────────────
     if (eventType === "user.created") {
       const { id, email_addresses, first_name, last_name, phone_numbers } = data;
-      const email = email_addresses?.[0]?.email_address;
-      const phone = phone_numbers?.[0]?.phone_number ?? null;
+      const email     = email_addresses?.[0]?.email_address;
+      const phone     = phone_numbers?.[0]?.phone_number ?? null;
       const full_name = [first_name, last_name].filter(Boolean).join(" ") || null;
 
       const { error } = await supabase.from("users").upsert(
@@ -55,117 +51,157 @@ export async function POST(req: NextRequest) {
         { onConflict: "clerk_user_id" }
       );
       if (error) {
-        console.error("Failed to create user:", error);
+        console.error("[webhook] user.created failed:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
-      console.log(`User synced: ${id}`);
+      console.log(`[webhook] user synced: ${id}`);
     }
 
-    // ── User Updated ──────────────────────────────────────────────
+    // ── user.updated ──────────────────────────────────────────────────────────
     if (eventType === "user.updated") {
       const { id, email_addresses, first_name, last_name, phone_numbers } = data;
-      const email = email_addresses?.[0]?.email_address;
-      const phone = phone_numbers?.[0]?.phone_number ?? null;
+      const email     = email_addresses?.[0]?.email_address;
+      const phone     = phone_numbers?.[0]?.phone_number ?? null;
       const full_name = [first_name, last_name].filter(Boolean).join(" ") || null;
 
       const { error } = await supabase
         .from("users")
         .update(val({ email, full_name, phone }))
         .eq("clerk_user_id", id);
-      if (error) console.error("Failed to update user:", error);
+      if (error) console.error("[webhook] user.updated failed:", error);
     }
 
-    // ── User Deleted ──────────────────────────────────────────────
+    // ── user.deleted ──────────────────────────────────────────────────────────
     if (eventType === "user.deleted") {
       const { id } = data;
       const { error } = await supabase
         .from("users")
         .update(val({ status: "inactive" }))
         .eq("clerk_user_id", id);
-      if (error) console.error("Failed to deactivate user:", error);
+      if (error) console.error("[webhook] user.deleted failed:", error);
     }
 
-    // ── Organization Created ──────────────────────────────────────
+    // ── organization.created ──────────────────────────────────────────────────
     if (eventType === "organization.created") {
       const { id, name } = data;
+      // NOTE: We intentionally do NOT set property_type here.
+      // The user sets it during onboarding. We only set it once via onboarding/setup.
       const { error } = await supabase.from("organizations").upsert(
         val({ id, name, plan_type: "free", status: "active" }),
         { onConflict: "id" }
       );
       if (error) {
-        console.error("Failed to create org:", error);
+        console.error("[webhook] organization.created failed:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
-      console.log(`Org synced: ${id}`);
+      console.log(`[webhook] org synced: ${id}`);
     }
 
-    // ── Organization Updated ──────────────────────────────────────
+    // ── organization.updated ──────────────────────────────────────────────────
     if (eventType === "organization.updated") {
       const { id, name } = data;
+      // Only update name — never overwrite property_type from Clerk
       const { error } = await supabase
         .from("organizations")
         .update(val({ name }))
         .eq("id", id);
-      if (error) console.error("Failed to update org:", error);
+      if (error) console.error("[webhook] organization.updated failed:", error);
     }
 
-    // ── Organization Deleted ──────────────────────────────────────
+    // ── organization.deleted ──────────────────────────────────────────────────
     if (eventType === "organization.deleted") {
       const { id } = data;
       const { error } = await supabase
         .from("organizations")
         .update(val({ status: "inactive" }))
         .eq("id", id);
-      if (error) console.error("Failed to deactivate org:", error);
+      if (error) console.error("[webhook] organization.deleted failed:", error);
     }
 
-    // ── Membership Created ────────────────────────────────────────
+    // ── organizationMembership.created ────────────────────────────────────────
     if (eventType === "organizationMembership.created") {
-      const { organization, public_user_data, role } = data;
+      const { organization, public_user_data, role: clerkRole } = data;
 
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("id")
         .eq("clerk_user_id", public_user_data.user_id)
         .returns<{ id: string }[]>()
-        .single();
+        .maybeSingle();
 
       if (userError || !userData) {
-        console.error("User not found for membership:", public_user_data.user_id);
-        return NextResponse.json({ error: "User not found" }, { status: 404 });
+        console.error("[webhook] user not found for membership:", public_user_data.user_id);
+        // Return 200 so Clerk doesn't retry — user may not exist yet, client sync handles it
+        return NextResponse.json({ received: true, warning: "User not found" });
       }
 
-      const normalizedRole = normalizeRole(role);
-      const { error } = await supabase.from("organization_memberships").upsert(
-        val({ user_id: userData.id, organization_id: organization.id, role: normalizedRole, status: "active" }),
-        { onConflict: "user_id,organization_id" }
-      );
-      if (error) console.error("Failed to create membership:", error);
-      else console.log(`Membership synced: ${public_user_data.user_id} → ${organization.id}`);
+      // Check if this is the first active member of the org
+      // → if so, they become owner regardless of what Clerk says
+      const { data: existingMembers } = await supabase
+        .from("organization_memberships")
+        .select("id")
+        .eq("organization_id", organization.id)
+        .eq("status", "active");
+
+      const isFirst = !existingMembers || existingMembers.length === 0;
+      const normalizedRole = isFirst ? "owner" : normalizeClerkRole(clerkRole);
+
+      // Use INSERT ... ON CONFLICT DO UPDATE instead of upsert to avoid
+      // overwriting a manually-set role with a stale Clerk role on re-sync
+      const { error: memberError } = await supabase
+        .from("organization_memberships")
+        .upsert(
+          val({
+            user_id: userData.id,
+            organization_id: organization.id,
+            role: normalizedRole,
+            status: "active",
+          }),
+          { onConflict: "user_id,organization_id" }
+        );
+
+      if (memberError) {
+        console.error("[webhook] membership upsert failed:", memberError);
+      } else {
+        console.log(
+          `[webhook] membership synced: ${public_user_data.user_id} → ${organization.id} as ${normalizedRole}`
+        );
+      }
     }
 
-    // ── Membership Updated ────────────────────────────────────────
+    // ── organizationMembership.updated ────────────────────────────────────────
     if (eventType === "organizationMembership.updated") {
-      const { organization, public_user_data, role } = data;
+      const { organization, public_user_data, role: clerkRole } = data;
 
       const { data: userData } = await supabase
         .from("users")
         .select("id")
         .eq("clerk_user_id", public_user_data.user_id)
         .returns<{ id: string }[]>()
-        .single();
+        .maybeSingle();
 
       if (userData) {
-        const normalizedRole = normalizeRole(role);
-        await supabase
+        // IMPORTANT: Only sync the Clerk role if the Supabase role is NOT "owner".
+        // Owner role is managed in-app and should not be overwritten by Clerk.
+        const { data: currentMember } = await supabase
           .from("organization_memberships")
-          .update(val({ role: normalizedRole }))
+          .select("role")
           .eq("user_id", userData.id)
-          .eq("organization_id", organization.id);
+          .eq("organization_id", organization.id)
+          .maybeSingle();
+
+        if (currentMember?.role !== "owner") {
+          const normalizedRole = normalizeClerkRole(clerkRole);
+          await supabase
+            .from("organization_memberships")
+            .update(val({ role: normalizedRole }))
+            .eq("user_id", userData.id)
+            .eq("organization_id", organization.id);
+        }
       }
     }
 
-    // ── Membership Deleted ────────────────────────────────────────
+    // ── organizationMembership.deleted ────────────────────────────────────────
     if (eventType === "organizationMembership.deleted") {
       const { organization, public_user_data } = data;
 
@@ -174,7 +210,7 @@ export async function POST(req: NextRequest) {
         .select("id")
         .eq("clerk_user_id", public_user_data.user_id)
         .returns<{ id: string }[]>()
-        .single();
+        .maybeSingle();
 
       if (userData) {
         await supabase
@@ -187,15 +223,20 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (err) {
-    console.error("Webhook handler error:", err);
+    console.error("[webhook] handler error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-function normalizeRole(clerkRole: string): "owner" | "admin" | "manager" | "viewer" {
-  if (clerkRole === "org:admin") return "admin";
-  if (clerkRole === "org:member") return "manager";
-  if (clerkRole === "basic_member") return "manager";
-  if (clerkRole === "admin") return "admin";
+/**
+ * Maps Clerk's role strings to our internal roles.
+ * "owner" is NEVER assigned from Clerk — it's set by first-member rule or in-app.
+ */
+function normalizeClerkRole(
+  clerkRole: string | undefined | null
+): "admin" | "manager" | "viewer" {
+  if (!clerkRole) return "viewer";
+  if (clerkRole === "org:admin" || clerkRole === "admin") return "admin";
+  if (clerkRole === "org:member" || clerkRole === "basic_member") return "manager";
   return "viewer";
 }
