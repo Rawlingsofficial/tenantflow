@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 export default function AccountSettings() {
   const { user, isLoaded } = useUser();
-  const supabase = createBrowserClient();
+  const supabase = getSupabaseBrowserClient();
 
   const [fullName, setFullName] = useState(
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
@@ -24,20 +24,21 @@ export default function AccountSettings() {
   async function handleSave() {
     setSaving(true);
     try {
-      const [firstName, ...rest] = fullName.trim().split(" ");
-      const lastName = rest.join(" ");
+      const parts = fullName.trim().split(" ");
+      const firstName = parts[0] ?? "";
+      const lastName = parts.slice(1).join(" ") || undefined; // undefined, not "" — Clerk rejects empty string
 
       await user?.update({ firstName, lastName });
 
       const { error } = await supabase
         .from("users")
-        .update({ full_name: fullName.trim(), phone: phone || null })
+        .update({ full_name: fullName.trim(), phone: phone || null } as any)
         .eq("clerk_user_id", user?.id ?? "");
 
       if (error) throw error;
       toast.success("Account updated successfully");
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to update account");
+      toast.error(err?.errors?.[0]?.message ?? err?.message ?? "Failed to update account");
     } finally {
       setSaving(false);
     }
@@ -181,3 +182,5 @@ export function SettingsSkeleton() {
     </div>
   );
 }
+
+
