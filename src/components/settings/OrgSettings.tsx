@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
-import { useOrgStore } from "@/store/orgStore";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useOrgStore, type OrgData } from "@/store/orgStore";
 import { toast } from "sonner";
 import { Section, Field, SaveButton, inputCls, SettingsSkeleton } from "./AccountSettings";
 
@@ -27,8 +27,8 @@ const PROPERTY_TYPES = [
 
 export default function OrgSettings() {
   const { orgId } = useAuth();
-  const supabase = createBrowserClient();
-  const { currentOrg, setCurrentOrg } = useOrgStore();
+  const supabase = getSupabaseBrowserClient();
+  const { setCurrentOrg } = useOrgStore();
 
   const [name, setName] = useState("");
   const [country, setCountry] = useState("");
@@ -43,16 +43,16 @@ export default function OrgSettings() {
 
   async function fetchOrg() {
     setLoading(true);
-    const { data } = await supabase
+    const result = await (supabase as any)
       .from("organizations")
-      .select("*")
+      .select("name, country, property_type")
       .eq("id", orgId!)
-      .single();
+      .single() as { data: { name: string; country: string | null; property_type: string | null } | null; error: any };
 
-    if (data) {
-      setName(data.name ?? "");
-      setCountry(data.country ?? "");
-      setPropertyType(data.property_type ?? "residential");
+    if (result.data) {
+      setName(result.data.name ?? "");
+      setCountry(result.data.country ?? "");
+      setPropertyType(result.data.property_type ?? "residential");
     }
     setLoading(false);
   }
@@ -61,15 +61,21 @@ export default function OrgSettings() {
     if (!orgId) return;
     setSaving(true);
     try {
-      const { error } = await supabase
+      const result = await (supabase as any)
         .from("organizations")
         .update({ name, country, property_type: propertyType })
-        .eq("id", orgId);
+        .eq("id", orgId) as { error: { message: string } | null };
 
-      if (error) throw error;
+      if (result.error) throw new Error(result.error.message);
 
-      // Update global store so sidebar/nav reacts instantly
-      setCurrentOrg({ id: orgId, name, property_type: propertyType });
+      const updated: OrgData = {
+        id: orgId,
+        name,
+        country,
+        property_type: propertyType as OrgData["property_type"],
+        plan_type: null,
+      };
+      setCurrentOrg(updated);
       toast.success("Organization updated");
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to update organization");
@@ -168,3 +174,5 @@ export default function OrgSettings() {
     </div>
   );
 }
+
+
