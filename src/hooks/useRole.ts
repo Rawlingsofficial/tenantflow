@@ -25,7 +25,7 @@ export function useRole() {
 
   useEffect(() => {
     if (!userId || !orgId) {
-      setUserRole(null);
+      setUserRole(null);        // ✅ now allowed
       setLoading(false);
       return;
     }
@@ -62,7 +62,7 @@ export function useRole() {
         if (cancelled) return;
 
         if (memberResult.data) {
-          setUserRole(memberResult.data.role);
+          setUserRole(memberResult.data.role); // ✅ role is never null here
         }
 
         // 3. Hydrate org info if not set
@@ -95,7 +95,5 @@ export function useRole() {
     return () => { cancelled = true; };
   }, [userId, orgId]);
 
-  return { role: userRole as Role | null, loading };
+  return { role: userRole, loading };
 }
-
-

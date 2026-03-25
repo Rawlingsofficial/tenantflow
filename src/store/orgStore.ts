@@ -14,7 +14,7 @@ interface OrgState {
   currentOrg: OrgData | null
   userRole: 'owner' | 'admin' | 'manager' | 'viewer' | null
   setCurrentOrg: (org: OrgData) => void
-  setUserRole: (role: 'owner' | 'admin' | 'manager' | 'viewer') => void
+  setUserRole: (role: 'owner' | 'admin' | 'manager' | 'viewer' | null) => void // 👈 now accepts null
   reset: () => void
 }
 
