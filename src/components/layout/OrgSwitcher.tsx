@@ -18,9 +18,9 @@ export default function OrgSwitcher() {
   const typeConfig = {
     residential: { label: 'Residential', dot: 'bg-teal-400' },
     commercial:  { label: 'Commercial',  dot: 'bg-indigo-400' },
-    mixed:       { label: 'Mixed',       dot: 'bg-violet-400' },
+    
   }
-  const type = typeConfig[currentOrg?.property_type ?? 'residential'] ?? typeConfig.residential
+  
 
   if (!currentOrg) return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.08] w-40 animate-pulse h-8" />
@@ -36,8 +36,8 @@ export default function OrgSwitcher() {
           {currentOrg.name}
         </p>
         <div className="flex items-center gap-1">
-          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${type.dot}`} />
-          <span className="text-[10px] text-gray-600">{type.label}</span>
+         
+          
         </div>
       </div>
     </div>

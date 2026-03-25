@@ -52,34 +52,41 @@ const PLANS: {
 ];
 
 export default function BillingSettings() {
-  const { orgId } = useAuth();
+  const { orgId, isLoaded } = useAuth(); // ✅ wait until auth is loaded
   const supabase = createBrowserClient();
 
   const [org, setOrg] = useState<OrgData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!orgId) return;
+    if (!isLoaded || !orgId) return; // wait for Clerk to be ready
+
+    const fetchOrg = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("organizations")
+          .select("plan_type, unit_limit, user_limit, status, units_used, users_used")
+          .eq("id", orgId)
+          .maybeSingle(); // ✅ use maybeSingle instead of single
+
+        if (error) throw error;
+
+        if (!data) {
+          console.warn("Organization not found for id:", orgId);
+          setOrg(null);
+        } else {
+          setOrg(data);
+        }
+      } catch (err: any) {
+        console.error("Failed to fetch org:", err?.message ?? err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchOrg();
-  }, [orgId]);
-
-  async function fetchOrg() {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("organizations")
-        .select("plan_type, unit_limit, user_limit, status, units_used, users_used")
-        .eq("id", orgId!)
-        .single();
-
-      if (error) throw error;
-      setOrg(data as OrgData | null);
-    } catch (err: any) {
-      console.error("Failed to fetch org:", err?.message ?? err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [orgId, isLoaded]);
 
   if (loading) return <SettingsSkeleton />;
   if (!org) return <p className="text-sm text-gray-500">Organization not found.</p>;
@@ -198,5 +205,3 @@ function UsageBar({ label, limit, used, max }: { label: string; limit: number; u
     </div>
   );
 }
-
-

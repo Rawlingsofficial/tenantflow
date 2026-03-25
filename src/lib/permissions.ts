@@ -50,7 +50,7 @@ export type Permission =
 
 // ─── Property type ────────────────────────────────────────────────────
 
-export type PropertyType = 'residential' | 'commercial' | 'mixed'
+export type PropertyType = 'residential' | 'commercial'  // mixed removed
 
 /**
  * Returns true if a given section/feature is accessible for a property type.
@@ -58,14 +58,13 @@ export type PropertyType = 'residential' | 'commercial' | 'mixed'
  * Rules:
  *  - 'residential' → only residential features
  *  - 'commercial'  → only commercial features
- *  - 'mixed'       → both residential AND commercial
+ *  - any other value (e.g., null, undefined, 'mixed' from old data) → false
  */
 export function isFeatureAllowedForPropertyType(
   propertyType: PropertyType | null | undefined,
   feature: 'residential' | 'commercial'
 ): boolean {
   if (!propertyType) return false
-  if (propertyType === 'mixed') return true
   return propertyType === feature
 }
 
@@ -78,7 +77,7 @@ export function getAllowedReportSections(
   if (!propertyType) return []
   if (propertyType === 'residential') return ['residential']
   if (propertyType === 'commercial') return ['commercial']
-  return ['residential', 'commercial']
+  return []  // mixed or invalid type → no sections
 }
 
 // ─── Role permission matrix ───────────────────────────────────────────
@@ -229,3 +228,4 @@ export function canAccess(
   }
   return true
 }
+

@@ -8,7 +8,7 @@ import {
   ChevronRight, Home, Briefcase,
 } from 'lucide-react'
 import { usePropertyType } from '@/hooks/usePropertyType'
-import { useMixedModeStore } from '@/store/mixedModeStore'
+
 import { cn } from '@/lib/utils'
 
 const RESIDENTIAL_NAV = [
@@ -49,34 +49,6 @@ function Logo() {
   )
 }
 
-function ModeToggle() {
-  const { mode, setMode } = useMixedModeStore()
-  return (
-    <div className="px-3 pt-3">
-      <div className="flex items-center bg-white/[0.05] rounded-xl p-1 gap-1">
-        {([
-          { id: 'residential' as const, label: 'Residential', icon: Home },
-          { id: 'commercial'  as const, label: 'Commercial',  icon: Briefcase },
-        ]).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setMode(id)}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-[10px] text-[11px] font-semibold transition-all duration-200',
-              mode === id
-                ? id === 'residential' ? 'bg-teal-500/20 text-teal-300' : 'bg-indigo-500/20 text-indigo-300'
-                : 'text-gray-600 hover:text-gray-400'
-            )}
-          >
-            <Icon className="h-3 w-3" />
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function NavItem({ item, active }: { item: typeof RESIDENTIAL_NAV[0]; active: boolean }) {
   return (
     <Link
@@ -104,11 +76,9 @@ function NavItem({ item, active }: { item: typeof RESIDENTIAL_NAV[0]; active: bo
 export default function Sidebar() {
   const pathname = usePathname()
   const { propertyType, loading } = usePropertyType()
-  const { mode } = useMixedModeStore()
 
-  const isMixed      = propertyType === 'mixed'
-  const isCommercial = propertyType === 'commercial' || (isMixed && mode === 'commercial')
-  const nav          = isCommercial ? COMMERCIAL_NAV : RESIDENTIAL_NAV
+  const isCommercial = propertyType === 'commercial'
+  const nav = isCommercial ? COMMERCIAL_NAV : RESIDENTIAL_NAV
 
   function isActive(href: string) {
     if (href === '/dashboard') return pathname === '/dashboard'
@@ -120,8 +90,6 @@ export default function Sidebar() {
       <div className="absolute top-0 left-0 w-32 h-32 bg-teal-500/[0.08] rounded-full blur-3xl pointer-events-none" />
 
       <Logo />
-
-      {!loading && isMixed && <ModeToggle />}
 
       <div className="px-4 pt-5 pb-1.5">
         <p className="text-[10px] font-semibold tracking-[0.12em] text-gray-700 uppercase">Menu</p>
@@ -142,3 +110,4 @@ export default function Sidebar() {
     </aside>
   )
 }
+

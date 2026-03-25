@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { usePropertyType } from "@/hooks/usePropertyType";
-import { useMixedModeStore } from "@/store/mixedModeStore";
+
 import { Home, Briefcase, Building2, MapPin, Image, X } from "lucide-react";
 
 interface AddBuildingDialogProps {
@@ -25,12 +25,12 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
 
   // FIX: hook returns `propertyType`, not `type`
   const { propertyType } = usePropertyType();
-  const { mode } = useMixedModeStore();
+  
 
   // Derive the default building type from org context
   const defaultBuildingType: "residential" | "commercial" =
     propertyType === "commercial" ? "commercial" :
-    propertyType === "mixed" ? mode :
+    
     "residential";
 
   const [form, setForm] = useState({
@@ -45,7 +45,7 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
   // For mixed orgs, user must explicitly choose.
   // For pure residential/commercial, the type is locked to their org type
   // but we still show a read-only indicator so they understand the context.
-  const isMixed = propertyType === "mixed";
+
   const isLockedCommercial = propertyType === "commercial";
   const isLockedResidential = propertyType === "residential";
   const isCommercial = form.building_type === "commercial";
@@ -113,7 +113,7 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
 
         <div className="px-6 py-5 space-y-4">
           {/* Portfolio type selector */}
-          {isMixed ? (
+          (
             // Mixed: user must choose
             <div>
               <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 block">
@@ -167,7 +167,7 @@ export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialo
                 </p>
               </div>
             </div>
-          )}
+          )
 
           {/* Building name */}
           <div>

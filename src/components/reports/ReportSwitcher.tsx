@@ -12,7 +12,7 @@ import dynamic from 'next/dynamic'
 
 const ResidentialOverview = dynamic(() => import('@/components/reports/residential/ResidentialReportsOverview'), { ssr: false })
 const CommercialOverview  = dynamic(() => import('@/components/reports/commercial/CommercialReportsOverview'),  { ssr: false })
-const MixedOverview       = dynamic(() => import('@/components/reports/mixed/MixedReportsOverview'),            { ssr: false })
+
 
 export default function ReportSwitcher() {
   const { propertyType, loading } = usePropertyType()
@@ -26,6 +26,6 @@ export default function ReportSwitcher() {
   )
 
   if (propertyType === 'commercial') return <CommercialOverview />
-  if (propertyType === 'mixed')       return <MixedOverview />
+  
   return <ResidentialOverview />
 }

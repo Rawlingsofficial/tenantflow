@@ -11,8 +11,6 @@ interface MonthData {
   label: string
   month: string   // yyyy-MM
   value: number
-  /** optional second series for mixed/stacked */
-  value2?: number
 }
 
 interface RevenueChartProps {
@@ -22,9 +20,7 @@ interface RevenueChartProps {
   height?: number
   /** Show a dashed average reference line */
   showAvg?: boolean
-  /** For stacked (mixed) mode — series names */
-  series?: { key: 'value'; color: string; label: string } |
-           { key: 'value' | 'value2'; color: string; label: string }[]
+  
   className?: string
 }
 
@@ -117,47 +113,3 @@ export function RevenueChart({
   )
 }
 
-// ─── Stacked variant for mixed mode ──────────────────────────────────────────
-interface StackedRevenueChartProps {
-  data: Array<{ label: string; month: string; resi: number; comm: number }>
-  currentMonth: string
-  height?: number
-  className?: string
-}
-
-function StackedTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="px-3 py-2 rounded-xl text-[11px] shadow-xl border bg-[#1a1f2e] border-white/10 text-white">
-      <p className="font-semibold text-gray-400 mb-1">{label}</p>
-      {payload.map((p: any, i: number) => (
-        <div key={i} className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.fill }} />
-          <span className="font-bold">${p.value.toLocaleString()}</span>
-          <span className="text-gray-500">{p.name}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export function StackedRevenueChart({ data, currentMonth, height = 140, className }: StackedRevenueChartProps) {
-  return (
-    <div className={cn('w-full', className)}>
-      <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={data} barCategoryGap="20%" margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" />
-          <XAxis dataKey="label" axisLine={false} tickLine={false}
-            tick={{ fontSize: 9, fill: '#4b5563', fontWeight: 500 }} dy={6} />
-          <YAxis hide />
-          <Tooltip
-            cursor={{ fill: 'rgba(255,255,255,0.02)' }}
-            content={<StackedTooltip />}
-          />
-          <Bar dataKey="resi" name="Residential" stackId="a" fill="rgba(20,184,166,0.6)" radius={[0, 0, 0, 0]} maxBarSize={32} />
-          <Bar dataKey="comm" name="Commercial" stackId="a" fill="rgba(99,102,241,0.75)" radius={[3, 3, 0, 0]} maxBarSize={32} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  )
-}

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Home, Building2, Layers, Loader2, ArrowRight } from 'lucide-react'
+import { Home, Building2, Loader2, ArrowRight } from 'lucide-react'
 import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout'
 import { PropertyTypeCard } from '@/components/onboarding/PropertyTypeCard'
 
@@ -39,30 +39,13 @@ const PROPERTY_TYPES = [
     border: 'border-blue-500',
     check: 'bg-blue-600',
   },
-  {
-    type: 'mixed' as const,
-    icon: Layers,
-    title: 'Mixed Portfolio',
-    subtitle: 'Residential & Commercial',
-    description: 'Your portfolio includes both.',
-    examples: ['Mixed-use buildings', 'Residential + retail'],
-    tenantLabel: 'Individuals and companies',
-    unitLabel: 'Apartments and commercial spaces',
-    paymentLabel: 'Payments + Invoices',
-    color: 'text-violet-700',
-    bg: 'bg-violet-50',
-    border: 'border-violet-500',
-    check: 'bg-violet-600',
-  },
 ]
 
 export default function OnboardingSetupPage() {
   const { orgId } = useAuth()
   const supabase = getSupabaseBrowserClient()
 
-  const [selected, setSelected] = useState<
-    'residential' | 'commercial' | 'mixed' | null
-  >(null)
+  const [selected, setSelected] = useState<'residential' | 'commercial' | null>(null)
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -80,13 +63,11 @@ export default function OnboardingSetupPage() {
     try {
       const { error } = await supabase
         .from('organizations')
-        .upsert(
-          {
-            id: orgId,
-            name: 'Temp Org', // temporary fallback
-            property_type: selected,
-          } as any // ✅ FIXED TYPE ERROR HERE
-        )
+        .upsert({
+          id: orgId,
+          name: 'Temp Org', // temporary fallback
+          property_type: selected,
+        } as any)
 
       if (error) throw error
 

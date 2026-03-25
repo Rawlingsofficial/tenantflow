@@ -20,11 +20,7 @@ const PROPERTY_TYPES = [
     label: "Commercial",
     description: "Offices, retail spaces, and commercial buildings.",
   },
-  {
-    value: "mixed",
-    label: "Mixed Use",
-    description: "Both residential and commercial properties.",
-  },
+  
 ];
 
 export default function OrgSettings() {
@@ -158,13 +154,7 @@ export default function OrgSettings() {
           })}
         </div>
 
-        {propertyType === "mixed" && (
-          <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
-            <p className="text-xs text-amber-800 font-medium">
-              Mixed mode is enabled — your team can access both residential and commercial features simultaneously.
-            </p>
-          </div>
-        )}
+        
 
         <div className="pt-4 flex justify-end">
           <SaveButton onClick={handleSave} loading={saving} label="Save property type" />

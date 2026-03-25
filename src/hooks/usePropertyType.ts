@@ -34,7 +34,7 @@ export function usePropertyType(): {
   loading: boolean;
   isResidential: boolean;
   isCommercial: boolean;
-  isMixed: boolean;
+  
   canView: (feature: "residential" | "commercial") => boolean;
   allowedSections: ("residential" | "commercial")[];
 } {
@@ -115,8 +115,8 @@ export function usePropertyType(): {
     loading,
     isResidential: propertyType === "residential",
     isCommercial: propertyType === "commercial",
-    isMixed: propertyType === "mixed",
     canView,
     allowedSections: getAllowedReportSections(propertyType),
   };
 }
+

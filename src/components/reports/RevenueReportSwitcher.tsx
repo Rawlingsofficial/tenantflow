@@ -11,7 +11,7 @@ const ResidentialRevenue = dynamic(() => import('@/app/(dashboard)/reports/reven
 const CommercialRevenue  = dynamic(() => import('@/components/reports/commercial/CommercialRevenueReport'), { ssr: false })
 
 // Mixed revenue = tabbed wrapper
-const MixedRevenue       = dynamic(() => import('@/components/reports/mixed/MixedRevenueReport'), { ssr: false })
+
 
 export default function RevenueReportSwitcher() {
   const { propertyType, loading } = usePropertyType()
@@ -21,6 +21,6 @@ export default function RevenueReportSwitcher() {
     </div>
   )
   if (propertyType === 'commercial') return <CommercialRevenue />
-  if (propertyType === 'mixed')       return <MixedRevenue />
+  
   return <ResidentialRevenue />
 }
