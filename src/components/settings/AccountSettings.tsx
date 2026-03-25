@@ -1,16 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useUser, useAuth } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { useRole } from "@/hooks/useRole";
 
 export default function AccountSettings() {
   const { user, isLoaded } = useUser();
-  const { orgId } = useAuth(); // <-- added
   const supabase = getSupabaseBrowserClient();
-  const { role, loading: roleLoading } = useRole();
 
   const [fullName, setFullName] = useState(
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
@@ -20,9 +17,7 @@ export default function AccountSettings() {
   );
   const [saving, setSaving] = useState(false);
 
-  if (!isLoaded) {
-    return <SettingsSkeleton />;
-  }
+  if (!isLoaded) return <SettingsSkeleton />;
 
   async function handleSave() {
     setSaving(true);
@@ -33,15 +28,17 @@ export default function AccountSettings() {
 
       await user?.update({ firstName, lastName });
 
-      const { error } = await (supabase
-        .from("users") as any)
+      const { error } = await (supabase as any)
+        .from("users")
         .update({ full_name: fullName.trim(), phone: phone || null })
         .eq("clerk_user_id", user?.id ?? "");
 
       if (error) throw error;
       toast.success("Account updated successfully");
     } catch (err: any) {
-      toast.error(err?.errors?.[0]?.message ?? err?.message ?? "Failed to update account");
+      toast.error(
+        err?.errors?.[0]?.message ?? err?.message ?? "Failed to update account"
+      );
     } finally {
       setSaving(false);
     }
@@ -49,28 +46,6 @@ export default function AccountSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Debug section */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 space-y-2">
-        <p className="text-sm text-gray-600">
-          Role loading: <span className="font-mono">{roleLoading ? "true" : "false"}</span>
-        </p>
-        {role && (
-          <p className="text-sm text-gray-600">
-            Your role: <span className="font-medium capitalize">{role}</span>
-          </p>
-        )}
-        {orgId && (
-          <p className="text-xs text-gray-500">
-            Org ID: <span className="font-mono">{orgId}</span>
-          </p>
-        )}
-        {!role && !roleLoading && (
-          <p className="text-sm text-red-600">
-            No role found. Please ensure your membership exists and is active.
-          </p>
-        )}
-      </div>
-
       <Section title="Profile" description="Your personal information.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Full Name">
@@ -108,11 +83,14 @@ export default function AccountSettings() {
         </div>
       </Section>
 
-      <Section title="Password" description="Change your sign-in password.">
+      <Section
+        title="Password"
+        description="Change your sign-in password."
+      >
         <p className="text-sm text-gray-500">
           Password management is handled through{" "}
-          <span className="font-medium text-gray-700">Clerk</span>. Click below
-          to open the password update flow.
+          <span className="font-medium text-gray-700">Clerk</span>. Click
+          below to open the password update flow.
         </p>
         <div className="pt-4">
           <button
@@ -127,7 +105,7 @@ export default function AccountSettings() {
   );
 }
 
-// ─── Shared primitives (unchanged) ────────────────────────────────────
+// ─── Shared primitives ────────────────────────────────────────────────
 
 export function Section({
   title,
@@ -195,11 +173,17 @@ export function SettingsSkeleton() {
   return (
     <div className="space-y-6">
       {[1, 2].map((i) => (
-        <div key={i} className="bg-white rounded-xl border border-gray-200 p-6">
+        <div
+          key={i}
+          className="bg-white rounded-xl border border-gray-200 p-6"
+        >
           <div className="h-5 w-32 bg-gray-100 rounded animate-pulse mb-4" />
           <div className="grid grid-cols-2 gap-4">
             {[1, 2, 3].map((j) => (
-              <div key={j} className="h-10 bg-gray-100 rounded animate-pulse" />
+              <div
+                key={j}
+                className="h-10 bg-gray-100 rounded animate-pulse"
+              />
             ))}
           </div>
         </div>
@@ -207,4 +191,3 @@ export function SettingsSkeleton() {
     </div>
   );
 }
-

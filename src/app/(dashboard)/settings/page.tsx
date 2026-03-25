@@ -17,38 +17,31 @@ import {
 } from "lucide-react";
 
 const TABS = [
-  { id: "account", label: "Account", icon: User, permission: null },
-  { id: "organization", label: "Organization", icon: Building2, permission: "settings.edit_org" },
-  { id: "team", label: "Team", icon: Users, permission: "settings.manage_team" },
-  { id: "permissions", label: "Permissions", icon: ShieldCheck, permission: "settings.manage_permissions" },
-  { id: "billing", label: "Billing", icon: CreditCard, permission: "settings.manage_billing" },
+  { id: "account",     label: "Account",     icon: User,        permission: null },
+  { id: "organization",label: "Organization", icon: Building2,   permission: "settings.edit_org" },
+  { id: "team",        label: "Team",         icon: Users,       permission: "settings.manage_team" },
+  { id: "permissions", label: "Permissions",  icon: ShieldCheck, permission: "settings.view" },
+  { id: "billing",     label: "Billing",      icon: CreditCard,  permission: "settings.manage_billing" },
 ] as const;
 
-type TabId = typeof TABS[number]["id"];
+type TabId = (typeof TABS)[number]["id"];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("account");
   const { role, loading } = useRole();
 
-  // Debug logs
-  console.log("[SettingsPage] role:", role);
-  console.log("[SettingsPage] loading:", loading);
-
+  /**
+   * Tab visibility rules:
+   *  - No permission required → always show (Account)
+   *  - Has permission & role loaded → show
+   *  - Still loading → show all tabs so the UI isn't empty (content itself guards)
+   */
   const visibleTabs = TABS.filter((tab) => {
     if (!tab.permission) return true;
+    if (loading) return true; // show skeleton tabs while loading
     if (!role) return false;
     return hasPermission(role, tab.permission as any);
   });
-
-  console.log("[SettingsPage] visible tabs:", visibleTabs.map(t => t.id));
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading settings...</div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -72,31 +65,45 @@ export default function SettingsPage() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors text-left ${
+                    disabled={loading && tab.permission !== null}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors text-left disabled:opacity-40 ${
                       isActive
                         ? "bg-white text-gray-900 shadow-sm border border-gray-200"
                         : "text-gray-600 hover:text-gray-900 hover:bg-white/60"
                     }`}
                   >
-                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-gray-700" : "text-gray-400"}`} />
+                    <Icon
+                      className={`w-4 h-4 shrink-0 ${
+                        isActive ? "text-gray-700" : "text-gray-400"
+                      }`}
+                    />
                     {tab.label}
                   </button>
                 );
               })}
             </nav>
+
+            {/* Role badge */}
+            {!loading && role && (
+              <div className="mt-4 px-3 py-2 rounded-md bg-white border border-gray-200">
+                <p className="text-xs text-gray-400">Signed in as</p>
+                <p className="text-xs font-semibold text-gray-700 capitalize mt-0.5">
+                  {role}
+                </p>
+              </div>
+            )}
           </aside>
 
           {/* Content */}
           <main className="flex-1 min-w-0">
-            {activeTab === "account" && <AccountSettings />}
+            {activeTab === "account"     && <AccountSettings />}
             {activeTab === "organization" && <OrgSettings />}
-            {activeTab === "team" && <TeamSettings />}
+            {activeTab === "team"        && <TeamSettings />}
             {activeTab === "permissions" && <PermissionsSettings />}
-            {activeTab === "billing" && <BillingSettings />}
+            {activeTab === "billing"     && <BillingSettings />}
           </main>
         </div>
       </div>
     </div>
   );
 }
-

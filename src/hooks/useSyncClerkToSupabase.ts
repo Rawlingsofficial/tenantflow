@@ -2,138 +2,120 @@
 
 import { useEffect } from "react";
 import { useAuth, useUser, useOrganization } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export function useSyncClerkToSupabase() {
   const { userId, orgId } = useAuth();
   const { user } = useUser();
   const { organization, membership } = useOrganization();
-  const supabase = createBrowserClient();
+  const supabase = getSupabaseBrowserClient();
 
+  // Sync user record
   useEffect(() => {
     if (!userId || !user) return;
-    syncUser();
-  }, [userId, user]);
 
-  useEffect(() => {
-    if (!orgId || !organization || !userId) return;
-    syncOrg();
-  }, [orgId, organization, membership, userId]);
+    const email = user.primaryEmailAddress?.emailAddress;
+    if (!email) return;
 
-  // =========================
-  // USER SYNC
-  // =========================
-  async function syncUser() {
-    try {
-      const email = user?.primaryEmailAddress?.emailAddress;
+    const full_name =
+      [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+    const phone = user.primaryPhoneNumber?.phoneNumber ?? null;
 
-      if (!email) {
-        console.error("❌ No email from Clerk");
-        return;
-      }
-
-      const full_name =
-        [user?.firstName, user?.lastName].filter(Boolean).join(" ") || null;
-
-      const phone = user?.primaryPhoneNumber?.phoneNumber ?? null;
-
-      const { error } = await supabase.from("users").upsert(
-        {
-          clerk_user_id: userId,
-          email,
-          full_name,
-          phone,
-          status: "active",
-        } as any,
+    (supabase as any)
+      .from("users")
+      .upsert(
+        { clerk_user_id: userId, email, full_name, phone, status: "active" },
         { onConflict: "clerk_user_id" }
-      );
+      )
+      .then(({ error }: { error: any }) => {
+        if (error) console.error("[sync] user upsert failed:", error);
+      });
+  }, [userId, user?.id]);
 
-      if (error) throw error;
+  // Sync org + membership
+  useEffect(() => {
+    if (!userId || !orgId || !organization) return;
 
-    } catch (err) {
-      console.error("❌ Failed to sync user:", err);
-    }
-  }
+    async function syncOrg() {
+      try {
+        const orgName = organization!.name ?? "Unnamed Org";
 
-  // =========================
-  // ORG SYNC
-  // =========================
-  async function syncOrg() {
-    try {
-      if (!organization) return; // ✅ EXTRA SAFETY (fixes TS)
+        // 1. Upsert org — only sets values if row is new (onConflict: ignore)
+        await (supabase as any)
+          .from("organizations")
+          .upsert(
+            {
+              id: orgId,
+              name: orgName,
+              plan_type: "free",
+              status: "active",
+            },
+            { onConflict: "id", ignoreDuplicates: true }
+          );
 
-      console.log("🔄 Syncing org:", orgId);
+        // 2. Get Supabase user UUID
+        const { data: userData, error: userError } = await (supabase as any)
+          .from("users")
+          .select("id")
+          .eq("clerk_user_id", userId!)
+          .single();
 
-      const orgName = organization.name ?? "Unnamed Org"; // ✅ SAFE ACCESS
+        if (userError || !userData) {
+          console.error("[sync] user not found for clerk_user_id:", userId);
+          return;
+        }
 
-      // ✅ 1. Ensure organization exists
-      const { error: orgError } = await supabase
-        .from("organizations")
-        .upsert(
-          {
-            id: orgId,
-            name: orgName,
-            plan_type: "free",
-            status: "active",
-            property_type: null,
-          } as any,
-          { onConflict: "id" }
+        // 3. Check if any membership exists for this org (to determine if this is the first/owner)
+        const { data: existingMembers } = await (supabase as any)
+          .from("organization_memberships")
+          .select("id, user_id, role")
+          .eq("organization_id", orgId)
+          .eq("status", "active");
+
+        const isFirstMember =
+          !existingMembers || existingMembers.length === 0;
+
+        // Check if this user already has a membership
+        const alreadyMember = existingMembers?.some(
+          (m: { user_id: string }) => m.user_id === userData.id
         );
 
-      if (orgError) throw orgError;
+        if (alreadyMember) {
+          // Already synced — nothing to do
+          return;
+        }
 
-      // ✅ 2. Get user UUID
-      const { data: userData, error: userError } = await supabase
-  .from("users")
-  .select("id")
-  .eq("clerk_user_id", userId!)
-  .single<{ id: string }>();
+        // The first person to join an org gets "owner"; subsequent get role from Clerk
+        const role = isFirstMember ? "owner" : normalizeRole(membership?.role as string);
 
-      if (userError || !userData) {
-        console.error("❌ User not found");
-        return;
+        const { error: memberError } = await (supabase as any)
+          .from("organization_memberships")
+          .insert({
+            user_id: userData.id,
+            organization_id: orgId,
+            role,
+            status: "active",
+          });
+
+        if (memberError && !memberError.message.includes("duplicate")) {
+          console.error("[sync] membership insert failed:", memberError);
+        }
+      } catch (err) {
+        console.error("[sync] syncOrg error:", err);
       }
-
-      // ✅ 3. Normalize role
-      const clerkRole = (membership?.role as string) ?? "org:member";
-      const role = normalizeRole(clerkRole);
-
-      // ✅ 4. Insert membership
-      const { error: memberError } = await supabase
-        .from("organization_memberships")
-        .insert({
-          user_id: userData.id,
-          organization_id: orgId,
-          role,
-          status: "active",
-        } as any);
-
-      // ignore duplicates
-      if (memberError && !memberError.message.includes("duplicate")) {
-        throw memberError;
-      }
-
-      console.log("✅ Org sync complete");
-
-    } catch (err) {
-      console.error("❌ Failed to sync org:", err);
     }
-  }
+
+    syncOrg();
+  }, [userId, orgId, organization?.id]);
 }
 
-// =========================
-// ROLE NORMALIZER
-// =========================
 function normalizeRole(
-  clerkRole: string
+  clerkRole: string | undefined | null
 ): "owner" | "admin" | "manager" | "viewer" {
-  if (clerkRole === "org:admin") return "admin";
-  if (clerkRole === "org:member") return "manager";
-  if (clerkRole === "basic_member") return "manager";
-  if (clerkRole === "admin") return "admin";
+  if (!clerkRole) return "viewer";
+  if (clerkRole === "org:admin" || clerkRole === "admin") return "admin";
+  if (clerkRole === "org:member" || clerkRole === "basic_member") return "manager";
   return "viewer";
 }
 
 
-
-//---------------------------
