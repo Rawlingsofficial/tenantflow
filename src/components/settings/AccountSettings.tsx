@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useRole } from "@/hooks/useRole";
 
 export default function AccountSettings() {
   const { user, isLoaded } = useUser();
+  const { orgId } = useAuth(); // <-- added
   const supabase = getSupabaseBrowserClient();
-  const { role } = useRole();
+  const { role, loading: roleLoading } = useRole();
 
   const [fullName, setFullName] = useState(
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
@@ -28,7 +29,7 @@ export default function AccountSettings() {
     try {
       const parts = fullName.trim().split(" ");
       const firstName = parts[0] ?? "";
-      const lastName = parts.slice(1).join(" ") || undefined; // undefined, not "" — Clerk rejects empty string
+      const lastName = parts.slice(1).join(" ") || undefined;
 
       await user?.update({ firstName, lastName });
 
@@ -48,14 +49,27 @@ export default function AccountSettings() {
 
   return (
     <div className="space-y-6">
-      {/* Role indicator */}
-      {role && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+      {/* Debug section */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 space-y-2">
+        <p className="text-sm text-gray-600">
+          Role loading: <span className="font-mono">{roleLoading ? "true" : "false"}</span>
+        </p>
+        {role && (
           <p className="text-sm text-gray-600">
             Your role: <span className="font-medium capitalize">{role}</span>
           </p>
-        </div>
-      )}
+        )}
+        {orgId && (
+          <p className="text-xs text-gray-500">
+            Org ID: <span className="font-mono">{orgId}</span>
+          </p>
+        )}
+        {!role && !roleLoading && (
+          <p className="text-sm text-red-600">
+            No role found. Please ensure your membership exists and is active.
+          </p>
+        )}
+      </div>
 
       <Section title="Profile" description="Your personal information.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -113,7 +127,7 @@ export default function AccountSettings() {
   );
 }
 
-// ─── Shared primitives ────────────────────────────────────────────────
+// ─── Shared primitives (unchanged) ────────────────────────────────────
 
 export function Section({
   title,
