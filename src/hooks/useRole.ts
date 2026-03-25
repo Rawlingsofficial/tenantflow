@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useOrgStore } from "@/store/orgStore";
 import type { Role } from "@/types";
 
@@ -14,20 +14,24 @@ import type { Role } from "@/types";
  */
 export function useRole() {
   const { userId, orgId } = useAuth();
-  const supabase = createBrowserClient();
+  const supabase = getSupabaseBrowserClient();
 
-  const { currentRole, setCurrentRole, currentOrg, setCurrentOrg } = useOrgStore();
-  const [loading, setLoading] = useState(!currentRole);
+  const currentOrg  = useOrgStore((s) => s.currentOrg);
+  const userRole    = useOrgStore((s) => s.userRole);
+  const setUserRole = useOrgStore((s) => s.setUserRole);
+  const setCurrentOrg = useOrgStore((s) => s.setCurrentOrg);
+
+  const [loading, setLoading] = useState(!userRole);
 
   useEffect(() => {
     if (!userId || !orgId) {
-      setCurrentRole(null);
+      setUserRole(null);
       setLoading(false);
       return;
     }
 
     // Already populated for this org — skip fetch
-    if (currentRole && currentOrg?.id === orgId) {
+    if (userRole && currentOrg?.id === orgId) {
       setLoading(false);
       return;
     }
@@ -38,39 +42,48 @@ export function useRole() {
       setLoading(true);
       try {
         // 1. Get user's Supabase UUID
-        const { data: userData } = await supabase
+        const userResult = await (supabase as any)
           .from("users")
           .select("id")
           .eq("clerk_user_id", userId!)
-          .single<{ id: string }>();
+          .single() as { data: { id: string } | null; error: any };
 
-        if (!userData || cancelled) return;
+        if (!userResult.data || cancelled) return;
 
-        // 2. Get membership
-        const { data: membership } = await supabase
+        // 2. Get membership role
+        const memberResult = await (supabase as any)
           .from("organization_memberships")
           .select("role")
-          .eq("user_id", userData.id)
+          .eq("user_id", userResult.data.id)
           .eq("organization_id", orgId!)
           .eq("status", "active")
-          .single<{ role: Role }>();
+          .single() as { data: { role: Role } | null; error: any };
 
         if (cancelled) return;
 
-        if (membership) {
-          setCurrentRole(membership.role);
+        if (memberResult.data) {
+          setUserRole(memberResult.data.role);
         }
 
-        // 3. Also hydrate org info if not set
+        // 3. Hydrate org info if not set
         if (!currentOrg || currentOrg.id !== orgId) {
-          const { data: orgData } = await supabase
+          const orgResult = await (supabase as any)
             .from("organizations")
-            .select("id, name, property_type")
+            .select("id, name, property_type, country, plan_type")
             .eq("id", orgId!)
-            .single<{ id: string; name: string; property_type?: string }>();
+            .single() as {
+              data: { id: string; name: string; property_type: string | null; country: string | null; plan_type: string | null } | null;
+              error: any;
+            };
 
-          if (orgData && !cancelled) {
-            setCurrentOrg(orgData);
+          if (orgResult.data && !cancelled) {
+            setCurrentOrg({
+              id: orgResult.data.id,
+              name: orgResult.data.name,
+              property_type: (orgResult.data.property_type ?? "residential") as any,
+              country: orgResult.data.country,
+              plan_type: orgResult.data.plan_type,
+            });
           }
         }
       } finally {
@@ -82,5 +95,7 @@ export function useRole() {
     return () => { cancelled = true; };
   }, [userId, orgId]);
 
-  return { role: currentRole, loading };
+  return { role: userRole as Role | null, loading };
 }
+
+
