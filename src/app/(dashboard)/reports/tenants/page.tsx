@@ -13,8 +13,6 @@ import {
   Plus, Search, Users, UserCheck, Calendar, ArrowUpRight,
 } from 'lucide-react'
 import AddTenantDialog from '@/components/tenants/AddTenantDialog'
-import { usePropertyType } from '@/hooks/usePropertyType'
-import { useMixedModeStore } from '@/store/mixedModeStore'
 
 type Tab = 'all' | 'active' | 'inactive'
 
@@ -23,42 +21,24 @@ export default function TenantsPage() {
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
 
-  // FIX: hook returns `propertyType`, not `type`
-  const { propertyType } = usePropertyType()
-  const { mode } = useMixedModeStore()
-
   const [tenants, setTenants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<Tab>('all')
   const [addOpen, setAddOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, mode, propertyType])
+  useEffect(() => { if (orgId) load() }, [orgId])
 
   async function load() {
     setLoading(true)
     const { data } = await supabase
       .from('tenants')
       .select(`*, leases(id, status, rent_amount, service_charge,
-        units(unit_code, unit_purpose, area_sqm, floor_number, buildings(name, building_type)))`)
+        units(unit_code, unit_purpose, area_sqm, floor_number, buildings(name)))`)
       .eq('organization_id', orgId!)
       .order('first_name', { ascending: true })
 
-    let result = data ?? []
-
-    // For mixed orgs, filter tenants by the active segment (mode)
-    if (propertyType === 'mixed') {
-      result = result.filter((t: any) => {
-        const activeLease = (t.leases ?? []).find((l: any) => l.status === 'active')
-        if (!activeLease) return true // unassigned tenants always show
-        const buildingType = activeLease.units?.buildings?.building_type ?? 'residential'
-        return mode === 'commercial'
-          ? buildingType === 'commercial'
-          : buildingType !== 'commercial'
-      })
-    }
-
-    setTenants(result)
+    setTenants(data ?? [])
     setLoading(false)
   }
 
@@ -85,11 +65,6 @@ export default function TenantsPage() {
     { label: 'Inactive', value: 'inactive' as Tab, count: tenants.length - activeCount },
   ]
 
-  const isMixed = propertyType === 'mixed'
-  const segmentLabel = isMixed
-    ? mode === 'commercial' ? 'Commercial portfolio' : 'Residential portfolio'
-    : null
-
   return (
     <div className="min-h-screen bg-slate-50/70">
       {/* Header */}
@@ -103,9 +78,6 @@ export default function TenantsPage() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tenants</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {activeCount} active · {withLeaseCount} with active lease
-            {segmentLabel && (
-              <span className="ml-2 text-teal-600 font-medium">· {segmentLabel}</span>
-            )}
           </p>
         </div>
         <Button
@@ -292,3 +264,5 @@ export default function TenantsPage() {
     </div>
   )
 }
+
+
