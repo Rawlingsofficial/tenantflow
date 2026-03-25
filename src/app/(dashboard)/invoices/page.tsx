@@ -27,7 +27,7 @@ export default function InvoicesPage() {
   const { orgId } = useAuth()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
-  const { propertyType } = usePropertyType() // renamed from 'type'
+  const { propertyType } = usePropertyType()
 
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,7 +35,7 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, propertyType]) // updated dependency
+  useEffect(() => { if (orgId) load() }, [orgId, propertyType])
 
   async function load() {
     setLoading(true)
@@ -47,14 +47,7 @@ export default function InvoicesPage() {
       .eq('organization_id', orgId!)
       .order('invoice_date', { ascending: false })
 
-    let result = data ?? []
-
-    // In mixed mode, only show invoices for commercial buildings
-    if (propertyType === 'mixed') { // changed type to propertyType
-      result = result.filter((inv: any) =>
-        inv.leases?.units?.buildings?.building_type === 'commercial'
-      )
-    }
+    const result = data ?? []
 
     setInvoices(result)
     setLoading(false)
@@ -97,7 +90,6 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Invoices</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             ${totalPaid.toLocaleString()} collected · ${totalOverdue.toLocaleString()} overdue
-            {propertyType === 'mixed' && <span className="ml-2 text-blue-500 font-medium">· Commercial portfolio</span>}
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}
