@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { useRole } from "@/hooks/useRole";
 
 export default function AccountSettings() {
   const { user, isLoaded } = useUser();
   const supabase = getSupabaseBrowserClient();
+  const { role } = useRole();
 
   const [fullName, setFullName] = useState(
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
@@ -31,9 +33,9 @@ export default function AccountSettings() {
       await user?.update({ firstName, lastName });
 
       const { error } = await (supabase
-  .from("users") as any)
-  .update({ full_name: fullName.trim(), phone: phone || null })
-  .eq("clerk_user_id", user?.id ?? "");
+        .from("users") as any)
+        .update({ full_name: fullName.trim(), phone: phone || null })
+        .eq("clerk_user_id", user?.id ?? "");
 
       if (error) throw error;
       toast.success("Account updated successfully");
@@ -46,6 +48,15 @@ export default function AccountSettings() {
 
   return (
     <div className="space-y-6">
+      {/* Role indicator */}
+      {role && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+          <p className="text-sm text-gray-600">
+            Your role: <span className="font-medium capitalize">{role}</span>
+          </p>
+        </div>
+      )}
+
       <Section title="Profile" description="Your personal information.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Full Name">
@@ -182,5 +193,4 @@ export function SettingsSkeleton() {
     </div>
   );
 }
-
 

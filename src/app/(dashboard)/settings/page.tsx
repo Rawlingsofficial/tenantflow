@@ -28,13 +28,27 @@ type TabId = typeof TABS[number]["id"];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("account");
-  const { role } = useRole();
+  const { role, loading } = useRole();
+
+  // Debug logs
+  console.log("[SettingsPage] role:", role);
+  console.log("[SettingsPage] loading:", loading);
 
   const visibleTabs = TABS.filter((tab) => {
     if (!tab.permission) return true;
     if (!role) return false;
     return hasPermission(role, tab.permission as any);
   });
+
+  console.log("[SettingsPage] visible tabs:", visibleTabs.map(t => t.id));
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">Loading settings...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
