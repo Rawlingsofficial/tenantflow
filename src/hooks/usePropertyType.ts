@@ -1,45 +1,122 @@
 "use client";
 
-import { useOrgStore } from "@/store/orgStore";
+import { useEffect } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useOrgStore, type PropertyType, type OrgData } from "@/store/orgStore";
 import {
   isFeatureAllowedForPropertyType,
   getAllowedReportSections,
-  type PropertyType,
 } from "@/lib/permissions";
 
+interface OrgRow {
+  id: string;
+  name: string;
+  property_type: string | null;
+  country: string | null;
+  plan_type: string | null;
+}
+
+interface UserRow {
+  id: string;
+}
+
+interface MembershipRow {
+  role: string;
+}
+
 /**
- * Returns the current org's property type and helper utilities.
- *
- * Usage:
- *   const { propertyType, isResidential, isCommercial, isMixed, canView } = usePropertyType()
- *
- *   if (!canView('residential')) return null  // hides component for wrong context
+ * Fetches the current org's property type + user role and keeps orgStore in sync.
+ * Returns the original { propertyType, loading } shape PLUS convenience helpers.
  */
-export function usePropertyType() {
-  const { currentOrg } = useOrgStore();
+export function usePropertyType(): {
+  propertyType: PropertyType | null;
+  loading: boolean;
+  isResidential: boolean;
+  isCommercial: boolean;
+  isMixed: boolean;
+  canView: (feature: "residential" | "commercial") => boolean;
+  allowedSections: ("residential" | "commercial")[];
+} {
+  const { orgId, userId } = useAuth();
+  const currentOrg = useOrgStore((s) => s.currentOrg);
+  const setCurrentOrg = useOrgStore((s) => s.setCurrentOrg);
+  const setUserRole = useOrgStore((s) => s.setUserRole);
+
+  const loading = !currentOrg && !!orgId;
+
+  useEffect(() => {
+    if (!orgId) return;
+    if (currentOrg?.id === orgId) return;
+
+    const supabase = getSupabaseBrowserClient();
+
+    const loadData = async () => {
+      try {
+        const { data: orgData, error: orgError } = await supabase
+          .from("organizations")
+          .select("id, name, property_type, country, plan_type")
+          .eq("id", orgId)
+          .single();
+
+        if (orgError) throw orgError;
+        if (!orgData) return;
+
+        const row = orgData as OrgRow;
+        const org: OrgData = {
+          id: row.id,
+          name: row.name,
+          property_type: (row.property_type as PropertyType) ?? "residential",
+          country: row.country ?? null,
+          plan_type: row.plan_type ?? null,
+        };
+        setCurrentOrg(org);
+
+        if (userId) {
+          const { data: userData, error: userError } = await supabase
+            .from("users")
+            .select("id")
+            .eq("clerk_user_id", userId)
+            .single<UserRow>();
+
+          if (userError) throw userError;
+          if (userData) {
+            const { data: membershipData, error: membershipError } = await supabase
+              .from("organization_memberships")
+              .select("role")
+              .eq("organization_id", orgId)
+              .eq("user_id", userData.id)
+              .single<MembershipRow>();
+
+            if (membershipError) throw membershipError;
+            if (membershipData) {
+              setUserRole(
+                membershipData.role as "owner" | "admin" | "manager" | "viewer"
+              );
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error loading organization or membership:", error);
+      }
+    };
+
+    loadData();
+  }, [orgId, userId, currentOrg?.id, setCurrentOrg, setUserRole]);
 
   const propertyType = (currentOrg?.property_type ?? null) as PropertyType | null;
 
-  const isResidential = propertyType === "residential";
-  const isCommercial = propertyType === "commercial";
-  const isMixed = propertyType === "mixed";
-
-  /**
-   * Returns true if the given feature context is allowed.
-   * Always true for 'mixed', strict for 'residential' / 'commercial'.
-   */
   function canView(feature: "residential" | "commercial"): boolean {
     return isFeatureAllowedForPropertyType(propertyType, feature);
   }
 
-  const allowedSections = getAllowedReportSections(propertyType);
-
   return {
     propertyType,
-    isResidential,
-    isCommercial,
-    isMixed,
+    loading,
+    isResidential: propertyType === "residential",
+    isCommercial: propertyType === "commercial",
+    isMixed: propertyType === "mixed",
     canView,
-    allowedSections,
+    allowedSections: getAllowedReportSections(propertyType),
   };
 }
