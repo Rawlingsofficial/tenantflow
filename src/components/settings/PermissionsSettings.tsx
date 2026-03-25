@@ -36,7 +36,7 @@ export default function PermissionsSettings() {
         )}
 
         <div className="overflow-x-auto -mx-6">
-          <table className="min-w-full">
+          <table className="min-w-full" role="table" aria-label="Role Permission Matrix">
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="text-left text-xs font-medium text-gray-500 pb-3 pl-6 pr-4 w-56">
@@ -54,9 +54,9 @@ export default function PermissionsSettings() {
             </thead>
             <tbody>
               {PERMISSION_GROUPS.map((group) => (
-                <>
+                <tbody key={group.label}>
                   {/* Group heading row */}
-                  <tr key={`group-${group.label}`} className="bg-gray-50">
+                  <tr className="bg-gray-50">
                     <td
                       colSpan={5}
                       className="pl-6 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider"
@@ -91,7 +91,7 @@ export default function PermissionsSettings() {
                       })}
                     </tr>
                   ))}
-                </>
+                </tbody>
               ))}
             </tbody>
           </table>
@@ -112,9 +112,7 @@ export default function PermissionsSettings() {
                   <div
                     key={p.key}
                     className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-sm ${
-                      allowed
-                        ? "text-gray-700"
-                        : "text-gray-300"
+                      allowed ? "text-gray-700" : "text-gray-300"
                     }`}
                   >
                     {allowed ? (
@@ -133,3 +131,4 @@ export default function PermissionsSettings() {
     </div>
   );
 }
+

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -9,13 +9,17 @@ export default function AccountSettings() {
   const { user, isLoaded } = useUser();
   const supabase = getSupabaseBrowserClient();
 
-  const [fullName, setFullName] = useState(
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
-  );
-  const [phone, setPhone] = useState(
-    user?.primaryPhoneNumber?.phoneNumber ?? ""
-  );
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // Initialize state once user is loaded
+  useEffect(() => {
+    if (!isLoaded || !user) return;
+
+    setFullName([user.firstName, user.lastName].filter(Boolean).join(" "));
+    setPhone(user.primaryPhoneNumber?.phoneNumber ?? "");
+  }, [isLoaded, user]);
 
   if (!isLoaded) return <SettingsSkeleton />;
 
@@ -26,22 +30,28 @@ export default function AccountSettings() {
       const firstName = parts[0] ?? "";
       const lastName = parts.slice(1).join(" ") || undefined;
 
+      // Update Clerk user
       await user?.update({ firstName, lastName });
 
+      // Update Supabase profile
       const { error } = await (supabase as any)
         .from("users")
         .update({ full_name: fullName.trim(), phone: phone || null })
         .eq("clerk_user_id", user?.id ?? "");
 
       if (error) throw error;
+
       toast.success("Account updated successfully");
     } catch (err: any) {
-      toast.error(
-        err?.errors?.[0]?.message ?? err?.message ?? "Failed to update account"
-      );
+      toast.error(err?.errors?.[0]?.message ?? err?.message ?? "Failed to update account");
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleChangePassword() {
+    // Clerk password flow
+    window.open(`${window.location.origin}/user/password/change`, "_blank");
   }
 
   return (
@@ -56,6 +66,7 @@ export default function AccountSettings() {
               className={inputCls}
             />
           </Field>
+
           <Field label="Email">
             <input
               type="email"
@@ -67,6 +78,7 @@ export default function AccountSettings() {
               Managed by your sign-in provider.
             </p>
           </Field>
+
           <Field label="Phone">
             <input
               type="tel"
@@ -83,18 +95,14 @@ export default function AccountSettings() {
         </div>
       </Section>
 
-      <Section
-        title="Password"
-        description="Change your sign-in password."
-      >
+      <Section title="Password" description="Change your sign-in password.">
         <p className="text-sm text-gray-500">
           Password management is handled through{" "}
-          <span className="font-medium text-gray-700">Clerk</span>. Click
-          below to open the password update flow.
+          <span className="font-medium text-gray-700">Clerk</span>.
         </p>
         <div className="pt-4">
           <button
-            onClick={() => user?.update({})}
+            onClick={handleChangePassword}
             className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Change Password
@@ -120,9 +128,7 @@ export function Section({
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <div className="mb-5">
         <h2 className="text-base font-semibold text-gray-900">{title}</h2>
-        {description && (
-          <p className="text-sm text-gray-500 mt-0.5">{description}</p>
-        )}
+        {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
       </div>
       {children}
     </div>
@@ -138,9 +144,7 @@ export function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label}
-      </label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       {children}
     </div>
   );
@@ -173,17 +177,11 @@ export function SettingsSkeleton() {
   return (
     <div className="space-y-6">
       {[1, 2].map((i) => (
-        <div
-          key={i}
-          className="bg-white rounded-xl border border-gray-200 p-6"
-        >
+        <div key={i} className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="h-5 w-32 bg-gray-100 rounded animate-pulse mb-4" />
           <div className="grid grid-cols-2 gap-4">
             {[1, 2, 3].map((j) => (
-              <div
-                key={j}
-                className="h-10 bg-gray-100 rounded animate-pulse"
-              />
+              <div key={j} className="h-10 bg-gray-100 rounded animate-pulse" />
             ))}
           </div>
         </div>
@@ -191,3 +189,5 @@ export function SettingsSkeleton() {
     </div>
   );
 }
+
+

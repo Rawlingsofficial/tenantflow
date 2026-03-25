@@ -13,6 +13,8 @@ type OrgData = {
   unit_limit: number;
   user_limit: number;
   status: string;
+  units_used?: number; // optional field for usage
+  users_used?: number;
 };
 
 const PLANS: {
@@ -63,17 +65,24 @@ export default function BillingSettings() {
 
   async function fetchOrg() {
     setLoading(true);
-    const { data } = await supabase
-      .from("organizations")
-      .select("plan_type, unit_limit, user_limit, status")
-      .eq("id", orgId!)
-      .single();
-    setOrg(data as OrgData | null);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("plan_type, unit_limit, user_limit, status, units_used, users_used")
+        .eq("id", orgId!)
+        .single();
+
+      if (error) throw error;
+      setOrg(data as OrgData | null);
+    } catch (err: any) {
+      console.error("Failed to fetch org:", err?.message ?? err);
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (loading) return <SettingsSkeleton />;
-  if (!org) return null;
+  if (!org) return <p className="text-sm text-gray-500">Organization not found.</p>;
 
   const currentPlan = PLANS.find((p) => p.id === org.plan_type) ?? PLANS[0];
 
@@ -84,14 +93,10 @@ export default function BillingSettings() {
         <div className="flex items-start gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-lg font-semibold text-gray-900 capitalize">
-                {currentPlan.label}
-              </span>
+              <span className="text-lg font-semibold text-gray-900 capitalize">{currentPlan.label}</span>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  org.status === "active"
-                    ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-700"
+                  org.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
                 }`}
               >
                 {org.status}
@@ -103,26 +108,13 @@ export default function BillingSettings() {
 
         {/* Usage bars */}
         <div className="mt-5 space-y-4">
-          <UsageBar
-            label="Units"
-            limit={org.unit_limit}
-            used={undefined}
-            max={currentPlan.units}
-          />
-          <UsageBar
-            label="Team Members"
-            limit={org.user_limit}
-            used={undefined}
-            max={currentPlan.users}
-          />
+          <UsageBar label="Units" limit={org.unit_limit} used={org.units_used} max={currentPlan.units} />
+          <UsageBar label="Team Members" limit={org.user_limit} used={org.users_used} max={currentPlan.users} />
         </div>
       </Section>
 
       {/* Plan cards */}
-      <Section
-        title="Available Plans"
-        description="Upgrade or downgrade your plan at any time."
-      >
+      <Section title="Available Plans" description="Upgrade or downgrade your plan at any time.">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {PLANS.map((plan) => {
             const isCurrent = plan.id === org.plan_type;
@@ -130,9 +122,7 @@ export default function BillingSettings() {
               <div
                 key={plan.id}
                 className={`rounded-xl border p-5 relative transition-all ${
-                  isCurrent
-                    ? "border-gray-900 shadow-md"
-                    : "border-gray-200 hover:border-gray-300"
+                  isCurrent ? "border-gray-900 shadow-md" : "border-gray-200 hover:border-gray-300"
                 }`}
               >
                 {isCurrent && (
@@ -142,9 +132,7 @@ export default function BillingSettings() {
                 )}
 
                 <p className="font-semibold text-gray-900">{plan.label}</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1 mb-4">
-                  {plan.price}
-                </p>
+                <p className="text-2xl font-bold text-gray-900 mt-1 mb-4">{plan.price}</p>
 
                 <ul className="space-y-2 mb-5">
                   {plan.features.map((f) => (
@@ -155,18 +143,21 @@ export default function BillingSettings() {
                   ))}
                 </ul>
 
-                {!isCurrent && (
-                  <button
-                    onClick={() =>
-                      alert(
-                        "Billing upgrade is handled via your payment provider. Contact support to upgrade."
-                      )
-                    }
-                    className="w-full py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    {plan.id === "enterprise" ? "Contact us" : "Upgrade"}
-                  </button>
-                )}
+                <button
+                  disabled={isCurrent}
+                  onClick={() =>
+                    alert(
+                      "Billing upgrade is handled via your payment provider. Contact support to upgrade."
+                    )
+                  }
+                  className={`w-full py-2 text-sm font-medium rounded-md border transition-colors ${
+                    isCurrent
+                      ? "border-gray-300 bg-gray-50 text-gray-400 cursor-not-allowed"
+                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {plan.id === "enterprise" ? "Contact us" : "Upgrade"}
+                </button>
               </div>
             );
           })}
@@ -186,38 +177,22 @@ export default function BillingSettings() {
   );
 }
 
-function UsageBar({
-  label,
-  limit,
-  used,
-  max,
-}: {
-  label: string;
-  limit: number;
-  used?: number;
-  max: number;
-}) {
-  const pct = used !== undefined ? Math.min((used / limit) * 100, 100) : null;
+function UsageBar({ label, limit, used, max }: { label: string; limit: number; used?: number; max: number }) {
+  const pct = used !== undefined ? Math.min((used / limit) * 100, 100) : 0;
   const unlimited = limit >= 99999;
 
   return (
     <div>
       <div className="flex justify-between text-xs text-gray-500 mb-1">
         <span>{label}</span>
-        <span>
-          {unlimited ? "Unlimited" : `${used ?? "?"} / ${limit} limit`}
-        </span>
+        <span>{unlimited ? "Unlimited" : `${used ?? "?"} / ${limit} limit`}</span>
       </div>
       <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all ${
-            pct !== null && pct > 85
-              ? "bg-red-500"
-              : pct !== null && pct > 60
-              ? "bg-amber-400"
-              : "bg-gray-900"
+            pct > 85 ? "bg-red-500" : pct > 60 ? "bg-amber-400" : "bg-gray-900"
           }`}
-          style={{ width: unlimited ? "100%" : `${pct ?? 10}%`, opacity: unlimited ? 0.15 : 1 }}
+          style={{ width: unlimited ? "100%" : `${pct}%`, opacity: unlimited ? 0.15 : 1 }}
         />
       </div>
     </div>

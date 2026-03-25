@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useRole } from "@/hooks/useRole";
+import { hasPermission } from "@/lib/permissions";
 import { useOrgStore, type OrgData } from "@/store/orgStore";
 import { toast } from "sonner";
 import { Section, Field, SaveButton, inputCls, SettingsSkeleton } from "./AccountSettings";
@@ -30,11 +32,22 @@ export default function OrgSettings() {
   const supabase = getSupabaseBrowserClient();
   const { setCurrentOrg } = useOrgStore();
 
+  const { role, loading: roleLoading } = useRole();
+
   const [name, setName] = useState("");
   const [country, setCountry] = useState("");
   const [propertyType, setPropertyType] = useState<string>("residential");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // --- Access Control ---
+  if (!roleLoading && (!role || !hasPermission(role, "settings.edit_org"))) {
+    return (
+      <div className="text-red-500 font-medium p-6">
+        You do not have permission to access organization settings.
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!orgId) return;
@@ -47,7 +60,10 @@ export default function OrgSettings() {
       .from("organizations")
       .select("name, country, property_type")
       .eq("id", orgId!)
-      .single() as { data: { name: string; country: string | null; property_type: string | null } | null; error: any };
+      .single() as {
+        data: { name: string; country: string | null; property_type: string | null } | null;
+        error: any;
+      };
 
     if (result.data) {
       setName(result.data.name ?? "");
@@ -84,7 +100,7 @@ export default function OrgSettings() {
     }
   }
 
-  if (loading) return <SettingsSkeleton />;
+  if (loading || roleLoading) return <SettingsSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -174,5 +190,4 @@ export default function OrgSettings() {
     </div>
   );
 }
-
 

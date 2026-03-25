@@ -1,108 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRole } from "@/hooks/useRole";
 import { hasPermission } from "@/lib/permissions";
 import AccountSettings from "@/components/settings/AccountSettings";
 import OrgSettings from "@/components/settings/OrgSettings";
 import TeamSettings from "@/components/settings/TeamSettings";
-import PermissionsSettings from "@/components/settings/PermissionsSettings";
 import BillingSettings from "@/components/settings/BillingSettings";
-import {
-  User,
-  Building2,
-  Users,
-  ShieldCheck,
-  CreditCard,
-} from "lucide-react";
 
 const TABS = [
-  { id: "account",     label: "Account",     icon: User,        permission: null },
-  { id: "organization",label: "Organization", icon: Building2,   permission: "settings.edit_org" },
-  { id: "team",        label: "Team",         icon: Users,       permission: "settings.manage_team" },
-  { id: "permissions", label: "Permissions",  icon: ShieldCheck, permission: "settings.view" },
-  { id: "billing",     label: "Billing",      icon: CreditCard,  permission: "settings.manage_billing" },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
+  { label: "Account", component: AccountSettings },
+  { label: "Organization", component: OrgSettings, permission: "settings.edit_org" },
+  { label: "Team", component: TeamSettings, permission: "settings.edit_team" },
+  { label: "Billing", component: BillingSettings, permission: "settings.edit_billing" },
+];
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("account");
-  const { role, loading } = useRole();
+  const { role, loading } = useRole();  // custom hook fetching role from Supabase
+  const [activeTab, setActiveTab] = useState("Account");
 
-  /**
-   * Tab visibility rules:
-   *  - No permission required → always show (Account)
-   *  - Has permission & role loaded → show
-   *  - Still loading → show all tabs so the UI isn't empty (content itself guards)
-   */
+  // Debug: show role & loading
+  useEffect(() => {
+    console.log("ROLE:", role, "LOADING:", loading);
+  }, [role, loading]);
+
+  // Filter tabs based on permission, but show all while loading
   const visibleTabs = TABS.filter((tab) => {
     if (!tab.permission) return true;
-    if (loading) return true; // show skeleton tabs while loading
-    if (!role) return false;
+    if (loading || !role) return true; // <-- fix: show tabs while role loading
     return hasPermission(role, tab.permission as any);
   });
 
+  const ActiveComponent = visibleTabs.find(tab => tab.label === activeTab)?.component || AccountSettings;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage your account, organization, and team preferences.
-          </p>
-        </div>
+    <div className="flex flex-col md:flex-row h-full">
+      {/* Tabs sidebar */}
+      <div className="w-full md:w-64 border-r border-gray-200">
+        <ul className="flex md:flex-col overflow-x-auto md:overflow-x-visible">
+          {visibleTabs.map((tab) => (
+            <li key={tab.label}>
+              <button
+                className={`p-4 w-full text-left ${
+                  activeTab === tab.label ? "bg-gray-100 font-semibold" : ""
+                }`}
+                onClick={() => setActiveTab(tab.label)}
+              >
+                {tab.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-        <div className="flex gap-6">
-          {/* Sidebar nav */}
-          <aside className="w-52 shrink-0">
-            <nav className="space-y-0.5">
-              {visibleTabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    disabled={loading && tab.permission !== null}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors text-left disabled:opacity-40 ${
-                      isActive
-                        ? "bg-white text-gray-900 shadow-sm border border-gray-200"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-white/60"
-                    }`}
-                  >
-                    <Icon
-                      className={`w-4 h-4 shrink-0 ${
-                        isActive ? "text-gray-700" : "text-gray-400"
-                      }`}
-                    />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Role badge */}
-            {!loading && role && (
-              <div className="mt-4 px-3 py-2 rounded-md bg-white border border-gray-200">
-                <p className="text-xs text-gray-400">Signed in as</p>
-                <p className="text-xs font-semibold text-gray-700 capitalize mt-0.5">
-                  {role}
-                </p>
-              </div>
-            )}
-          </aside>
-
-          {/* Content */}
-          <main className="flex-1 min-w-0">
-            {activeTab === "account"     && <AccountSettings />}
-            {activeTab === "organization" && <OrgSettings />}
-            {activeTab === "team"        && <TeamSettings />}
-            {activeTab === "permissions" && <PermissionsSettings />}
-            {activeTab === "billing"     && <BillingSettings />}
-          </main>
-        </div>
+      {/* Tab content */}
+      <div className="flex-1 p-6">
+        <ActiveComponent />
       </div>
     </div>
   );
