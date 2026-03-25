@@ -26,7 +26,6 @@ export default function RentTrackerPage() {
   const { propertyType } = usePropertyType() // renamed from 'type'
 
   const isCommercial = propertyType === 'commercial'
-  const isMixed      = propertyType === 'mixed'
 
   const [leases,          setLeases]          = useState<any[]>([])
   const [loading,         setLoading]         = useState(true)
@@ -35,7 +34,7 @@ export default function RentTrackerPage() {
   const [selectedLeaseId, setSelectedLeaseId] = useState<string | undefined>()
   const [paymentOpen,     setPaymentOpen]     = useState(false)
 
-  useEffect(() => { if (orgId) load() }, [orgId, propertyType]) // added propertyType dependency
+  useEffect(() => { if (orgId) load() }, [orgId, propertyType])
 
   async function load() {
     setLoading(true)
@@ -49,11 +48,10 @@ export default function RentTrackerPage() {
       .order('lease_start', { ascending: false })
 
     let result = data ?? []
-    // For commercial/mixed mode, filter to residential only (commercial uses invoices)
+
+    // For commercial mode, filter to residential only if needed
     if (isCommercial) {
       // Commercial users don't use rent tracker — show redirect notice below
-    } else if (isMixed) {
-      result = result.filter((l: any) => l.units?.buildings?.building_type !== 'commercial')
     }
 
     setLeases(result)
@@ -133,7 +131,6 @@ export default function RentTrackerPage() {
             <h1 className="text-lg font-bold text-slate-900">Track & Manage Rent</h1>
             <p className="text-xs text-slate-400 mt-0.5">
               {format(new Date(), 'MMMM yyyy')} · {leases.length} active leases
-              {isMixed && <span className="ml-1.5 text-teal-600 font-medium">· Residential only</span>}
             </p>
           </div>
         </div>
@@ -142,21 +139,6 @@ export default function RentTrackerPage() {
           <Plus className="h-3.5 w-3.5" /> Record Payment
         </Button>
       </motion.div>
-
-      {/* Mixed mode notice */}
-      {isMixed && (
-        <div className="px-6 mb-4">
-          <div className="flex items-center gap-3 px-4 py-3 bg-[#1B3B6F]/5 border border-[#1B3B6F]/15 rounded-xl text-sm">
-            <Building2 className="h-4 w-4 text-[#1B3B6F] shrink-0" />
-            <p className="text-[#1B3B6F] text-sm">
-              Showing <strong>residential</strong> tenants only.
-              <button onClick={() => router.push('/invoices')} className="ml-1 underline font-semibold">
-                View commercial invoices →
-              </button>
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Collection summary */}
       <motion.div

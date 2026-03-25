@@ -10,412 +10,333 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  Plus, Search, TrendingUp, CreditCard, Clock,
-  ChevronRight, AlertTriangle, DollarSign, Receipt, ArrowRightLeft
+  ArrowLeft, Search, CheckCircle2, AlertCircle, Clock,
+  CreditCard, Plus, Building2, ArrowUpRight, Receipt
 } from 'lucide-react'
-import LeasesTable from '@/components/leases/LeasesTable'
-import AssignTenantDialog from '@/components/tenants/AssignTenantDialog'
-import { differenceInDays, format } from 'date-fns'
-import type { LeaseWithDetails } from '@/types'
+import RecordPaymentDialog from '@/components/payments/RecordPaymentDialog'
+import { format } from 'date-fns'
 import { usePropertyType } from '@/hooks/usePropertyType'
-import { useMixedModeStore } from '@/store/mixedModeStore'
-import { HouseIcon, BuildingIcon } from '@/components/ui/portfolio-icons'
 
-type FilterTab = 'all' | 'active' | 'expiring_soon' | 'ended'
-type Portfolio  = 'residential' | 'commercial'
+type FilterTab = 'all' | 'paid' | 'unpaid'
 
-export default function LeasesPage() {
+export default function RentTrackerPage() {
   const { orgId } = useAuth()
   const router    = useRouter()
   const supabase  = getSupabaseBrowserClient()
-  const { propertyType, loading: typeLoading } = usePropertyType() // renamed from 'type'
-  const { mode, setMode } = useMixedModeStore()
+  const { propertyType } = usePropertyType() // renamed from 'type'
 
-  const isMixed       = propertyType === 'mixed'
-  const isCommercial  = propertyType === 'commercial' || (isMixed && mode === 'commercial')
-  const tableMode: 'residential' | 'commercial' = isCommercial ? 'commercial' : 'residential'
+  const isCommercial = propertyType === 'commercial'
 
-  const [allLeases,    setAllLeases]    = useState<LeaseWithDetails[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [newLeaseOpen, setNewLeaseOpen] = useState(false)
-  const [filter,       setFilter]       = useState<FilterTab>('all')
-  const [search,       setSearch]       = useState('')
+  const [leases,          setLeases]          = useState<any[]>([])
+  const [loading,         setLoading]         = useState(true)
+  const [filter,          setFilter]          = useState<FilterTab>('all')
+  const [search,          setSearch]          = useState('')
+  const [selectedLeaseId, setSelectedLeaseId] = useState<string | undefined>()
+  const [paymentOpen,     setPaymentOpen]     = useState(false)
 
-  useEffect(() => { if (orgId && !typeLoading) load() }, [orgId, typeLoading])
+  useEffect(() => { if (orgId) load() }, [orgId, propertyType])
 
   async function load() {
     setLoading(true)
     const { data } = await supabase
       .from('leases')
-      .select(`*,
-        tenants(id, first_name, last_name, primary_phone, email, photo_url,
-                tenant_type, company_name, industry, contact_person),
-        units(id, unit_code, unit_type, building_id,
-              buildings(id, name, building_type)),
-        rent_payments(id, amount, payment_date, status)`)
+      .select(`*, tenants(id, first_name, last_name, primary_phone, photo_url, tenant_type, company_name),
+        units(id, unit_code, buildings(id, name, building_type)),
+        rent_payments(id, amount, payment_date, status, method)`)
       .eq('organization_id', orgId!)
+      .eq('status', 'active')
       .order('lease_start', { ascending: false })
-    setAllLeases((data as LeaseWithDetails[]) ?? [])
+
+    let result = data ?? []
+
+    // For commercial mode, filter to residential only if needed
+    if (isCommercial) {
+      // Commercial users don't use rent tracker — show redirect notice below
+    }
+
+    setLeases(result)
     setLoading(false)
   }
 
-  function splitByPortfolio(leases: LeaseWithDetails[]) {
-    const commercial  = leases.filter(l => (l as any).units?.buildings?.building_type === 'commercial')
-    const residential = leases.filter(l => (l as any).units?.buildings?.building_type !== 'commercial')
-    return { commercial, residential }
-  }
-
-  const { commercial: commercialLeases, residential: residentialLeases } = splitByPortfolio(allLeases)
-
-  const visibleLeases = isMixed
-    ? (mode === 'commercial' ? commercialLeases : residentialLeases)
-    : isCommercial
-      ? commercialLeases
-      : allLeases
-
-  const now       = new Date()
-  const thisMonth = format(now, 'yyyy-MM')
-
-  function computeKPIs(leases: LeaseWithDetails[]) {
-    const active = leases.filter(l => l.status === 'active')
-    const rent   = active.reduce((s, l) => s + Number(l.rent_amount), 0)
-    const sc     = active.reduce((s, l) => s + Number((l as any).service_charge ?? 0), 0)
-    const allPays = leases.flatMap(l => (l as any).rent_payments ?? [])
-    const collected = allPays
+  const thisMonth    = format(new Date(), 'yyyy-MM')
+  const totalExpected = leases.reduce((s, l) => s + Number(l.rent_amount), 0)
+  const totalCollected = leases.reduce((s, l) => {
+    return s + (l.rent_payments ?? [])
       .filter((p: any) => p.status === 'completed' && p.payment_date?.startsWith(thisMonth))
-      .reduce((s: number, p: any) => s + Number(p.amount), 0)
-    const unpaid = active.filter(l => {
-      const pays = (l as any).rent_payments ?? []
-      return !pays.some((p: any) => p.status === 'completed' && p.payment_date?.startsWith(thisMonth))
-    }).length
-    const expiring = active.filter(l => {
-      if (!l.lease_end) return false
-      const d = differenceInDays(new Date(l.lease_end), now)
-      return d >= 0 && d <= 30
-    })
-    const expired = active.filter(l => {
-      if (!l.lease_end) return false
-      return differenceInDays(new Date(l.lease_end), now) < 0
-    })
-    return { active, rent, sc, total: rent + sc, collected, unpaid, expiring, expired }
+      .reduce((ss: number, p: any) => ss + Number(p.amount), 0)
+  }, 0)
+  const collectionRate = totalExpected > 0
+    ? Math.round((totalCollected / totalExpected) * 100) : 0
+
+  function getStatus(lease: any): 'paid' | 'partial' | 'unpaid' {
+    const pays = (lease.rent_payments ?? []).filter((p: any) => p.status === 'completed' && p.payment_date?.startsWith(thisMonth))
+    if (pays.length === 0) return 'unpaid'
+    const amt = pays.reduce((s: number, p: any) => s + Number(p.amount), 0)
+    return amt >= Number(lease.rent_amount) ? 'paid' : 'partial'
   }
 
-  const kpi     = computeKPIs(visibleLeases)
-  const resKPI  = isMixed ? computeKPIs(residentialLeases) : null
-  const comKPI  = isMixed ? computeKPIs(commercialLeases)  : null
+  const enriched  = leases.map(l => ({ ...l, _status: getStatus(l) }))
+  const paidCount = enriched.filter(l => l._status === 'paid').length
+  const unpaidCount = enriched.filter(l => l._status !== 'paid').length
 
-  // KPI card definitions
-  const residentialKPICards = [
-    {
-      metric: `$${kpi.total.toLocaleString()}`,
-      metricSub: `${kpi.active.length} active leases`,
-      title: 'Track & Manage Rent',
-      subtitle: kpi.unpaid > 0
-        ? `${kpi.unpaid} tenant${kpi.unpaid > 1 ? 's' : ''} unpaid this month`
-        : 'All paid this month ✓',
-      subtitleColor: kpi.unpaid > 0 ? 'text-amber-600' : 'text-teal-600',
-      gradient: 'from-[#1B3B6F] to-[#2a4f8f]',
-      icon: TrendingUp, href: '/leases/rent-tracker',
-    },
-    {
-      metric: `$${kpi.collected.toLocaleString()}`,
-      metricSub: 'collected this month',
-      title: 'Rent Payments',
-      subtitle: kpi.total - kpi.collected > 0
-        ? `$${(kpi.total - kpi.collected).toLocaleString()} outstanding`
-        : 'Fully collected ✓',
-      subtitleColor: kpi.total - kpi.collected > 0 ? 'text-amber-600' : 'text-teal-600',
-      gradient: 'from-teal-500 to-teal-600',
-      icon: CreditCard, href: '/leases/rent-tracker',
-    },
-    {
-      metric: String(kpi.expiring.length),
-      metricSub: 'expiring in 30 days',
-      title: 'Lease Expirations',
-      subtitle: kpi.expiring.length === 0 && kpi.expired.length === 0
-        ? 'No expirations soon ✓'
-        : `${kpi.expired.length > 0 ? `${kpi.expired.length} overdue · ` : ''}Action needed`,
-      subtitleColor: kpi.expiring.length > 0 || kpi.expired.length > 0 ? 'text-amber-600' : 'text-teal-600',
-      gradient: 'from-[#0d9488] to-teal-400',
-      icon: Clock, href: '/leases',
-    },
-  ]
-
-  const commercialKPICards = [
-    {
-      metric: `$${kpi.rent.toLocaleString()}`,
-      metricSub: 'base rent/mo',
-      title: 'Monthly Rent',
-      subtitle: `${kpi.active.length} active commercial lease${kpi.active.length !== 1 ? 's' : ''}`,
-      subtitleColor: 'text-slate-400',
-      gradient: 'from-[#1B3B6F] to-[#2a4f8f]',
-      icon: DollarSign, href: '/leases',
-    },
-    {
-      metric: `$${kpi.sc.toLocaleString()}`,
-      metricSub: 'service charges/mo',
-      title: 'Service Charges',
-      subtitle: `Total monthly: $${kpi.total.toLocaleString()}`,
-      subtitleColor: 'text-teal-600',
-      gradient: 'from-teal-500 to-[#0d9488]',
-      icon: Receipt, href: '/invoices',
-    },
-    {
-      metric: String(kpi.expiring.length),
-      metricSub: 'expiring in 30 days',
-      title: 'Lease Expirations',
-      subtitle: kpi.expiring.length === 0 && kpi.expired.length === 0
-        ? 'No expirations soon ✓'
-        : 'Action needed',
-      subtitleColor: kpi.expiring.length > 0 || kpi.expired.length > 0 ? 'text-amber-600' : 'text-teal-600',
-      gradient: 'from-[#0d9488] to-teal-400',
-      icon: Clock, href: '/leases',
-    },
-  ]
-
-  const kpiCards = isCommercial ? commercialKPICards : residentialKPICards
-
-  const filtered = visibleLeases.filter(l => {
+  const filtered = enriched.filter(l => {
     const q  = search.toLowerCase()
-    const t  = (l as any).tenants
-    const u  = (l as any).units
+    const t  = l.tenants
     const isC = t?.tenant_type === 'company'
-    const name = isC
-      ? (t?.company_name ?? '').toLowerCase()
-      : `${t?.first_name ?? ''} ${t?.last_name ?? ''}`.toLowerCase()
-    if (q && !name.includes(q) && !(u?.unit_code ?? '').toLowerCase().includes(q) && !(u?.buildings?.name ?? '').toLowerCase().includes(q)) return false
-    if (filter === 'active') return l.status === 'active'
-    if (filter === 'expiring_soon') return kpi.expiring.some(e => e.id === l.id) || kpi.expired.some(e => e.id === l.id)
-    if (filter === 'ended') return l.status === 'ended' || l.status === 'terminated'
+    const name = isC ? (t?.company_name ?? '').toLowerCase() : `${t?.first_name ?? ''} ${t?.last_name ?? ''}`.toLowerCase()
+    if (q && !name.includes(q) && !(l.units?.unit_code ?? '').toLowerCase().includes(q)) return false
+    if (filter === 'paid')   return l._status === 'paid'
+    if (filter === 'unpaid') return l._status === 'unpaid' || l._status === 'partial'
     return true
   })
 
-  const tabs: { label: string; value: FilterTab; count: number }[] = [
-    { label: 'All',           value: 'all',           count: visibleLeases.length },
-    { label: 'Active',        value: 'active',        count: kpi.active.length },
-    { label: 'Expiring Soon', value: 'expiring_soon', count: kpi.expiring.length + kpi.expired.length },
-    { label: 'Ended',         value: 'ended',         count: visibleLeases.filter(l => l.status !== 'active').length },
-  ]
-
-  if (typeLoading) return (
-    <div className="min-h-screen bg-slate-50/70 p-6 space-y-6">
-      <Skeleton className="h-8 w-48 rounded-xl" />
-      <div className="grid grid-cols-3 gap-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}</div>
-      <Skeleton className="h-96 rounded-2xl" />
+  // Commercial users — show redirect notice
+  if (isCommercial) return (
+    <div className="min-h-screen bg-slate-50/70 flex items-center justify-center">
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-8 max-w-md text-center">
+        <div className="w-12 h-12 bg-[#1B3B6F]/8 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Receipt className="h-6 w-6 text-[#1B3B6F]" />
+        </div>
+        <h2 className="text-lg font-bold text-slate-900 mb-2">Rent Tracker is for Residential</h2>
+        <p className="text-sm text-slate-500 mb-5">
+          Commercial tenants are billed via invoices with service charges included. Use the Invoices section to track payments.
+        </p>
+        <div className="flex flex-col gap-2">
+          <Button onClick={() => router.push('/invoices')}
+            className="h-9 bg-[#1B3B6F] hover:bg-[#162d52] text-white text-sm rounded-xl font-semibold shadow-sm">
+            Go to Invoices
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/leases')}
+            className="h-9 text-sm rounded-xl border-slate-200">
+            Back to Leases
+          </Button>
+        </div>
+      </div>
     </div>
   )
 
   return (
     <div className="min-h-screen bg-slate-50/70">
-
       {/* Header */}
       <motion.div
-        initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
-        className="px-6 pt-6 pb-4 flex items-center justify-between"
+        initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+        className="px-6 pt-5 pb-4 flex items-center justify-between"
       >
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Leases</h1>
-          <p className="text-sm text-slate-400 mt-0.5">
-            {kpi.active.length} active · ${kpi.total.toLocaleString()}/mo
-            {isMixed && (
-              <span className={`ml-2 font-semibold ${mode === 'commercial' ? 'text-[#1B3B6F]' : 'text-teal-600'}`}>
-                · {mode === 'commercial' ? 'Commercial' : 'Residential'} portfolio
-              </span>
-            )}
-            {!isMixed && propertyType === 'commercial' && <span className="ml-2 text-[#1B3B6F] font-semibold">· Commercial</span>}
-          </p>
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.push('/leases')}
+            className="p-1 rounded-lg hover:bg-slate-200 transition-colors text-slate-400">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-lg font-bold text-slate-900">Track & Manage Rent</h1>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {format(new Date(), 'MMMM yyyy')} · {leases.length} active leases
+            </p>
+          </div>
         </div>
-        <Button onClick={() => setNewLeaseOpen(true)}
+        <Button onClick={() => { setSelectedLeaseId(undefined); setPaymentOpen(true) }}
           className="h-9 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-xl gap-1.5 px-4 shadow-sm">
-          <Plus className="h-3.5 w-3.5" /> New Lease
+          <Plus className="h-3.5 w-3.5" /> Record Payment
         </Button>
       </motion.div>
 
-      {/* Mixed portfolio switcher */}
-      {isMixed && (
-        <motion.div
-          initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-          className="px-6 mb-4"
-        >
-          <div className="flex items-center gap-1 bg-white border border-slate-200/80 rounded-2xl p-1 shadow-sm w-fit">
-            {(['residential', 'commercial'] as Portfolio[]).map(p => (
-              <button key={p} onClick={() => setMode(p)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-                  mode === p
-                    ? p === 'commercial'
-                      ? 'bg-[#1B3B6F] text-white shadow-sm'
-                      : 'bg-teal-600 text-white shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}>
-                {p === 'residential'
-                  ? <HouseIcon className="w-3.5 h-3.5" />
-                  : <BuildingIcon className="w-3.5 h-3.5" />}
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ml-0.5 ${
-                  mode === p ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {p === 'residential' ? residentialLeases.length : commercialLeases.length}
-                </span>
-              </button>
-            ))}
-            <div className="mx-1 h-5 w-px bg-slate-200" />
-            <div className="px-3 py-1 flex items-center gap-1 text-xs text-slate-400">
-              <ArrowRightLeft className="h-3.5 w-3.5" /> Mixed portfolio
+      {/* Collection summary */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.35 }}
+        className="px-6 mb-5"
+      >
+        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                {format(new Date(), 'MMMM yyyy')} — Rent Collection
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {paidCount} of {leases.length} tenants paid · ${totalCollected.toLocaleString()} of ${totalExpected.toLocaleString()} collected
+              </p>
+            </div>
+            <div className="text-right">
+              <p className={`text-2xl font-bold tabular-nums ${collectionRate >= 90 ? 'text-teal-600' : collectionRate >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                {collectionRate}%
+              </p>
+              <p className="text-xs text-slate-400">collection rate</p>
             </div>
           </div>
-
-          {/* Overview strip */}
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            {[
-              {
-                label: 'Residential',
-                icon: 'house',
-                active: resKPI!.active.length,
-                total: resKPI!.total,
-                unpaid: resKPI!.unpaid,
-                border: 'border-teal-200',
-                bg: 'bg-teal-50/50',
-                activeColor: 'text-teal-700',
-                iconBg: 'bg-teal-500/10',
-              },
-              {
-                label: 'Commercial',
-                icon: 'building',
-                active: comKPI!.active.length,
-                total: comKPI!.total,
-                unpaid: comKPI!.unpaid,
-                border: 'border-[#1B3B6F]/20',
-                bg: 'bg-[#1B3B6F]/4',
-                activeColor: 'text-[#1B3B6F]',
-                iconBg: 'bg-[#1B3B6F]/8',
-              },
-            ].map(s => (
-              <div key={s.label} className={`rounded-xl border ${s.border} ${s.bg} px-4 py-3 flex items-center justify-between`}>
-                <div className="flex items-center gap-3">
-                  <div className={`w-7 h-7 rounded-lg ${s.iconBg} flex items-center justify-center`}>
-                    {s.icon === 'house'
-                      ? <HouseIcon    className={`w-3.5 h-3.5 ${s.activeColor}`} />
-                      : <BuildingIcon className={`w-3.5 h-3.5 ${s.activeColor}`} />}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-600">{s.label}</p>
-                    <p className={`text-lg font-bold tabular-nums ${s.activeColor}`}>{s.active} active</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-slate-800 tabular-nums">${s.total.toLocaleString()}/mo</p>
-                  {s.unpaid > 0 && <p className="text-[10px] text-amber-600 font-semibold">{s.unpaid} unpaid</p>}
-                </div>
-              </div>
-            ))}
+          {/* Progress bar */}
+          <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${collectionRate}%` }}
+              transition={{ delay: 0.2, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className={`h-full rounded-full ${collectionRate >= 90 ? 'bg-gradient-to-r from-teal-500 to-teal-400' : collectionRate >= 50 ? 'bg-gradient-to-r from-amber-400 to-amber-300' : 'bg-gradient-to-r from-red-400 to-red-300'}`}
+            />
           </div>
-        </motion.div>
-      )}
-
-      {/* KPI cards */}
-      <div className="px-6 grid grid-cols-3 gap-4 mb-5">
-        {kpiCards.map((card, i) => (
-          <motion.button key={card.title}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: (isMixed ? 0.15 : 0) + i * 0.07, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            onClick={() => router.push(card.href)}
-            className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-left hover:shadow-md transition-shadow group"
-          >
-            <div className={`h-24 bg-gradient-to-br ${card.gradient} p-4 flex items-center justify-between`}>
-              <div>
-                <p className="text-xs text-white/70 font-medium uppercase tracking-wider">
-                  {isCommercial ? 'Monthly' : 'Expected'}
-                </p>
-                <p className="text-2xl font-bold text-white tabular-nums">{card.metric}</p>
-                <p className="text-xs text-white/70 mt-0.5">{card.metricSub}</p>
-              </div>
-              <card.icon className="h-9 w-9 text-white/20" />
-            </div>
-            <div className="p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">{card.title}</p>
-                <p className={`text-xs mt-0.5 font-medium ${card.subtitleColor}`}>{card.subtitle}</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-teal-500 transition-colors flex-shrink-0" />
-            </div>
-          </motion.button>
-        ))}
-      </div>
+          <div className="flex justify-between mt-1.5">
+            <span className="text-xs text-teal-600 font-semibold">${totalCollected.toLocaleString()} collected</span>
+            <span className="text-xs text-amber-600 font-semibold">${(totalExpected - totalCollected).toLocaleString()} outstanding</span>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Tabs + search */}
       <div className="px-6 flex items-center justify-between">
         <div className="flex items-center gap-0.5 border-b border-slate-200">
-          {tabs.map(tab => (
+          {[
+            { label: 'All', value: 'all' as FilterTab, count: leases.length },
+            { label: 'Paid', value: 'paid' as FilterTab, count: paidCount },
+            { label: 'Unpaid', value: 'unpaid' as FilterTab, count: unpaidCount },
+          ].map(tab => (
             <button key={tab.value} onClick={() => setFilter(tab.value)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-1.5 ${
                 filter === tab.value ? 'border-teal-600 text-teal-700' : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}>
               {tab.label}
-              {tab.count > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                  filter === tab.value ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'
-                }`}>{tab.count}</span>
-              )}
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                filter === tab.value ? 'bg-teal-100 text-teal-700' : 'bg-slate-100 text-slate-500'
+              }`}>{tab.count}</span>
             </button>
           ))}
         </div>
         <div className="relative pb-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <Input
-            placeholder={isCommercial ? 'Search companies, spaces…' : 'Search tenants, units…'}
-            value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-9 h-8 w-56 text-xs bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-400/25"
-          />
+          <Input placeholder="Search tenant or unit…" value={search} onChange={e => setSearch(e.target.value)}
+            className="pl-9 h-8 w-52 text-xs bg-white border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-400/25" />
         </div>
       </div>
 
-      {/* Alerts */}
-      {(kpi.expired.length > 0 || kpi.expiring.length > 0) && filter !== 'expiring_soon' && (
-        <div className="px-6 pt-3 space-y-2">
-          {kpi.expired.length > 0 && (
-            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm">
-              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
-              <span className="text-red-800">
-                <strong>{kpi.expired.length}</strong> lease{kpi.expired.length > 1 ? 's' : ''} expired but still marked active
-              </span>
-              <button onClick={() => setFilter('expiring_soon')} className="ml-auto text-xs text-red-700 font-semibold underline">Resolve</button>
-            </motion.div>
-          )}
-          {kpi.expiring.length > 0 && (
-            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}
-              className="flex items-center gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
-              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-              <span className="text-amber-800"><strong>{kpi.expiring.length}</strong> expiring within 30 days</span>
-              <button onClick={() => setFilter('expiring_soon')} className="ml-auto text-xs text-amber-700 font-semibold underline">View</button>
-            </motion.div>
-          )}
-        </div>
-      )}
-
       {/* Table */}
-      <div className="px-6 pb-8 mt-0">
+      <div className="px-6 pb-8">
         <div className="bg-white rounded-b-2xl border border-t-0 border-slate-200/80 shadow-sm overflow-hidden">
           {loading ? (
             <div className="p-6 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-10 h-10 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <CreditCard className="h-5 w-5 text-slate-300" />
+              </div>
+              <p className="text-sm text-slate-500">No results</p>
+            </div>
           ) : (
-            <LeasesTable
-              leases={filtered}
-              onViewDetail={lease => router.push(`/leases/${lease.id}`)}
-              mode={tableMode}
-            />
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60">
+                  {['Tenant', 'Unit', 'Monthly Rent', 'This Month', 'Last Payment', 'Status', ''].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider first:px-5">{h}</th>
+                  ))}
+                  </tr>
+              </thead>
+              <tbody>
+                {filtered.map((lease, i) => {
+                  const t    = lease.tenants
+                  const u    = lease.units
+                  const isC  = t?.tenant_type === 'company'
+                  const name = isC ? (t?.company_name ?? '—') : `${t?.first_name ?? ''} ${t?.last_name ?? ''}`.trim()
+                  const init = isC ? (t?.company_name ?? 'C')[0].toUpperCase() : `${t?.first_name?.[0] ?? ''}${t?.last_name?.[0] ?? ''}`.toUpperCase()
+                  const thisMonthPays = (lease.rent_payments ?? []).filter((p: any) => p.status === 'completed' && p.payment_date?.startsWith(thisMonth))
+                  const thisMonthAmt  = thisMonthPays.reduce((s: number, p: any) => s + Number(p.amount), 0)
+                  const allPays = (lease.rent_payments ?? []).filter((p: any) => p.status === 'completed')
+                    .sort((a: any, b: any) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
+                  const lastPay = allPays[0]
+                  const st = lease._status
+
+                  return (
+                    <motion.tr
+                      key={lease.id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.025, duration: 0.25 }}
+                      className={`border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer group ${st === 'unpaid' ? 'bg-amber-50/25' : ''}`}
+                      onClick={() => router.push(`/leases/${lease.id}`)}
+                    >
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl overflow-hidden bg-gradient-to-br from-[#1B3B6F] to-[#2a4f8f] flex-shrink-0 flex items-center justify-center text-xs font-bold text-[#14b8a6] border border-[#1B3B6F]/20">
+                            {t?.photo_url
+                              ? <img src={t.photo_url} alt={name} className="w-full h-full object-cover" />
+                              : init}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900 group-hover:text-teal-700 transition-colors">{name}</p>
+                            <p className="text-[11px] text-slate-400">{t?.primary_phone ?? '—'}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="text-sm font-semibold text-slate-800 font-mono">{u?.unit_code}</p>
+                        <p className="text-[11px] text-slate-400">{u?.buildings?.name}</p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="text-sm font-bold text-slate-900 tabular-nums">${Number(lease.rent_amount).toLocaleString()}</p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {thisMonthAmt > 0
+                          ? <span className="text-sm font-bold text-teal-600 tabular-nums">${thisMonthAmt.toLocaleString()}</span>
+                          : <span className="text-sm text-slate-400">—</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-slate-500">
+                        {lastPay ? format(new Date(lastPay.payment_date), 'MMM d, yyyy') : '—'}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        {st === 'paid' && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                            <CheckCircle2 className="h-3 w-3" /> Paid
+                          </span>
+                        )}
+                        {st === 'partial' && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#1B3B6F]/8 text-[#1B3B6F] border border-[#1B3B6F]/20">
+                            <Clock className="h-3 w-3" /> Partial
+                          </span>
+                        )}
+                        {st === 'unpaid' && (
+                          <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                            <AlertCircle className="h-3 w-3" /> Unpaid
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                        {st !== 'paid' && (
+                          <button
+                            onClick={() => { setSelectedLeaseId(lease.id); setPaymentOpen(true) }}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-teal-600 font-semibold hover:underline"
+                          >
+                            <CreditCard className="h-3 w-3" /> Record
+                          </button>
+                        )}
+                      </td>
+                    </motion.tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-slate-100 bg-slate-50/50">
+                  <td colSpan={3} className="px-5 py-2.5">
+                    <span className="text-xs text-slate-500">
+                      <span className="font-bold text-slate-700">{paidCount}</span> paid ·{' '}
+                      <span className="font-bold text-amber-600">{unpaidCount}</span> unpaid ·{' '}
+                      <span className="font-bold text-slate-700">{leases.length}</span> total
+                    </span>
+                  </td>
+                  <td colSpan={4} className="px-4 py-2.5 text-right">
+                    <span className="text-xs text-slate-400">
+                      Expected: <span className="font-bold text-slate-700">${totalExpected.toLocaleString()}</span> ·{' '}
+                      Collected: <span className="font-bold text-teal-600">${totalCollected.toLocaleString()}</span>
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           )}
         </div>
       </div>
 
-      <AssignTenantDialog
-        open={newLeaseOpen}
-        onClose={() => setNewLeaseOpen(false)}
-        onSaved={() => { setNewLeaseOpen(false); load() }}
-        unit={null}
+      <RecordPaymentDialog
+        open={paymentOpen}
+        onClose={() => setPaymentOpen(false)}
+        onSaved={() => { setPaymentOpen(false); load() }}
         organizationId={orgId ?? ''}
+        preselectedLeaseId={selectedLeaseId}
       />
     </div>
   )
 }
+
