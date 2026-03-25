@@ -30,10 +30,10 @@ export default function AccountSettings() {
 
       await user?.update({ firstName, lastName });
 
-      const { error } = await supabase
-        .from("users")
-        .update({ full_name: fullName.trim(), phone: phone || null } as any)
-        .eq("clerk_user_id", user?.id ?? "");
+      const { error } = await (supabase
+  .from("users") as any)
+  .update({ full_name: fullName.trim(), phone: phone || null })
+  .eq("clerk_user_id", user?.id ?? "");
 
       if (error) throw error;
       toast.success("Account updated successfully");
