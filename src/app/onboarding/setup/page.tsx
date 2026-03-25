@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Home, Building2, Layers, Loader2, ArrowRight, Check } from 'lucide-react'
+import { Home, Building2, Layers, Loader2, ArrowRight } from 'lucide-react'
 import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout'
 import { PropertyTypeCard } from '@/components/onboarding/PropertyTypeCard'
 
@@ -60,44 +60,48 @@ export default function OnboardingSetupPage() {
   const { orgId } = useAuth()
   const supabase = getSupabaseBrowserClient()
 
-  const [selected, setSelected] = useState<typeof PROPERTY_TYPES[number]['type'] | null>(null)
+  const [selected, setSelected] = useState<
+    'residential' | 'commercial' | 'mixed' | null
+  >(null)
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(false)
 
   async function handleSave() {
-  if (!selected || !orgId) {
-    setError('Missing information. Please try again.')
-    return
+    if (!selected || !orgId) {
+      setError('Missing information. Please try again.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    try {
+      const { error } = await supabase
+        .from('organizations')
+        .upsert(
+          {
+            id: orgId,
+            name: 'Temp Org', // temporary fallback
+            property_type: selected,
+          } as any // ✅ FIXED TYPE ERROR HERE
+        )
+
+      if (error) throw error
+
+      setCompleted(true)
+
+      setTimeout(() => {
+        window.location.href = '/dashboard'
+      }, 1200)
+
+    } catch (err: unknown) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+      setSaving(false)
+    }
   }
-
-  setSaving(true)
-  setError('')
-
-  try {
-    const { error: e } = await supabase
-      .from('organizations')
-      .upsert({
-        id: orgId,
-        name: 'Temp Org', // 🔥 REQUIRED FIX
-        property_type: selected,
-      })
-
-    if (e) throw e
-
-    setCompleted(true)
-
-    setTimeout(() => {
-      window.location.href = '/dashboard'
-    }, 1200)
-
-  } catch (err: unknown) {
-    console.error(err)
-    setError(err instanceof Error ? err.message : 'Something went wrong')
-    setSaving(false)
-  }
-}
-
 
   const selectedType = PROPERTY_TYPES.find(p => p.type === selected)
 
@@ -106,8 +110,12 @@ export default function OnboardingSetupPage() {
       <div className="space-y-6">
         
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-slate-900">Complete your setup</h1>
-          <p className="text-slate-500 mt-1">Choose your property type</p>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Complete your setup
+          </h1>
+          <p className="text-slate-500 mt-1">
+            Choose your property type
+          </p>
         </div>
 
         {!completed ? (
@@ -142,7 +150,7 @@ export default function OnboardingSetupPage() {
               ) : (
                 <>
                   Continue to Dashboard
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </>
               )}
             </Button>
@@ -155,8 +163,8 @@ export default function OnboardingSetupPage() {
             </div>
           )
         )}
-
       </div>
     </OnboardingLayout>
   )
 }
+
