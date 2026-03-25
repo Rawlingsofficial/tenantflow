@@ -36,17 +36,18 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   // Has org → check property_type
-  if (orgId) {
-    const { data: org, error } = await supabase
-      .from('organizations')
-      .select('property_type')
-      .eq('id', orgId)
-      .single()
+ if (orgId) {
+  const { data: org, error } = await supabase
+    .from('organizations')
+    .select('property_type')
+    .eq('id', orgId)
+    .maybeSingle()
+  console.log('Middleware check', orgId, org?.property_type, error)
 
     // If property_type is missing and not already on onboarding setup route, redirect
-    if ((error || !org?.property_type) && !isOnboardingRoute(req)) {
-      return NextResponse.redirect(new URL('/onboarding/setup', req.url))
-    }
+    if ((!org || !org.property_type) && !isOnboardingRoute(req)) {
+  return NextResponse.redirect(new URL('/onboarding/setup', req.url))
+}
 
     // If property_type exists and user tries to access onboarding routes, redirect to dashboard
     if (org?.property_type && isOnboardingRoute(req)) {

@@ -44,11 +44,11 @@ const PROPERTY_TYPES = [
     icon: Layers,
     title: 'Mixed Portfolio',
     subtitle: 'Residential & Commercial',
-    description: 'Your portfolio includes both. Switch views anytime from the sidebar.',
-    examples: ['Mixed-use buildings', 'Residential + retail', 'Diverse portfolio'],
+    description: 'Your portfolio includes both.',
+    examples: ['Mixed-use buildings', 'Residential + retail'],
     tenantLabel: 'Individuals and companies',
     unitLabel: 'Apartments and commercial spaces',
-    paymentLabel: 'Payments + Invoices (both)',
+    paymentLabel: 'Payments + Invoices',
     color: 'text-violet-700',
     bg: 'bg-violet-50',
     border: 'border-violet-500',
@@ -56,79 +56,58 @@ const PROPERTY_TYPES = [
   },
 ]
 
-function dbVal<T>(v: T): never { return v as never }
-
 export default function OnboardingSetupPage() {
   const { orgId } = useAuth()
   const supabase = getSupabaseBrowserClient()
+
   const [selected, setSelected] = useState<typeof PROPERTY_TYPES[number]['type'] | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(false)
 
   async function handleSave() {
-  if (!selected || !orgId) return
-  setSaving(true); setError('')
-  try {
-    console.log('Updating organization', orgId, 'with property_type:', selected)
-    const { data, error: e } = await supabase
-      .from('organizations')
-      .update(dbVal({ property_type: selected }))   // ← use dbVal here
-      .eq('id', orgId)
-      .select()
+  if (!selected || !orgId) {
+    setError('Missing information. Please try again.')
+    return
+  }
 
-    if (e) {
-      console.error('Supabase update error:', e)
-      throw new Error(e.message)
-    }
-    console.log('Update successful:', data)
+  setSaving(true)
+  setError('')
+
+  try {
+    const { error: e } = await supabase
+      .from('organizations')
+      .upsert({
+        id: orgId,
+        name: 'Temp Org', // 🔥 REQUIRED FIX
+        property_type: selected,
+      })
+
+    if (e) throw e
 
     setCompleted(true)
+
     setTimeout(() => {
       window.location.href = '/dashboard'
-    }, 1500)
+    }, 1200)
+
   } catch (err: unknown) {
-    console.error('Caught error:', err)
+    console.error(err)
     setError(err instanceof Error ? err.message : 'Something went wrong')
     setSaving(false)
   }
 }
+
 
   const selectedType = PROPERTY_TYPES.find(p => p.type === selected)
 
   return (
     <OnboardingLayout>
       <div className="space-y-6">
-        {/* Header */}
+        
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="relative h-10 w-10">
-              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 15L16 4L29 15" stroke="#2BBE9A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M6 13V27H26V13" stroke="#1F3A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="10" y="16" width="12" height="2.5" rx="1" fill="#1F3A5F"/>
-                <rect x="14.5" y="16" width="3" height="10" rx="1" fill="#1F3A5F"/>
-                <rect x="20" y="4" width="3.5" height="6" rx="1" fill="#2BBE9A"/>
-              </svg>
-            </div>
-            <div>
-              <span className="text-[#1F3A5F] font-bold text-2xl">Tenant</span>
-              <span className="text-[#2BBE9A] font-bold text-2xl">Flow</span>
-            </div>
-          </div>
           <h1 className="text-2xl font-bold text-slate-900">Complete your setup</h1>
-          <p className="text-slate-500 mt-1">Choose your property type to continue</p>
-        </div>
-
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#2BBE9A] text-white flex items-center justify-center text-xs font-bold">
-            <Check className="h-3.5 w-3.5" />
-          </div>
-          <div className="w-16 h-0.5 bg-[#2BBE9A]" />
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${!completed ? 'bg-[#1F3A5F] text-white ring-4 ring-[#1F3A5F]/20' : 'bg-[#2BBE9A] text-white'}`}>
-            {completed ? <Check className="h-3.5 w-3.5" /> : '2'}
-          </div>
+          <p className="text-slate-500 mt-1">Choose your property type</p>
         </div>
 
         {!completed ? (
@@ -143,35 +122,40 @@ export default function OnboardingSetupPage() {
                 />
               ))}
             </div>
-            {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+            {error && (
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">
+                {error}
+              </p>
+            )}
+
             <Button
               onClick={handleSave}
               disabled={!selected || saving}
-              className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-bold gap-2"
+              className="w-full"
             >
-              {saving
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</>
-                : <>Continue to Dashboard <ArrowRight className="h-4 w-4" /></>}
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  Continue to Dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
-            <p className="text-center text-xs text-slate-400">
-              This can only be changed by contacting support.
-            </p>
           </>
         ) : (
-          // Confirmation view
           selectedType && (
             <div className="text-center space-y-4">
-              <div className={`w-16 h-16 rounded-2xl ${selectedType.bg} border-2 ${selectedType.border} flex items-center justify-center mx-auto`}>
-                <selectedType.icon className={`h-8 w-8 ${selectedType.color}`} />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900">Ready to go! 🎉</h2>
-                <p className="text-slate-500 mt-1">Redirecting to dashboard...</p>
-              </div>
-              <Loader2 className="h-6 w-6 animate-spin mx-auto text-[#2BBE9A]" />
+              <h2 className="text-xl font-bold">Ready 🎉</h2>
+              <Loader2 className="h-6 w-6 animate-spin mx-auto" />
             </div>
           )
         )}
+
       </div>
     </OnboardingLayout>
   )

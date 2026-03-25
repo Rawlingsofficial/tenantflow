@@ -2,19 +2,19 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useOrganizationList } from '@clerk/nextjs'
+import { useOrganizationList, useUser } from '@clerk/nextjs'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, ArrowRight, Home, Building2, Layers, Check } from 'lucide-react'
+import { Loader2, ArrowRight } from 'lucide-react'
 import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout'
-import { StepIndicator } from '@/components/onboarding/StepIndicator'
 
 function dbVal<T>(v: T): never { return v as never }
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const { user } = useUser()
   const { createOrganization, setActive } = useOrganizationList()
   const supabase = getSupabaseBrowserClient()
 
@@ -25,18 +25,34 @@ export default function OnboardingPage() {
   const handleCreate = async () => {
     if (!orgName.trim()) { setError('Organization name is required'); return }
     if (!createOrganization || !setActive) { setError('Please refresh and try again'); return }
-    setLoading(true); setError('')
+    if (!user) { setError('User not found'); return }
+
+    setLoading(true)
+    setError('')
     try {
+      // 1. Create organization in Clerk
       const org = await createOrganization({ name: orgName.trim() })
       await setActive({ organization: org.id })
-      const { error: e } = await supabase.from('organizations').insert(dbVal({
-        id: org.id,
-        name: orgName.trim(),
-      }))
-      if (e) throw new Error(e.message)
-      // Redirect to setup page for property type selection
+
+      // 2. Insert organization into Supabase
+      console.log('Inserting organization into Supabase:', org.id, orgName.trim())
+      const { error: insertError } = await supabase
+        .from('organizations')
+        .insert(dbVal({
+          id: org.id,
+          name: orgName.trim(),
+        }))
+
+      if (insertError) {
+        console.error('Supabase insert error:', insertError)
+        throw new Error(`Failed to save organization: ${insertError.message}`)
+      }
+      console.log('Organization inserted successfully')
+
+      // 3. Redirect to setup
       router.push('/onboarding/setup')
     } catch (err: unknown) {
+      console.error('Onboarding error:', err)
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
     }
@@ -45,7 +61,6 @@ export default function OnboardingPage() {
   return (
     <OnboardingLayout>
       <div className="space-y-6">
-        {/* Logo and title */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="relative h-10 w-10">
