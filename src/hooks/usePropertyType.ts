@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
@@ -27,14 +27,14 @@ interface MembershipRow {
 
 /**
  * Fetches the current org's property type + user role and keeps orgStore in sync.
- * Returns the original { propertyType, loading } shape PLUS convenience helpers.
+ * Returns { propertyType, loading } plus convenience helpers.
  */
 export function usePropertyType(): {
-  propertyType: PropertyType | null;
+  propertyType: PropertyType;
   loading: boolean;
   isResidential: boolean;
   isCommercial: boolean;
-  
+
   canView: (feature: "residential" | "commercial") => boolean;
   allowedSections: ("residential" | "commercial")[];
 } {
@@ -63,10 +63,15 @@ export function usePropertyType(): {
         if (!orgData) return;
 
         const row = orgData as OrgRow;
+
+        // Ensure property_type is only 'residential' or 'commercial'
+        const propType: PropertyType =
+          row.property_type === "commercial" ? "commercial" : "residential";
+
         const org: OrgData = {
           id: row.id,
           name: row.name,
-          property_type: (row.property_type as PropertyType) ?? "residential",
+          property_type: propType,
           country: row.country ?? null,
           plan_type: row.plan_type ?? null,
         };
@@ -80,13 +85,15 @@ export function usePropertyType(): {
             .single<UserRow>();
 
           if (userError) throw userError;
+
           if (userData) {
-            const { data: membershipData, error: membershipError } = await supabase
-              .from("organization_memberships")
-              .select("role")
-              .eq("organization_id", orgId)
-              .eq("user_id", userData.id)
-              .single<MembershipRow>();
+            const { data: membershipData, error: membershipError } =
+              await supabase
+                .from("organization_memberships")
+                .select("role")
+                .eq("organization_id", orgId)
+                .eq("user_id", userData.id)
+                .single<MembershipRow>();
 
             if (membershipError) throw membershipError;
             if (membershipData) {
@@ -104,7 +111,8 @@ export function usePropertyType(): {
     loadData();
   }, [orgId, userId, currentOrg?.id, setCurrentOrg, setUserRole]);
 
-  const propertyType = (currentOrg?.property_type ?? null) as PropertyType | null;
+  // default to 'residential' if not yet loaded
+  const propertyType: PropertyType = currentOrg?.property_type ?? "residential";
 
   function canView(feature: "residential" | "commercial"): boolean {
     return isFeatureAllowedForPropertyType(propertyType, feature);
@@ -119,4 +127,3 @@ export function usePropertyType(): {
     allowedSections: getAllowedReportSections(propertyType),
   };
 }
-
