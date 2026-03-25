@@ -1,329 +1,309 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useAuth } from '@clerk/nextjs'
-import {
-  Users, Crown, Shield, Eye,
-  UserCheck, Copy, Check,
-  ChevronDown, Loader2, Trash2
-} from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import type { Role } from '@/types'
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { createBrowserClient } from "@/lib/supabase/client";
+import { useRole } from "@/hooks/useRole";
+import { hasPermission } from "@/lib/permissions";
+import { toast } from "sonner";
+import { Trash2, UserPlus, Crown, Shield, Eye, Briefcase } from "lucide-react";
+import { Section, Field, SaveButton, inputCls, SettingsSkeleton } from "./AccountSettings";
+import type { Role } from "@/types";
 
-interface Member {
-  id: string
-  user_id: string
-  role: string
-  status: string
+type Member = {
+  id: string;
+  user_id: string;
+  role: Role;
+  status: string;
   users: {
-    email: string
-    full_name: string | null
-    clerk_user_id: string
-  } | null
-}
+    full_name: string | null;
+    email: string;
+    phone: string | null;
+  };
+};
 
-const ROLE_CONFIG: Record<string, {
-  label: string
-  icon: any
-  color: string
-  bg: string
-  description: string
-}> = {
-  owner: {
-    label: 'Owner',
-    icon: Crown,
-    color: 'text-amber-600',
-    bg: 'bg-amber-100',
-    description: 'Full access including billing & permissions',
-  },
-  admin: {
-    label: 'Admin',
-    icon: Shield,
-    color: 'text-indigo-600',
-    bg: 'bg-indigo-100',
-    description: 'Manage everything except billing',
-  },
-  manager: {
-    label: 'Manager',
-    icon: UserCheck,
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-100',
-    description: 'Day-to-day property management',
-  },
-  viewer: {
-    label: 'Viewer',
-    icon: Eye,
-    color: 'text-slate-500',
-    bg: 'bg-slate-100',
-    description: 'Read-only access',
-  },
-}
+const ROLE_OPTIONS: { value: Role; label: string; icon: React.ElementType }[] = [
+  { value: "owner", label: "Owner", icon: Crown },
+  { value: "admin", label: "Admin", icon: Shield },
+  { value: "manager", label: "Manager", icon: Briefcase },
+  { value: "viewer", label: "Viewer", icon: Eye },
+];
 
-const ASSIGNABLE_ROLES: Role[] = ['admin', 'manager', 'viewer']
+const ROLE_COLORS: Record<Role, string> = {
+  owner: "bg-amber-100 text-amber-800",
+  admin: "bg-blue-100 text-blue-800",
+  manager: "bg-green-100 text-green-800",
+  viewer: "bg-gray-100 text-gray-600",
+};
 
 export default function TeamSettings() {
-  const { orgId, userId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const { orgId, userId } = useAuth();
+  const supabase = createBrowserClient();
+  const { role: myRole } = useRole();
 
-  const [members, setMembers] = useState<Member[]>([])
-  const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState(false)
-  const [updatingRole, setUpdatingRole] = useState<string | null>(null)
-  const [removingMember, setRemovingMember] = useState<string | null>(null)
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-  const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
+  const canManage = myRole ? hasPermission(myRole, "settings.manage_team") : false;
+
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Invite form
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("viewer");
+  const [inviteFullName, setInviteFullName] = useState("");
+  const [inviting, setInviting] = useState(false);
+
+  const fetchMembers = useCallback(async () => {
+    if (!orgId) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("organization_memberships")
+      .select(`
+        id,
+        user_id,
+        role,
+        status,
+        users (
+          full_name,
+          email,
+          phone
+        )
+      `)
+      .eq("organization_id", orgId)
+      .eq("status", "active")
+      .order("role");
+
+    if (!error && data) setMembers(data as any);
+    setLoading(false);
+  }, [orgId]);
 
   useEffect(() => {
-    if (orgId) loadMembers()
-  }, [orgId])
+    fetchMembers();
+  }, [fetchMembers]);
 
-  async function loadMembers() {
-    setLoading(true)
-    const { data } = await supabase
-      .from('organization_memberships')
-      .select(`
-        id, user_id, role, status,
-        users ( email, full_name, clerk_user_id )
-      `)
-      .eq('organization_id', orgId!)
-      .eq('status', 'active')
+  async function handleInvite() {
+    if (!orgId || !inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      // 1. Upsert the user record
+      const { data: userData, error: upsertErr } = await supabase
+        .from("users")
+        .upsert(
+          { email: inviteEmail.trim(), full_name: inviteFullName.trim() || null },
+          { onConflict: "email" }
+        )
+        .select("id")
+        .single<{ id: string }>();
 
-    setMembers((data as Member[]) ?? [])
-    setLoading(false)
+      if (upsertErr || !userData) throw upsertErr ?? new Error("Failed to create user");
+
+      // 2. Insert membership (ignore duplicate)
+      const { error: memberErr } = await supabase
+        .from("organization_memberships")
+        .insert({
+          user_id: userData.id,
+          organization_id: orgId,
+          role: inviteRole,
+          status: "active",
+        } as any);
+
+      if (memberErr && !memberErr.message.includes("duplicate")) throw memberErr;
+
+      toast.success(`${inviteEmail} added as ${inviteRole}`);
+      setInviteEmail("");
+      setInviteFullName("");
+      setInviteRole("viewer");
+      fetchMembers();
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to add member");
+    } finally {
+      setInviting(false);
+    }
   }
 
   async function handleRoleChange(memberId: string, newRole: Role) {
-    setUpdatingRole(memberId)
-    setOpenDropdown(null)
-    try {
-      const { error } = await (supabase as any)
-  .from('organization_memberships')
-  .update({ role: newRole })
-  .eq('id', memberId)
+    const { error } = await supabase
+      .from("organization_memberships")
+      .update({ role: newRole })
+      .eq("id", memberId);
 
-      if (error) throw new Error(error.message)
+    if (error) {
+      toast.error("Failed to update role");
+    } else {
+      toast.success("Role updated");
       setMembers((prev) =>
-        prev.map((m) => m.id === memberId ? { ...m, role: newRole } : m)
-      )
-    } catch (err) {
-      console.error('Failed to update role:', err)
-    } finally {
-      setUpdatingRole(null)
+        prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+      );
     }
   }
 
-  async function handleRemoveMember(memberId: string) {
-    setRemovingMember(memberId)
-    try {
-      const { error } = await (supabase as any)
-  .from('organization_memberships')
-  .update({ status: 'inactive' })
-  .eq('id', memberId)
+  async function handleRemove(memberId: string) {
+    if (!confirm("Remove this member from the organization?")) return;
+    const { error } = await supabase
+      .from("organization_memberships")
+      .update({ status: "inactive" })
+      .eq("id", memberId);
 
-      if (error) throw new Error(error.message)
-      setMembers((prev) => prev.filter((m) => m.id !== memberId))
-      setConfirmRemove(null)
-    } catch (err) {
-      console.error('Failed to remove member:', err)
-    } finally {
-      setRemovingMember(null)
+    if (error) {
+      toast.error("Failed to remove member");
+    } else {
+      toast.success("Member removed");
+      fetchMembers();
     }
   }
 
-  function copyInviteLink() {
-    const link = `${window.location.origin}/sign-up`
-    navigator.clipboard.writeText(link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  if (loading) return <SettingsSkeleton />;
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Team members */}
-      <Card className="border border-slate-200 shadow-none">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-              <Users className="h-4 w-4 text-slate-400" />
-              Team members ({members.length})
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {loading ? (
-            <div className="space-y-2">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-16 bg-slate-100 rounded-lg animate-pulse" />
-              ))}
-            </div>
-          ) : members.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-6">
-              No team members yet
-            </p>
-          ) : (
-            members.map((member) => {
-              const config = ROLE_CONFIG[member.role] ?? ROLE_CONFIG.viewer
-              const RoleIcon = config.icon
-              const isCurrentUser = member.users?.clerk_user_id === userId
-              const isOwner = member.role === 'owner'
-              const displayName = member.users?.full_name ?? member.users?.email ?? 'Unknown'
+    <div className="space-y-6">
+      {/* Member list */}
+      <Section
+        title="Team Members"
+        description={`${members.length} active member${members.length !== 1 ? "s" : ""} in this organization.`}
+      >
+        <div className="divide-y divide-gray-100">
+          {members.map((m) => {
+            const isSelf = m.user_id === userId;
+            const isOwner = m.role === "owner";
+            const canEdit = canManage && !isSelf && !isOwner;
 
-              return (
-                <div key={member.id} className="space-y-2">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-bold text-indigo-700 shrink-0">
-                        {displayName[0]?.toUpperCase() ?? '?'}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-slate-900">
-                            {displayName}
-                          </p>
-                          {isCurrentUser && (
-                            <span className="text-xs text-slate-400">(you)</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-400">
-                          {member.users?.email ?? '—'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {/* Role badge / dropdown */}
-                      {isOwner || isCurrentUser ? (
-                        <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${config.bg} ${config.color}`}>
-                          <RoleIcon className="h-3 w-3" />
-                          {config.label}
-                        </span>
-                      ) : (
-                        <div className="relative">
-                          <button
-                            onClick={() => setOpenDropdown(
-                              openDropdown === member.id ? null : member.id
-                            )}
-                            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium cursor-pointer hover:opacity-80 transition-opacity ${config.bg} ${config.color}`}
-                          >
-                            {updatingRole === member.id
-                              ? <Loader2 className="h-3 w-3 animate-spin" />
-                              : <RoleIcon className="h-3 w-3" />
-                            }
-                            {config.label}
-                            <ChevronDown className="h-3 w-3" />
-                          </button>
-
-                          {openDropdown === member.id && (
-                            <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden py-1">
-                              {ASSIGNABLE_ROLES.map((role) => {
-                                const rc = ROLE_CONFIG[role]
-                                const RI = rc.icon
-                                return (
-                                  <button
-                                    key={role}
-                                    onClick={() => handleRoleChange(member.id, role)}
-                                    className={`w-full flex items-start gap-3 px-4 py-2.5 text-left hover:bg-slate-50 transition-colors ${
-                                      member.role === role ? 'bg-indigo-50' : ''
-                                    }`}
-                                  >
-                                    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium shrink-0 mt-0.5 ${rc.bg} ${rc.color}`}>
-                                      <RI className="h-3 w-3" />
-                                      {rc.label}
-                                    </span>
-                                    <span className="text-xs text-slate-400">
-                                      {rc.description}
-                                    </span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Remove button */}
-                      {!isOwner && !isCurrentUser && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 w-7 p-0 text-slate-400 hover:text-red-500"
-                          onClick={() => setConfirmRemove(member.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Confirm remove */}
-                  {confirmRemove === member.id && (
-                    <div className="ml-3 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
-                      <p className="text-xs text-red-700">
-                        Remove <strong>{displayName}</strong> from this organization?
-                      </p>
-                      <div className="flex gap-2 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          onClick={() => setConfirmRemove(null)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs bg-red-600 hover:bg-red-700"
-                          onClick={() => handleRemoveMember(member.id)}
-                          disabled={removingMember === member.id}
-                        >
-                          {removingMember === member.id
-                            ? <Loader2 className="h-3 w-3 animate-spin" />
-                            : 'Remove'
-                          }
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+            return (
+              <div key={m.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                {/* Avatar */}
+                <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold text-gray-600 shrink-0">
+                  {(m.users?.full_name ?? m.users?.email ?? "?")[0].toUpperCase()}
                 </div>
-              )
-            })
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Invite */}
-      <Card className="border border-slate-200 shadow-none">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-slate-700">
-            Invite team member
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-slate-500">
-            Share the sign-up link. After signing up they will appear in your Clerk dashboard where you can add them to your organization.
-          </p>
-          <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100">
-            <code className="text-xs text-slate-500 flex-1 truncate">
-              {typeof window !== 'undefined'
-                ? `${window.location.origin}/sign-up`
-                : '/sign-up'}
-            </code>
-            <Button
-              size="sm"
-              variant="outline"
-              className="shrink-0 h-7 text-xs"
-              onClick={copyInviteLink}
-            >
-              {copied
-                ? <><Check className="h-3 w-3 mr-1 text-emerald-600" />Copied</>
-                : <><Copy className="h-3 w-3 mr-1" />Copy</>
-              }
-            </Button>
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {m.users?.full_name ?? m.users?.email}
+                    {isSelf && <span className="ml-1.5 text-xs text-gray-400">(you)</span>}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">{m.users?.email}</p>
+                </div>
+
+                {/* Role badge / selector */}
+                {canEdit ? (
+                  <select
+                    value={m.role}
+                    onChange={(e) => handleRoleChange(m.id, e.target.value as Role)}
+                    className="text-xs px-2 py-1 rounded-md border border-gray-200 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  >
+                    {ROLE_OPTIONS.filter((r) => r.value !== "owner").map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_COLORS[m.role]}`}
+                  >
+                    {m.role}
+                  </span>
+                )}
+
+                {/* Remove */}
+                {canEdit && (
+                  <button
+                    onClick={() => handleRemove(m.id)}
+                    className="text-gray-300 hover:text-red-500 transition-colors"
+                    title="Remove member"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      {/* Invite new member */}
+      {canManage && (
+        <Section
+          title="Add Team Member"
+          description="Add someone by email. They will be able to log in with that email via Clerk."
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Full Name">
+              <input
+                type="text"
+                value={inviteFullName}
+                onChange={(e) => setInviteFullName(e.target.value)}
+                placeholder="Jane Smith"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Email Address">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="jane@company.com"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Role">
+              <select
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as Role)}
+                className={inputCls}
+              >
+                {ROLE_OPTIONS.filter((r) => r.value !== "owner").map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <RoleHint role={inviteRole} />
+            </Field>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="pt-4 flex justify-end">
+            <button
+              onClick={handleInvite}
+              disabled={inviting || !inviteEmail.trim()}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              {inviting ? "Adding…" : "Add member"}
+            </button>
+          </div>
+        </Section>
+      )}
+
+      {/* Role reference */}
+      <Section title="Role Reference" description="What each role can do in the organization.">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {ROLE_OPTIONS.map(({ value, label, icon: Icon }) => (
+            <div key={value} className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Icon className="w-4 h-4 text-gray-500" />
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ROLE_COLORS[value]}`}>
+                  {label}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                {ROLE_DESCRIPTIONS[value]}
+              </p>
+            </div>
+          ))}
+        </div>
+      </Section>
     </div>
-  )
+  );
+}
+
+const ROLE_DESCRIPTIONS: Record<Role, string> = {
+  owner: "Full access to everything including billing and destructive actions. Cannot be changed.",
+  admin: "Full access except billing management. Can manage team members and permissions.",
+  manager: "Can manage tenants, units, leases, and payments. Cannot access billing or team settings.",
+  viewer: "Read-only access to all data. Cannot create, edit, or delete anything.",
+};
+
+function RoleHint({ role }: { role: Role }) {
+  return (
+    <p className="mt-1 text-xs text-gray-400">{ROLE_DESCRIPTIONS[role]}</p>
+  );
 }

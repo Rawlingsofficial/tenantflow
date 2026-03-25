@@ -48,6 +48,39 @@ export type Permission =
   | 'settings.manage_billing'
   | 'settings.manage_permissions'
 
+// ─── Property type ────────────────────────────────────────────────────
+
+export type PropertyType = 'residential' | 'commercial' | 'mixed'
+
+/**
+ * Returns true if a given section/feature is accessible for a property type.
+ *
+ * Rules:
+ *  - 'residential' → only residential features
+ *  - 'commercial'  → only commercial features
+ *  - 'mixed'       → both residential AND commercial
+ */
+export function isFeatureAllowedForPropertyType(
+  propertyType: PropertyType | null | undefined,
+  feature: 'residential' | 'commercial'
+): boolean {
+  if (!propertyType) return false
+  if (propertyType === 'mixed') return true
+  return propertyType === feature
+}
+
+/**
+ * Returns which report sections are visible based on property type.
+ */
+export function getAllowedReportSections(
+  propertyType: PropertyType | null | undefined
+): ('residential' | 'commercial')[] {
+  if (!propertyType) return []
+  if (propertyType === 'residential') return ['residential']
+  if (propertyType === 'commercial') return ['commercial']
+  return ['residential', 'commercial']
+}
+
 // ─── Role permission matrix ───────────────────────────────────────────
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
@@ -166,7 +199,7 @@ export const PERMISSION_GROUPS = [
   },
 ]
 
-// ─── Helper ───────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────
 
 export function hasPermission(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
@@ -176,3 +209,23 @@ export function getRolePermissions(role: Role): Permission[] {
   return ROLE_PERMISSIONS[role] ?? []
 }
 
+/**
+ * Gate helper: returns true only if the user's role has the permission
+ * AND the property type allows the feature context.
+ *
+ * Usage:
+ *   canAccess(myRole, propertyType, 'reports.view', 'commercial')
+ */
+export function canAccess(
+  role: Role | null | undefined,
+  propertyType: PropertyType | null | undefined,
+  permission: Permission,
+  featureContext?: 'residential' | 'commercial'
+): boolean {
+  if (!role) return false
+  if (!hasPermission(role, permission)) return false
+  if (featureContext) {
+    return isFeatureAllowedForPropertyType(propertyType, featureContext)
+  }
+  return true
+}

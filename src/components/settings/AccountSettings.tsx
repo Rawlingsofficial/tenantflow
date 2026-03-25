@@ -1,140 +1,183 @@
-'use client'
+"use client";
 
-import { useUser, useClerk } from '@clerk/nextjs'
-import { useRouter } from 'next/navigation'
-import {
-  User, Mail, Phone, Shield,
-  LogOut, ExternalLink
-} from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { useState } from "react";
+import { useUser } from "@clerk/nextjs";
+import { createBrowserClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 export default function AccountSettings() {
-  const { user } = useUser()
-  const { signOut, openUserProfile } = useClerk()
-  const router = useRouter()
+  const { user, isLoaded } = useUser();
+  const supabase = createBrowserClient();
 
-  const initials = user?.fullName
-    ? user.fullName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : '?'
+  const [fullName, setFullName] = useState(
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
+  );
+  const [phone, setPhone] = useState(
+    user?.primaryPhoneNumber?.phoneNumber ?? ""
+  );
+  const [saving, setSaving] = useState(false);
+
+  if (!isLoaded) {
+    return <SettingsSkeleton />;
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const [firstName, ...rest] = fullName.trim().split(" ");
+      const lastName = rest.join(" ");
+
+      await user?.update({ firstName, lastName });
+
+      const { error } = await supabase
+        .from("users")
+        .update({ full_name: fullName.trim(), phone: phone || null })
+        .eq("clerk_user_id", user?.id ?? "");
+
+      if (error) throw error;
+      toast.success("Account updated successfully");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to update account");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      {/* Profile */}
-      <Card className="border border-slate-200 shadow-none">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-            <User className="h-4 w-4 text-slate-400" />
-            My profile
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Avatar + name */}
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-full overflow-hidden border-2 border-slate-200 shrink-0">
-              {user?.imageUrl ? (
-                <img
-                  src={user.imageUrl}
-                  alt={user.fullName ?? ''}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full bg-indigo-100 flex items-center justify-center text-xl font-bold text-indigo-700">
-                  {initials}
-                </div>
-              )}
-            </div>
-            <div>
-              <p className="text-lg font-semibold text-slate-900">
-                {user?.fullName ?? 'No name set'}
-              </p>
-              <p className="text-sm text-slate-400">
-                {user?.primaryEmailAddress?.emailAddress ?? '—'}
-              </p>
-              <Badge className="mt-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-xs">
-                Active
-              </Badge>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <Section title="Profile" description="Your personal information.">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Full Name">
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Email">
+            <input
+              type="email"
+              value={user?.primaryEmailAddress?.emailAddress ?? ""}
+              disabled
+              className={`${inputCls} bg-gray-50 text-gray-400 cursor-not-allowed`}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Managed by your sign-in provider.
+            </p>
+          </Field>
+          <Field label="Phone">
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 555 000 0000"
+              className={inputCls}
+            />
+          </Field>
+        </div>
 
-          {/* Profile fields */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-              <Mail className="h-4 w-4 text-slate-400 shrink-0" />
-              <div>
-                <p className="text-xs text-slate-400">Email</p>
-                <p className="text-sm font-medium text-slate-800">
-                  {user?.primaryEmailAddress?.emailAddress ?? '—'}
-                </p>
-              </div>
-            </div>
+        <div className="pt-4 flex justify-end">
+          <SaveButton onClick={handleSave} loading={saving} />
+        </div>
+      </Section>
 
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-              <Phone className="h-4 w-4 text-slate-400 shrink-0" />
-              <div>
-                <p className="text-xs text-slate-400">Phone</p>
-                <p className="text-sm font-medium text-slate-800">
-                  {user?.primaryPhoneNumber?.phoneNumber ?? 'Not set'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-              <Shield className="h-4 w-4 text-slate-400 shrink-0" />
-              <div>
-                <p className="text-xs text-slate-400">Authentication</p>
-                <p className="text-sm font-medium text-slate-800">
-                  Managed by Clerk
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Edit via Clerk */}
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            onClick={() => openUserProfile()}
+      <Section title="Password" description="Change your sign-in password.">
+        <p className="text-sm text-gray-500">
+          Password management is handled through{" "}
+          <span className="font-medium text-gray-700">Clerk</span>. Click below
+          to open the password update flow.
+        </p>
+        <div className="pt-4">
+          <button
+            onClick={() => user?.update({})}
+            className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <ExternalLink className="h-4 w-4" />
-            Edit profile, password & security
-          </Button>
-
-          <p className="text-xs text-slate-400">
-            Profile changes, password updates and two-factor authentication are managed through Clerk's secure profile portal.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Danger zone */}
-      <Card className="border border-red-100 shadow-none">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-red-600">
-            Danger zone
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-lg border border-red-100 bg-red-50">
-            <div>
-              <p className="text-sm font-medium text-slate-800">Sign out</p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Sign out of your account on this device
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-red-500 hover:text-red-600 hover:border-red-200 shrink-0"
-              onClick={() => signOut({ redirectUrl: '/sign-in' })}
-            >
-              <LogOut className="h-4 w-4 mr-1.5" />
-              Sign out
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+            Change Password
+          </button>
+        </div>
+      </Section>
     </div>
-  )
+  );
 }
 
+// ─── Shared primitives ────────────────────────────────────────────────
+
+export function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="mb-5">
+        <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+        {description && (
+          <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+export function SaveButton({
+  onClick,
+  loading,
+  label = "Save changes",
+}: {
+  onClick: () => void;
+  loading: boolean;
+  label?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="px-4 py-2 text-sm font-medium rounded-md bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50 transition-colors"
+    >
+      {loading ? "Saving…" : label}
+    </button>
+  );
+}
+
+export const inputCls =
+  "w-full px-3 py-2 text-sm rounded-md border border-gray-300 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent transition";
+
+export function SettingsSkeleton() {
+  return (
+    <div className="space-y-6">
+      {[1, 2].map((i) => (
+        <div key={i} className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="h-5 w-32 bg-gray-100 rounded animate-pulse mb-4" />
+          <div className="grid grid-cols-2 gap-4">
+            {[1, 2, 3].map((j) => (
+              <div key={j} className="h-10 bg-gray-100 rounded animate-pulse" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
