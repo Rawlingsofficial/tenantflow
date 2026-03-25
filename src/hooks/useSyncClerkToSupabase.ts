@@ -60,7 +60,11 @@ export function useSyncClerkToSupabase() {
   // =========================
   async function syncOrg() {
     try {
+      if (!organization) return; // ✅ EXTRA SAFETY (fixes TS)
+
       console.log("🔄 Syncing org:", orgId);
+
+      const orgName = organization.name ?? "Unnamed Org"; // ✅ SAFE ACCESS
 
       // ✅ 1. Ensure organization exists
       const { error: orgError } = await supabase
@@ -68,7 +72,7 @@ export function useSyncClerkToSupabase() {
         .upsert(
           {
             id: orgId,
-            name: organization.name || "Unnamed Org",
+            name: orgName,
             plan_type: "free",
             status: "active",
             property_type: null,
@@ -94,7 +98,7 @@ export function useSyncClerkToSupabase() {
       const clerkRole = (membership?.role as string) ?? "org:member";
       const role = normalizeRole(clerkRole);
 
-      // ❗ IMPORTANT FIX: NO onConflict here (since no unique constraint)
+      // ✅ 4. Insert membership
       const { error: memberError } = await supabase
         .from("organization_memberships")
         .insert({
@@ -104,7 +108,7 @@ export function useSyncClerkToSupabase() {
           status: "active",
         } as any);
 
-      // Ignore duplicate errors manually
+      // ignore duplicates
       if (memberError && !memberError.message.includes("duplicate")) {
         throw memberError;
       }
@@ -129,3 +133,4 @@ function normalizeRole(
   if (clerkRole === "admin") return "admin";
   return "viewer";
 }
+
