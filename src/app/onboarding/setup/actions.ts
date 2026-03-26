@@ -14,7 +14,7 @@ export async function savePropertyType({
   try {
     const supabase = createServerClient()
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('organizations')
       .upsert(
         {
