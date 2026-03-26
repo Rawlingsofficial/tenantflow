@@ -1,3 +1,4 @@
+// src/hooks/useRole.ts
 "use client";
 
 import { useEffect, useRef, useState } from "react";

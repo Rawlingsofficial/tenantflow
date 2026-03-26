@@ -1,3 +1,4 @@
+// src/hooks/usePropertyType.ts
 'use client';
 
 import { useEffect } from "react";

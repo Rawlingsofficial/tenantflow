@@ -1,3 +1,4 @@
+// src/store/orgStore.ts
 import { create } from 'zustand'
 import type { Role } from '@/types'
 
