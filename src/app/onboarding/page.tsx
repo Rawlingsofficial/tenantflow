@@ -1,104 +1,96 @@
-// src/app/onboarding/page.tsx
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useOrganizationList, useUser } from '@clerk/nextjs'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Loader2, ArrowRight } from 'lucide-react'
-import { OnboardingLayout } from '@/components/onboarding/OnboardingLayout'
+import { useAuth } from '@clerk/nextjs'
+import { useOrganization } from '@clerk/nextjs'
+import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 
-export default function OnboardingPage() {
-  const router = useRouter()
-  const { user } = useUser()
-  const { createOrganization, setActive } = useOrganizationList()
+export default function OnboardingSetupPage() {
+  const { orgId } = useAuth()
+  const { organization } = useOrganization()
+  const supabase = getSupabaseBrowserClient()
 
-  const [orgName, setOrgName] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [selected, setSelected] = useState<'residential' | 'commercial' | null>(null)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const handleCreate = async () => {
-    if (!orgName.trim()) { setError('Organization name is required'); return }
-    if (!createOrganization || !setActive) { setError('Please refresh and try again'); return }
-    if (!user) { setError('User not found'); return }
+  async function handleSave() {
+    if (!selected || !orgId) {
+      setError('Please select a property type.')
+      return
+    }
 
-    setLoading(true)
+    setSaving(true)
     setError('')
 
     try {
-      // 1. Create org in Clerk — webhook fires automatically and syncs to Supabase
-      const org = await createOrganization({ name: orgName.trim() })
+      const { error: upsertError } = await (supabase as any)
+        .from('organizations')
+        .upsert(
+          {
+            id: orgId,
+            name: organization?.name ?? 'My Organization',
+            property_type: selected,
+            plan_type: 'free',
+            status: 'active',
+          },
+          { onConflict: 'id' }
+        )
 
-      // 2. Set as active org in Clerk session
-      await setActive({ organization: org.id })
+      if (upsertError) throw upsertError
 
-      // 3. Go to property type setup
-      // DO NOT insert into Supabase here — the webhook handles org + membership sync
-      router.push('/onboarding/setup')
-
+      window.location.href = '/dashboard'
     } catch (err: unknown) {
-      console.error('[onboarding] create org error:', err)
       setError(err instanceof Error ? err.message : 'Something went wrong')
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   return (
-    <OnboardingLayout>
-      <div className="space-y-6">
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <div className="relative h-10 w-10">
-              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M3 15L16 4L29 15" stroke="#2BBE9A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M6 13V27H26V13" stroke="#1F3A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <rect x="10" y="16" width="12" height="2.5" rx="1" fill="#1F3A5F"/>
-                <rect x="14.5" y="16" width="3" height="10" rx="1" fill="#1F3A5F"/>
-                <rect x="20" y="4" width="3.5" height="6" rx="1" fill="#2BBE9A"/>
-                <rect x="20" y="4" width="3.5" height="6" rx="1" fill="#2BBE9A"/>
-              </svg>
-            </div>
-            <div>
-              <span className="text-[#1F3A5F] font-bold text-2xl">Tenant</span>
-              <span className="text-[#2BBE9A] font-bold text-2xl">Flow</span>
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Create your organization</h1>
-          <p className="text-slate-500 mt-1">Set up your property management workspace</p>
-        </div>
+    <div style={{ maxWidth: 400, margin: '100px auto', padding: 24 }}>
+      <h1>What type of properties do you manage?</h1>
 
-        <div className="space-y-5">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-slate-700">Organization name</Label>
-            <Input
-              placeholder="e.g., Acme Properties"
-              value={orgName}
-              onChange={e => setOrgName(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCreate()}
-              className="h-11 rounded-xl border-slate-200 focus:ring-[#2BBE9A]/20"
-              autoFocus
-            />
-            <p className="text-xs text-slate-400">This will be your workspace name.</p>
-          </div>
+      <div style={{ display: 'flex', gap: 16, margin: '24px 0' }}>
+        <button
+          onClick={() => setSelected('residential')}
+          style={{
+            flex: 1,
+            padding: '16px',
+            fontSize: 16,
+            cursor: 'pointer',
+            border: selected === 'residential' ? '2px solid black' : '2px solid #ccc',
+            borderRadius: 8,
+            background: selected === 'residential' ? '#f0f0f0' : 'white',
+          }}
+        >
+          Residential
+        </button>
 
-          {error && (
-            <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
-          )}
-
-          <Button
-            onClick={handleCreate}
-            disabled={loading || !orgName.trim()}
-            className="w-full h-11 bg-[#1F3A5F] hover:bg-[#152e56] text-white rounded-xl font-semibold gap-2"
-          >
-            {loading
-              ? <><Loader2 className="h-4 w-4 animate-spin" /> Creating...</>
-              : <>Continue <ArrowRight className="h-4 w-4" /></>
-            }
-          </Button>
-        </div>
+        <button
+          onClick={() => setSelected('commercial')}
+          style={{
+            flex: 1,
+            padding: '16px',
+            fontSize: 16,
+            cursor: 'pointer',
+            border: selected === 'commercial' ? '2px solid black' : '2px solid #ccc',
+            borderRadius: 8,
+            background: selected === 'commercial' ? '#f0f0f0' : 'white',
+          }}
+        >
+          Commercial
+        </button>
       </div>
-    </OnboardingLayout>
+
+      {error && <p style={{ color: 'red', marginBottom: 12 }}>{error}</p>}
+
+      <button
+        onClick={handleSave}
+        disabled={!selected || saving}
+        style={{ padding: '8px 24px', fontSize: 16, cursor: 'pointer' }}
+      >
+        {saving ? 'Saving...' : 'Continue to Dashboard'}
+      </button>
+    </div>
   )
 }
