@@ -1,3 +1,5 @@
+// src/app/api/listings/[id]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase/server';
@@ -18,20 +20,21 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
 
   const supabase = createServerClient();
 
-  // Explicit type for Supabase response
-  const { data: userData } = await supabase
-    .from<User>('users')
+  // 🔥 FIX 1: Removed .from<User> and explicitly typed the awaited response
+  const { data: userData } = (await supabase
+    .from('users')
     .select('id')
     .eq('clerk_user_id', userId)
-    .maybeSingle();
+    .maybeSingle()) as { data: User | null };
 
   if (!userData) return [];
 
-  const { data: memberships } = await supabase
-    .from<Membership>('organization_memberships')
+  // 🔥 FIX 2: Removed .from<Membership> and explicitly typed the awaited response
+  const { data: memberships } = (await supabase
+    .from('organization_memberships')
     .select('organization_id')
     .eq('user_id', userData.id)
-    .eq('status', 'active');
+    .eq('status', 'active')) as { data: Membership[] | null };
 
   return (memberships ?? []).map((m) => m.organization_id);
 }
