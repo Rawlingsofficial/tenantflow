@@ -30,7 +30,8 @@ export async function savePropertyType({
     if (!email) return { error: 'No email found on your account' };
 
     // 2. Upsert user — safe whether webhook has fired or not
-    const { data: userRecord, error: userError } = await supabase
+    // 🔥 FIX 1: Cast the payload to 'any' and explicitly type the expected return data
+    const { data: userRecord, error: userError } = (await supabase
       .from('users')
       .upsert(
         {
@@ -38,11 +39,11 @@ export async function savePropertyType({
           email,
           full_name: fullName,
           status: 'active',
-        },
+        } as any, 
         { onConflict: 'clerk_user_id' }
       )
       .select('id')
-      .single();
+      .single()) as { data: { id: string } | null; error: any };
 
     if (userError || !userRecord) {
       console.error('[savePropertyType] user upsert failed:', userError);
@@ -50,6 +51,7 @@ export async function savePropertyType({
     }
 
     // 3. Upsert organization with property_type
+    // 🔥 FIX 2: Cast the payload to 'any'
     const { error: orgError } = await supabase
       .from('organizations')
       .upsert(
@@ -59,7 +61,7 @@ export async function savePropertyType({
           property_type: propertyType,
           plan_type: 'free',
           status: 'active',
-        },
+        } as any,
         { onConflict: 'id' }
       );
 
@@ -69,6 +71,7 @@ export async function savePropertyType({
     }
 
     // 4. Upsert membership as owner
+    // 🔥 FIX 3: Cast the payload to 'any' (userRecord.id is now properly recognized by TS)
     const { error: membershipError } = await supabase
       .from('organization_memberships')
       .upsert(
@@ -77,7 +80,7 @@ export async function savePropertyType({
           organization_id: orgId,
           role: 'owner',
           status: 'active',
-        },
+        } as any,
         { onConflict: 'user_id,organization_id' }
       );
 
