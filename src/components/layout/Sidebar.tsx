@@ -5,30 +5,34 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, FileText,
   Receipt, BarChart3, Settings, CreditCard,
-  ChevronRight, Home, Briefcase,
+  ChevronRight, Globe, Wrench,
 } from 'lucide-react'
 import { usePropertyType } from '@/hooks/usePropertyType'
 
 import { cn } from '@/lib/utils'
 
 const RESIDENTIAL_NAV = [
-  { label: 'Dashboard',         href: '/dashboard',  icon: LayoutDashboard },
-  { label: 'Buildings & Units', href: '/buildings',  icon: Building2 },
-  { label: 'Tenants',           href: '/tenants',    icon: Users },
-  { label: 'Leases',            href: '/leases',     icon: FileText },
-  { label: 'Payments',          href: '/payments',   icon: CreditCard },
-  { label: 'Reports',           href: '/reports',    icon: BarChart3 },
-  { label: 'Settings',          href: '/settings',   icon: Settings },
+  { label: 'Dashboard',         href: '/dashboard',    icon: LayoutDashboard },
+  { label: 'Buildings & Units', href: '/buildings',    icon: Building2 },
+  { label: 'Tenants',           href: '/tenants',      icon: Users },
+  { label: 'Leases',            href: '/leases',       icon: FileText },
+  { label: 'Payments',          href: '/payments',     icon: CreditCard },
+  { label: 'Listings',          href: '/listings',     icon: Globe },
+  { label: 'Maintenance',       href: '/maintenance',  icon: Wrench },
+  { label: 'Reports',           href: '/reports',      icon: BarChart3 },
+  { label: 'Settings',          href: '/settings',     icon: Settings },
 ]
 
 const COMMERCIAL_NAV = [
-  { label: 'Dashboard',          href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Buildings & Spaces', href: '/buildings', icon: Building2 },
-  { label: 'Companies',          href: '/companies', icon: Users },
-  { label: 'Leases',             href: '/leases',    icon: FileText },
-  { label: 'Invoices',           href: '/invoices',  icon: Receipt },
-  { label: 'Reports',            href: '/reports',   icon: BarChart3 },
-  { label: 'Settings',           href: '/settings',  icon: Settings },
+  { label: 'Dashboard',          href: '/dashboard',   icon: LayoutDashboard },
+  { label: 'Buildings & Spaces', href: '/buildings',   icon: Building2 },
+  { label: 'Companies',          href: '/companies',   icon: Users },
+  { label: 'Leases',             href: '/leases',      icon: FileText },
+  { label: 'Invoices',           href: '/invoices',    icon: Receipt },
+  { label: 'Listings',           href: '/listings',    icon: Globe },
+  { label: 'Maintenance',        href: '/maintenance', icon: Wrench },
+  { label: 'Reports',            href: '/reports',     icon: BarChart3 },
+  { label: 'Settings',           href: '/settings',    icon: Settings },
 ]
 
 function Logo() {
@@ -110,4 +114,3 @@ export default function Sidebar() {
     </aside>
   )
 }
-
