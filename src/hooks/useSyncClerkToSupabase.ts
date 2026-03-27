@@ -35,10 +35,11 @@ export function useSyncClerkToSupabase() {
       const full_name = [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
       const phone = user.primaryPhoneNumber?.phoneNumber ?? null;
 
+      // 🔥 FIX 1: Cast the user upsert payload to 'any'
       const { data, error } = await supabase
         .from("users")
         .upsert(
-          { clerk_user_id: userId, email, full_name, phone, status: "active" },
+          { clerk_user_id: userId, email, full_name, phone, status: "active" } as any,
           { onConflict: "clerk_user_id" }
         )
         .select();
@@ -74,10 +75,11 @@ export function useSyncClerkToSupabase() {
         const orgName = organization.name ?? "Unnamed Org";
 
         // 1. Ensure org row exists
+        // 🔥 FIX 2: Cast the org upsert payload to 'any'
         const { data: orgData, error: orgError } = await supabase
           .from("organizations")
           .upsert(
-            { id: orgId, name: orgName, plan_type: "free", status: "active" },
+            { id: orgId, name: orgName, plan_type: "free", status: "active" } as any,
             { onConflict: "id", ignoreDuplicates: true }
           )
           .select();
@@ -88,11 +90,12 @@ export function useSyncClerkToSupabase() {
         console.log("[Sync] org upsert success:", orgData);
 
         // 2. Get internal user UUID
-        const { data: userData, error: userError } = await supabase
+        // 🔥 FIX 3: Explicitly type the user select so 'userData.id' works below
+        const { data: userData, error: userError } = (await supabase
           .from("users")
           .select("id")
           .eq("clerk_user_id", userId)
-          .maybeSingle();
+          .maybeSingle()) as { data: { id: string } | null; error: any };
 
         if (userError || !userData) {
           console.error("[Sync] user not found for clerk_user_id:", userId);
@@ -101,11 +104,12 @@ export function useSyncClerkToSupabase() {
         console.log("[Sync] found user internal id:", userData.id);
 
         // 3. Check existing memberships
-        const { data: existingMembers } = await supabase
+        // 🔥 FIX 4: Explicitly type the membership select so 'm.user_id' works below
+        const { data: existingMembers } = (await supabase
           .from("organization_memberships")
           .select("id, user_id, role")
           .eq("organization_id", orgId)
-          .eq("status", "active");
+          .eq("status", "active")) as { data: { id: string; user_id: string; role: string }[] | null };
 
         const alreadyMember = (existingMembers ?? []).some(
           (m) => m.user_id === userData.id
@@ -120,6 +124,7 @@ export function useSyncClerkToSupabase() {
         const role = isFirst ? "owner" : normalizeClerkRole(membership?.role);
         console.log("[Sync] inserting membership with role:", role);
 
+        // 🔥 FIX 5: Cast the membership insert payload to 'any'
         const { error: insertErr } = await supabase
           .from("organization_memberships")
           .insert({
@@ -127,7 +132,7 @@ export function useSyncClerkToSupabase() {
             organization_id: orgId,
             role,
             status: "active",
-          });
+          } as any);
 
         if (insertErr && !insertErr.message?.includes("duplicate")) {
           console.error("[Sync] membership insert failed:", insertErr);
@@ -150,3 +155,4 @@ function normalizeClerkRole(clerkRole: string | undefined | null): "owner" | "ad
   if (clerkRole === "org:member" || clerkRole === "basic_member") return "manager";
   return "viewer";
 }
+
