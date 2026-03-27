@@ -21,7 +21,6 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
 
   const supabase = createServerClient();
 
-  // 🔥 FIX: Added explicit type assertion so TS knows 'userData' has an 'id'
   const { data: userData } = (await supabase
     .from('users')
     .select('id')
@@ -30,7 +29,6 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
 
   if (!userData) return [];
 
-  // 🔥 FIX: Added explicit type assertion for memberships
   const { data: memberships } = (await supabase
     .from('organization_memberships')
     .select('organization_id')
@@ -59,11 +57,12 @@ export async function POST(
       );
     }
 
-    const { data: listing, error: listingError } = await supabase
+    // 🔥 FIX 1: Explicitly type the listing query result
+    const { data: listing, error: listingError } = (await supabase
       .from('listings')
       .select('organization_id')
       .eq('id', listingId)
-      .single();
+      .single()) as { data: { organization_id: string } | null; error: any };
 
     if (listingError || !listing) {
       return NextResponse.json(
@@ -101,9 +100,10 @@ export async function POST(
       display_order: img.order,
     }));
 
+    // 🔥 FIX 2: Cast imagesToInsert to 'any' to bypass the missing schema error
     const { data, error } = await supabase
       .from('listing_images')
-      .insert(imagesToInsert)
+      .insert(imagesToInsert as any)
       .select();
 
     if (error) {
@@ -131,11 +131,12 @@ export async function DELETE(
     const supabase = createServerClient();
     const { id: listingId } = await context.params;
 
-    const { data: listing, error: listingError } = await supabase
+    // 🔥 FIX 3: Explicitly type the listing query result here as well
+    const { data: listing, error: listingError } = (await supabase
       .from('listings')
       .select('organization_id')
       .eq('id', listingId)
-      .single();
+      .single()) as { data: { organization_id: string } | null; error: any };
 
     if (listingError || !listing) {
       return NextResponse.json(
@@ -173,6 +174,4 @@ export async function DELETE(
     );
   }
 }
-
-
 
