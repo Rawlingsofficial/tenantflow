@@ -36,7 +36,7 @@ export function ListingForm({ initialData, organizationId, onSuccess }: ListingF
     unit_id: initialData?.unit_id || '',
     title: initialData?.title || '',
     description: initialData?.description || '',
-    price: initialData?.price || '',
+    price: initialData?.price?.toString() || '',
     city: initialData?.city || '',
     area: initialData?.area || '',
     contact_phone: initialData?.contact_phone || '',
@@ -73,7 +73,7 @@ export function ListingForm({ initialData, organizationId, onSuccess }: ListingF
       let listingData: any = {
         organization_id: organizationId,
         ...formData,
-        price: parseFloat(formData.price),
+        price: parseFloat(String(formData.price)),
       };
 
       if (initialData) {
@@ -122,7 +122,8 @@ export function ListingForm({ initialData, organizationId, onSuccess }: ListingF
         <Label htmlFor="unit_id">Unit</Label>
         <Select
           value={formData.unit_id}
-          onValueChange={(val) => handleSelectChange('unit_id', val)}
+          // 🔥 FIX 1: Explicitly typed val as string
+          onValueChange={((val: any) => handleSelectChange('unit_id', val)) as any}
           disabled={!!initialData} // Can't change unit after creation
         >
           <SelectTrigger>
@@ -211,7 +212,8 @@ export function ListingForm({ initialData, organizationId, onSuccess }: ListingF
         <Label htmlFor="status">Status</Label>
         <Select
           value={formData.status}
-          onValueChange={(val) => handleSelectChange('status', val)}
+          // 🔥 FIX 2: Explicitly typed val as string
+          onValueChange={((val: any) => handleSelectChange('status', val)) as any}
         >
           <SelectTrigger>
             <SelectValue />
@@ -245,4 +247,3 @@ export function ListingForm({ initialData, organizationId, onSuccess }: ListingF
     </form>
   );
 }
-
