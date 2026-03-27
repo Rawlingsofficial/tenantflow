@@ -56,11 +56,12 @@ export function ListingCard({ listing, onDelete, onStatusChange }: ListingCardPr
           <div className="flex items-center justify-center h-full text-gray-400">No image</div>
         )}
         <div className="absolute top-2 right-2 flex gap-1">
-          <Button size="sm" variant="secondary" asChild className="h-8 w-8 p-0">
-            <Link href={`/dashboard/listings/${listing.id}`}>
+          {/* 🔥 FIX: Wrapped Button in Link and removed asChild */}
+          <Link href={`/dashboard/listings/${listing.id}`}>
+            <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
               <Pencil className="h-4 w-4" />
-            </Link>
-          </Button>
+            </Button>
+          </Link>
           <Button size="sm" variant="destructive" className="h-8 w-8 p-0" onClick={handleDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
