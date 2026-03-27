@@ -21,19 +21,21 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
 
   const supabase = createServerClient();
 
-  const { data: userData } = await supabase
+  // 🔥 FIX: Added explicit type assertion so TS knows 'userData' has an 'id'
+  const { data: userData } = (await supabase
     .from('users')
     .select('id')
     .eq('clerk_user_id', userId)
-    .maybeSingle();
+    .maybeSingle()) as { data: { id: string } | null };
 
   if (!userData) return [];
 
-  const { data: memberships } = await supabase
+  // 🔥 FIX: Added explicit type assertion for memberships
+  const { data: memberships } = (await supabase
     .from('organization_memberships')
     .select('organization_id')
     .eq('user_id', userData.id)
-    .eq('status', 'active');
+    .eq('status', 'active')) as { data: { organization_id: string }[] | null };
 
   return (memberships ?? []).map((m) => m.organization_id);
 }
@@ -171,4 +173,6 @@ export async function DELETE(
     );
   }
 }
+
+
 

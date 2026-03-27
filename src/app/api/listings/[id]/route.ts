@@ -3,29 +3,12 @@ import { auth } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase/server';
 
 /* ================= TYPES ================= */
-type Listing = {
+type User = {
   id: string;
-  organization_id: string;
-  title?: string;
-  description?: string;
-  price?: number;
-  city?: string;
-  area?: string;
-  contact_phone?: string;
-  status?: string;
-  updated_at?: string;
-  [key: string]: any;
 };
 
-type UpdateListing = {
-  title?: string;
-  description?: string;
-  price?: number;
-  city?: string;
-  area?: string;
-  contact_phone?: string;
-  status?: string;
-  updated_at?: string;
+type Membership = {
+  organization_id: string;
 };
 
 /* ================= HELPERS ================= */
@@ -35,141 +18,139 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
 
   const supabase = createServerClient();
 
+  // Explicit type for Supabase response
   const { data: userData } = await supabase
-    .from('users')
+    .from<User>('users')
     .select('id')
     .eq('clerk_user_id', userId)
-    .maybeSingle() as { data: { id: string } | null };
+    .maybeSingle();
 
   if (!userData) return [];
 
   const { data: memberships } = await supabase
-    .from('organization_memberships')
+    .from<Membership>('organization_memberships')
     .select('organization_id')
     .eq('user_id', userData.id)
-    .eq('status', 'active') as { data: Array<{ organization_id: string }> | null };
+    .eq('status', 'active');
 
-  return (memberships ?? []).map(m => m.organization_id);
+  return (memberships ?? []).map((m) => m.organization_id);
 }
 
 /* ================= GET ================= */
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest) {
   const supabase = createServerClient();
-  const { id } = await context.params;
+  const orgId = req.nextUrl.searchParams.get('org_id');
+  const status = req.nextUrl.searchParams.get('status');
+  const unitId = req.nextUrl.searchParams.get('unit_id');
 
-  const { data: listing, error } = await supabase
+  if (!orgId) {
+    return NextResponse.json({ error: 'org_id is required' }, { status: 400 });
+  }
+
+  const authorizedOrgs = await getAuthorizedOrgIds();
+  if (!authorizedOrgs.includes(orgId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  let query = supabase
     .from('listings')
     .select(`
       *,
-      unit:units(*, buildings(id, name, address)),
+      unit:units(
+        *,
+        buildings(id, name, address)
+      ),
       images:listing_images(*)
     `)
-    .eq('id', id)
-    .single() as { data: Listing | null; error: any };
+    .eq('organization_id', orgId);
 
-  if (error || !listing) {
-    return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+  if (status) query = query.eq('status', status);
+  if (unitId) query = query.eq('unit_id', unitId);
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const authorizedOrgs = await getAuthorizedOrgIds();
-  if (!authorizedOrgs.includes(listing.organization_id)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  return NextResponse.json({ listing });
+  return NextResponse.json({ listings: data });
 }
 
-/* ================= PATCH ================= */
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+/* ================= POST ================= */
+export async function POST(req: NextRequest) {
   const supabase = createServerClient();
-  const { id } = await context.params;
   const body = await req.json();
 
-  const { data: existingListing, error: fetchError } = await supabase
-    .from('listings')
-    .select('organization_id')
-    .eq('id', id)
-    .single() as { data: { organization_id: string } | null; error: any };
+  const {
+    organization_id,
+    unit_id,
+    title,
+    description,
+    price,
+    city,
+    area,
+    contact_phone,
+    status,
+  } = body;
 
-  if (fetchError || !existingListing) {
-    return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+  if (!organization_id || !unit_id || !title || !price || !city || !contact_phone) {
+    return NextResponse.json(
+      { error: 'Missing required fields: organization_id, unit_id, title, price, city, contact_phone' },
+      { status: 400 }
+    );
   }
 
   const authorizedOrgs = await getAuthorizedOrgIds();
-  if (!authorizedOrgs.includes(existingListing.organization_id)) {
+  if (!authorizedOrgs.includes(organization_id)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const allowedUpdates = [
-    'title',
-    'description',
-    'price',
-    'city',
-    'area',
-    'contact_phone',
-    'status'
-  ];
+  // Verify unit exists
+  const { data: unit, error: unitError } = await supabase
+    .from('units')
+    .select('id, building_id, status')
+    .eq('id', unit_id)
+    .single();
 
-  const updateData: UpdateListing = {};
-
-  for (const field of allowedUpdates) {
-    if (body[field] !== undefined) {
-      (updateData as any)[field] = body[field];
-    }
+  if (unitError || !unit) {
+    return NextResponse.json({ error: 'Unit not found' }, { status: 404 });
   }
 
-  updateData.updated_at = new Date().toISOString();
+  // Verify building belongs to the organization
+  const { data: building, error: buildingError } = await supabase
+    .from('buildings')
+    .select('id')
+    .eq('id', unit.building_id)
+    .eq('organization_id', organization_id)
+    .single();
 
-  const { data, error } = await supabase
+  if (buildingError || !building) {
+    return NextResponse.json({ error: 'Unit does not belong to this organization' }, { status: 400 });
+  }
+
+  if (unit.status !== 'vacant') {
+    return NextResponse.json({ error: 'Unit must be vacant to create a listing' }, { status: 400 });
+  }
+
+  const { data: listing, error: insertError } = await supabase
     .from('listings')
-    .update(updateData)
-    .eq('id', id)
+    .insert({
+      organization_id,
+      unit_id,
+      title,
+      description: description || null,
+      price,
+      city,
+      area: area || null,
+      contact_phone,
+      status: status || 'draft',
+    })
     .select()
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (insertError) {
+    return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  return NextResponse.json({ listing: data });
-}
-
-/* ================= DELETE ================= */
-export async function DELETE(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
-  const supabase = createServerClient();
-  const { id } = await context.params;
-
-  const { data: listing, error: fetchError } = await supabase
-    .from('listings')
-    .select('organization_id')
-    .eq('id', id)
-    .single() as { data: { organization_id: string } | null; error: any };
-
-  if (fetchError || !listing) {
-    return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
-  }
-
-  const authorizedOrgs = await getAuthorizedOrgIds();
-  if (!authorizedOrgs.includes(listing.organization_id)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  await supabase.from('listing_images').delete().eq('listing_id', id);
-
-  const { error } = await supabase.from('listings').delete().eq('id', id);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ listing }, { status: 201 });
 }
