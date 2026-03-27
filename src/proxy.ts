@@ -1,4 +1,3 @@
-// src/proxy.ts
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
@@ -7,11 +6,12 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/webhooks/(.*)',
+  '/api/org-context',
 ])
 
+// Only /onboarding — no /onboarding/setup, that folder is deleted
 const isOnboardingRoute = createRouteMatcher([
   '/onboarding',
-  '/onboarding/setup',
 ])
 
 const supabase = createClient(
@@ -31,29 +31,31 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next()
   }
 
-  // Logged in, no org yet → redirect to /onboarding (org creation)
-  if (!orgId && !isOnboardingRoute(req)) {
-    return NextResponse.redirect(new URL('/onboarding', req.url))
+  // Logged in but no org yet → send to /onboarding so Clerk can create one
+  if (!orgId) {
+    if (!isOnboardingRoute(req) && !isPublicRoute(req)) {
+      return NextResponse.redirect(new URL('/onboarding', req.url))
+    }
+    return NextResponse.next()
   }
 
-  // Has org → check property_type
- if (orgId) {
+  // Has org → check if property_type is set in Supabase
   const { data: org, error } = await supabase
     .from('organizations')
     .select('property_type')
     .eq('id', orgId)
     .maybeSingle()
+
   console.log('Middleware check', orgId, org?.property_type, error)
 
-    // If property_type is missing and not already on onboarding setup route, redirect
-    if ((!org || !org.property_type) && !isOnboardingRoute(req)) {
-  return NextResponse.redirect(new URL('/onboarding/setup', req.url))
-}
+  // Org exists in Clerk but not yet in Supabase (webhook delay), or property_type missing
+  if ((!org || !org.property_type) && !isOnboardingRoute(req) && !isPublicRoute(req)) {
+    return NextResponse.redirect(new URL('/onboarding', req.url))
+  }
 
-    // If property_type exists and user tries to access onboarding routes, redirect to dashboard
-    if (org?.property_type && isOnboardingRoute(req)) {
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
+  // Onboarding complete — don't let them back to /onboarding
+  if (org?.property_type && isOnboardingRoute(req)) {
+    return NextResponse.redirect(new URL('/dashboard', req.url))
   }
 
   return NextResponse.next()
@@ -65,5 +67,3 @@ export const config = {
     '/(api|trpc)(.*)',
   ],
 }
-
-

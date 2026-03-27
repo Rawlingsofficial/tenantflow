@@ -207,6 +207,39 @@ export interface DashboardStats {
   outstandingBalance: number
 }
 
+// Listing types
+export type ListingStatus = 'draft' | 'published' | 'unavailable';
+
+export interface Listing {
+  id: string;
+  organization_id: string;
+  unit_id: string;
+  status: ListingStatus;
+  title: string;
+  description: string | null;
+  price: number;
+  city: string;
+  area: string | null;
+  contact_phone: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListingImage {
+  id: string;
+  listing_id: string;
+  url: string;
+  display_order: number;
+  created_at: string;
+}
+
+// Extended type for UI (includes unit and building info)
+export interface ListingWithDetails extends Listing {
+  unit: Unit & { buildings: Pick<Building, 'id' | 'name' | 'address'> };
+  images: ListingImage[];
+}
+
+
 // ─── Supabase Database type (used by client/server) ───────────────────
 
 export type Database = {
@@ -404,6 +437,17 @@ export type Database = {
         }
         Update: Partial<AuditLog>
       }
+
+      listings: {
+  Row: Listing;
+  Insert: Omit<Listing, 'id' | 'created_at' | 'updated_at'>;
+  Update: Partial<Omit<Listing, 'id' | 'created_at' | 'updated_at'>>;
+};
+listing_images: {
+  Row: ListingImage;
+  Insert: Omit<ListingImage, 'id' | 'created_at'>;
+  Update: Partial<Omit<ListingImage, 'id' | 'created_at'>>;
+};
     }
   }
 }
