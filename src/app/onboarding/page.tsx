@@ -21,11 +21,12 @@ export default async function OnboardingPage() {
 
   const supabase = createServerClient();
 
-  const { data: org } = await supabase
+  // 🔥 FIX: Explicitly type the org response so TS knows about name and property_type
+  const { data: org } = (await supabase
     .from('organizations')
     .select('name, property_type')
     .eq('id', orgId)
-    .maybeSingle();
+    .maybeSingle()) as { data: { name: string; property_type: string | null } | null };
 
   // Already completed onboarding
   if (org?.property_type) {
@@ -40,3 +41,4 @@ export default async function OnboardingPage() {
     </div>
   );
 }
+
