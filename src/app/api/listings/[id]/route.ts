@@ -1,8 +1,34 @@
-// src/app/api/listings/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase/server';
 
+/* ================= TYPES ================= */
+type Listing = {
+  id: string;
+  organization_id: string;
+  title?: string;
+  description?: string;
+  price?: number;
+  city?: string;
+  area?: string;
+  contact_phone?: string;
+  status?: string;
+  updated_at?: string;
+  [key: string]: any;
+};
+
+type UpdateListing = {
+  title?: string;
+  description?: string;
+  price?: number;
+  city?: string;
+  area?: string;
+  contact_phone?: string;
+  status?: string;
+  updated_at?: string;
+};
+
+/* ================= HELPERS ================= */
 async function getAuthorizedOrgIds(): Promise<string[]> {
   const { userId } = await auth();
   if (!userId) return [];
@@ -42,7 +68,7 @@ export async function GET(
       images:listing_images(*)
     `)
     .eq('id', id)
-    .single() as { data: { id: string; organization_id: string; [key: string]: any } | null; error: any };
+    .single() as { data: Listing | null; error: any };
 
   if (error || !listing) {
     return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
@@ -90,16 +116,19 @@ export async function PATCH(
     'status'
   ];
 
-  const updateData: Record<string, any> = {};
+  const updateData: UpdateListing = {};
+
   for (const field of allowedUpdates) {
-    if (body[field] !== undefined) updateData[field] = body[field];
+    if (body[field] !== undefined) {
+      (updateData as any)[field] = body[field];
+    }
   }
 
   updateData.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
     .from('listings')
-    .update(updateData as any)
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
@@ -123,7 +152,7 @@ export async function DELETE(
     .from('listings')
     .select('organization_id')
     .eq('id', id)
-    .single() as any;
+    .single() as { data: { organization_id: string } | null; error: any };
 
   if (fetchError || !listing) {
     return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
@@ -134,7 +163,6 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Delete images first (FK constraint)
   await supabase.from('listing_images').delete().eq('listing_id', id);
 
   const { error } = await supabase.from('listings').delete().eq('id', id);
@@ -145,4 +173,3 @@ export async function DELETE(
 
   return NextResponse.json({ success: true });
 }
-
