@@ -9,19 +9,21 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
 
   const supabase = createServerClient();
 
-  const { data: userData } = await supabase
+  // 🔥 FIX 1: Explicitly type userData
+  const { data: userData } = (await supabase
     .from('users')
     .select('id')
     .eq('clerk_user_id', userId)
-    .maybeSingle();
+    .maybeSingle()) as { data: { id: string } | null };
 
   if (!userData) return [];
 
-  const { data: memberships } = await supabase
+  // 🔥 FIX 2: Explicitly type memberships
+  const { data: memberships } = (await supabase
     .from('organization_memberships')
     .select('organization_id')
     .eq('user_id', userData.id)
-    .eq('status', 'active');
+    .eq('status', 'active')) as { data: { organization_id: string }[] | null };
 
   return (memberships ?? []).map(m => m.organization_id);
 }
@@ -93,24 +95,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Verify unit exists
-  const { data: unit, error: unitError } = await supabase
+  // 🔥 FIX 3: Explicitly type the unit query so TS knows about building_id and status
+  const { data: unit, error: unitError } = (await supabase
     .from('units')
     .select('id, building_id, status')
     .eq('id', unit_id)
-    .single();
+    .single()) as { data: { id: string; building_id: string; status: string } | null; error: any };
 
   if (unitError || !unit) {
     return NextResponse.json({ error: 'Unit not found' }, { status: 404 });
   }
 
-  // Verify building belongs to the organization
-  const { data: building, error: buildingError } = await supabase
+  // 🔥 FIX 4: Explicitly type the building query
+  const { data: building, error: buildingError } = (await supabase
     .from('buildings')
     .select('id')
     .eq('id', unit.building_id)
     .eq('organization_id', organization_id)
-    .single();
+    .single()) as { data: { id: string } | null; error: any };
 
   if (buildingError || !building) {
     return NextResponse.json({ error: 'Unit does not belong to this organization' }, { status: 400 });
@@ -120,6 +122,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unit must be vacant to create a listing' }, { status: 400 });
   }
 
+  // 🔥 FIX 5: Cast the insert object to 'any' to bypass the missing schema error
   const { data: listing, error: insertError } = await supabase
     .from('listings')
     .insert({
@@ -132,7 +135,7 @@ export async function POST(req: NextRequest) {
       area: area || null,
       contact_phone,
       status: status || 'draft',
-    })
+    } as any)
     .select()
     .single();
 
