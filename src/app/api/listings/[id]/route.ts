@@ -26,12 +26,13 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
   return (memberships ?? []).map(m => m.organization_id);
 }
 
+/* ================= GET ================= */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerClient();
-  const { id } = params;
+  const { id } = await context.params;
 
   const { data: listing, error } = await supabase
     .from('listings')
@@ -55,12 +56,13 @@ export async function GET(
   return NextResponse.json({ listing });
 }
 
+/* ================= PATCH ================= */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerClient();
-  const { id } = params;
+  const { id } = await context.params;
   const body = await req.json();
 
   const { data: existingListing, error: fetchError } = await supabase
@@ -78,11 +80,21 @@ export async function PATCH(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const allowedUpdates = ['title', 'description', 'price', 'city', 'area', 'contact_phone', 'status'];
+  const allowedUpdates = [
+    'title',
+    'description',
+    'price',
+    'city',
+    'area',
+    'contact_phone',
+    'status'
+  ];
+
   const updateData: Record<string, any> = {};
   for (const field of allowedUpdates) {
     if (body[field] !== undefined) updateData[field] = body[field];
   }
+
   updateData.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
@@ -96,18 +108,16 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // If status changed to unavailable, we don't need to touch the unit here
-  // The unit status is managed separately when a lease is created
-
   return NextResponse.json({ listing: data });
 }
 
+/* ================= DELETE ================= */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   const supabase = createServerClient();
-  const { id } = params;
+  const { id } = await context.params;
 
   const { data: listing, error: fetchError } = await supabase
     .from('listings')
@@ -135,3 +145,4 @@ export async function DELETE(
 
   return NextResponse.json({ success: true });
 }
+
