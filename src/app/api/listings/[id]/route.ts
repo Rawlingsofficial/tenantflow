@@ -15,7 +15,6 @@ type Membership = {
 };
 
 /* ================= HELPERS ================= */
-// Reusing your excellent security helper to ensure strict access control
 async function getAuthorizedOrgIds(): Promise<string[]> {
   const { userId } = await auth();
   if (!userId) return [];
@@ -42,15 +41,15 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
 /* ================= PATCH (Update Status/Data) ================= */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  // 🔥 FIX: params is now a Promise in Next.js 15+
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params;
-    const listingId = resolvedParams.id;
+    // 🔥 FIX: Await the params
+    const { id: listingId } = await params;
     
     const body = await req.json();
     
-    // We use the Admin client to bypass RLS, BUT we manually enforce security below
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -67,7 +66,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
-    // 2. Enforce your security rules
+    // 2. Enforce security rules
     const authorizedOrgs = await getAuthorizedOrgIds();
     if (!authorizedOrgs.includes(existingListing.organization_id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -91,18 +90,19 @@ export async function PATCH(
 /* ================= DELETE (Remove Listing) ================= */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  // 🔥 FIX: params is now a Promise in Next.js 15+
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const resolvedParams = await params;
-    const listingId = resolvedParams.id;
+    // 🔥 FIX: Await the params
+    const { id: listingId } = await params;
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 1. Fetch the listing to see who owns it
+    // 1. Fetch listing to check ownership
     const { data: existingListing } = await supabaseAdmin
       .from('listings')
       .select('organization_id')
@@ -113,13 +113,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
     }
 
-    // 2. Enforce your security rules
+    // 2. Enforce security
     const authorizedOrgs = await getAuthorizedOrgIds();
     if (!authorizedOrgs.includes(existingListing.organization_id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // 3. Clean up related images first
+    // 3. Clean up related images
     await supabaseAdmin
       .from('listing_images')
       .delete()
