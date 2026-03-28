@@ -58,65 +58,67 @@ export default function EditListingForm({ listing, organizationId }: EditListing
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    
-    // We cast the client to any to bypass the strict "never" type matching on the build server
-    const supabaseAny = supabase as any;
+  e.preventDefault();
+  setIsSubmitting(true);
 
-    const payload = {
-      title: formData.title,
-      description: formData.description,
-      price: parseFloat(formData.price) || 0,
-      deposit_amount: parseFloat(formData.deposit_amount) || 0,
-      city: formData.city,
-      area: formData.area,
-      full_address: formData.full_address,
-      contact_phone: formData.contact_phone,
-      bedrooms: isCommercial ? null : parseInt(formData.bedrooms) || null,
-      bathrooms: isCommercial ? null : parseFloat(formData.bathrooms) || null,
-      square_footage: parseFloat(formData.square_footage) || null,
-      pet_policy: isCommercial ? null : formData.pet_policy,
-      lease_terms: formData.lease_terms,
-      status: formData.status,
-      features_amenities: { items: formData.features },
-    };
-
-    try {
-      // 1. Update the Listing
-      const { error: listingError } = await supabaseAny
-        .from('listings')
-        .update(payload)
-        .eq('id', listing.id);
-
-      if (listingError) throw listingError;
-
-      // 2. Sync Images (Delete old ones, insert new ones)
-      await supabaseAny
-        .from('listing_images')
-        .delete()
-        .eq('listing_id', listing.id);
-      
-      if (images.length > 0) {
-        const imagePayload = images.map((img, idx) => ({
-          listing_id: listing.id,
-          url: img.url,
-          display_order: idx
-        }));
-        await supabaseAny
-          .from('listing_images')
-          .insert(imagePayload);
-      }
-
-      toast.success('Listing updated successfully!');
-      router.push('/listings');
-      router.refresh(); 
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to update listing');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const payload = {
+    title: formData.title,
+    description: formData.description,
+    price: parseFloat(formData.price) || 0,
+    deposit_amount: parseFloat(formData.deposit_amount) || 0,
+    city: formData.city,
+    area: formData.area,
+    full_address: formData.full_address,
+    contact_phone: formData.contact_phone,
+    bedrooms: isCommercial ? null : parseInt(formData.bedrooms) || null,
+    bathrooms: isCommercial ? null : parseFloat(formData.bathrooms) || null,
+    square_footage: parseFloat(formData.square_footage) || null,
+    pet_policy: isCommercial ? null : formData.pet_policy,
+    lease_terms: formData.lease_terms,
+    status: formData.status,
+    features_amenities: { items: formData.features },
   };
+
+  try {
+    // ✅ FIX: cast payload
+    const { data: listingData, error } = await supabase
+      .from('listings')
+      .update(payload as any)
+      .eq('id', listing.id)
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    // delete old images
+    await supabase
+      .from('listing_images')
+      .delete()
+      .eq('listing_id', listing.id);
+
+    if (images.length > 0) {
+      const imagePayload = images.map((img, idx) => ({
+        listing_id: listing.id,
+        url: img.url,
+        display_order: idx
+      }));
+
+      // ✅ FIX: cast array
+      await supabase
+        .from('listing_images')
+        .insert(imagePayload as any);
+    }
+
+    toast.success('Listing updated successfully!');
+    router.push('/listings');
+    router.refresh();
+
+  } catch (err: any) {
+    toast.error(err.message || 'Failed to update listing');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
   const activeFeatures = isCommercial 
     ? ['Loading Dock', 'Freight Elevator', '24/7 Security', 'High-Voltage Power', 'HVAC Included', 'Conference Rooms']
     : ['Water Included', 'Electricity Included', 'High-Speed Internet', 'In-Unit Washer/Dryer', 'Dishwasher', 'Balcony/Patio', 'Gym Access', 'Pool Access'];
