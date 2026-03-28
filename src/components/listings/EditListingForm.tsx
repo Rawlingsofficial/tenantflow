@@ -1,4 +1,3 @@
-// src/components/listings/EditListingForm.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -62,7 +61,8 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     e.preventDefault();
     setIsSubmitting(true);
     
-    const payload = {
+    // 🔥 FIX 1: Explicit payload type
+    const payload: any = {
       title: formData.title,
       description: formData.description,
       price: parseFloat(formData.price) || 0,
@@ -81,28 +81,30 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     };
 
     try {
-      // 1. Update the Listing text data
-      const { error: listingError } = await supabase
+      // 1. Update the Listing
+      const { error: listingError } = await (supabase
         .from('listings')
-        .update(payload)
+        .update(payload) as any)
         .eq('id', listing.id);
 
       if (listingError) throw listingError;
 
       // 2. Sync Images (Delete old ones, insert new ones)
-      await supabase.from('listing_images').delete().eq('listing_id', listing.id);
+      await (supabase.from('listing_images').delete() as any).eq('listing_id', listing.id);
       
       if (images.length > 0) {
-        const imagePayload = images.map((img, idx) => ({
+        // 🔥 FIX 2: Explicit image payload type
+        const imagePayload: any[] = images.map((img, idx) => ({
           listing_id: listing.id,
           url: img.url,
           display_order: idx
         }));
-        await supabase.from('listing_images').insert(imagePayload);
+        await (supabase.from('listing_images').insert(imagePayload) as any);
       }
 
       toast.success('Listing updated successfully!');
       router.push('/listings');
+      router.refresh();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update listing');
     } finally {
@@ -148,11 +150,11 @@ export default function EditListingForm({ listing, organizationId }: EditListing
         <CardContent className="p-8">
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-5 bg-gray-50 rounded-xl p-1 mb-8">
-              <TabsTrigger value="basic" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Basic Info</TabsTrigger>
-              <TabsTrigger value="location" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Location</TabsTrigger>
-              <TabsTrigger value="financial" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Financials</TabsTrigger>
-              <TabsTrigger value="features" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Features</TabsTrigger>
-              <TabsTrigger value="media" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Media</TabsTrigger>
+              <TabsTrigger value="basic" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1F3A5F] data-[state=active]:shadow-sm">Basic Info</TabsTrigger>
+              <TabsTrigger value="location" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1F3A5F] data-[state=active]:shadow-sm">Location</TabsTrigger>
+              <TabsTrigger value="financial" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1F3A5F] data-[state=active]:shadow-sm">Financials</TabsTrigger>
+              <TabsTrigger value="features" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1F3A5F] data-[state=active]:shadow-sm">Features</TabsTrigger>
+              <TabsTrigger value="media" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1F3A5F] data-[state=active]:shadow-sm">Media</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-6">
@@ -251,7 +253,12 @@ export default function EditListingForm({ listing, organizationId }: EditListing
               <div className="space-y-2">
                 <Label className="text-[#1F3A5F] font-semibold">Property Images</Label>
                 <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-200">
-                  <ImageUpload value={images} onChange={setImages} organizationId={organizationId} listingId={listing.id} />
+                  {/* 🔥 FIX 3: Proper image upload props */}
+                  <ImageUpload 
+                    value={images} 
+                    onChange={setImages} 
+                    organizationId={organizationId} 
+                  />
                 </div>
               </div>
             </TabsContent>
@@ -270,3 +277,5 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     </form>
   );
 }
+
+//----------------------------------------testing snippets----------------------------------------
