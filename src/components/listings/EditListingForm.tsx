@@ -59,58 +59,58 @@ export default function EditListingForm({ listing, organizationId }: EditListing
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.unit_id) return toast.error('Please select a vacant unit.');
     setIsSubmitting(true);
     
+    // 🔥 FIX: Removed unit_id and organization_id from the payload. 
+    // We only update the fields that are actually allowed to change!
     const payload = {
-      organization_id: organizationId, 
-      unit_id: formData.unit_id, 
       title: formData.title,
-      description: formData.description, 
+      description: formData.description,
       price: parseFloat(formData.price) || 0,
-      deposit_amount: parseFloat(formData.deposit_amount) || 0, 
-      city: formData.city, 
+      deposit_amount: parseFloat(formData.deposit_amount) || 0,
+      city: formData.city,
       area: formData.area,
-      full_address: formData.full_address, 
-      contact_phone: formData.contact_phone, 
-      property_type: propertyType,
+      full_address: formData.full_address,
+      contact_phone: formData.contact_phone,
       bedrooms: isCommercial ? null : parseInt(formData.bedrooms) || null,
       bathrooms: isCommercial ? null : parseFloat(formData.bathrooms) || null,
-      square_footage: parseFloat(formData.square_footage) || null, 
+      square_footage: parseFloat(formData.square_footage) || null,
       pet_policy: isCommercial ? null : formData.pet_policy,
-      lease_terms: formData.lease_terms, 
-      available_date: formData.available_date || null,
-      features_amenities: { items: formData.features }, 
-      status: 'published'
+      lease_terms: formData.lease_terms,
+      status: formData.status,
+      features_amenities: { items: formData.features },
     };
 
     try {
-      // 🔥 FIX: Cast the table selector to 'any' to bypass the 'never' parameter error
-      const { data: listingData, error } = await (supabase.from('listings') as any)
-        .insert(payload)
-        .select('id')
-        .single();
-        
-      if (error) throw error;
+      // 1. Update the Listing
+      const { error: listingError } = await (supabase.from('listings') as any)
+        .update(payload)
+        .eq('id', listing.id);
+
+      if (listingError) throw listingError;
+
+      // 2. Sync Images (Delete old ones, insert new ones)
+      await (supabase.from('listing_images') as any).delete().eq('listing_id', listing.id);
       
       if (images.length > 0) {
-        // 🔥 FIX: Cast the listing_images table selector to 'any' as well
-        await (supabase.from('listing_images') as any).insert(images.map((img, idx) => ({
-          listing_id: listingData.id, 
-          url: img.url, 
+        const imagePayload = images.map((img, idx) => ({
+          listing_id: listing.id,
+          url: img.url,
           display_order: idx
-        })));
+        }));
+        await (supabase.from('listing_images') as any).insert(imagePayload);
       }
-      
-      toast.success('Listing Published to Tenant App!');
+
+      toast.success('Listing updated successfully!');
       router.push('/listings');
-      router.refresh();
+      router.refresh(); 
     } catch (err: any) {
-      toast.error(err.message);
-    } finally { 
-      setIsSubmitting(false); 
+      toast.error(err.message || 'Failed to update listing');
+    } finally {
+      setIsSubmitting(false);
     }
   };
+  
   const activeFeatures = isCommercial 
     ? ['Loading Dock', 'Freight Elevator', '24/7 Security', 'High-Voltage Power', 'HVAC Included', 'Conference Rooms']
     : ['Water Included', 'Electricity Included', 'High-Speed Internet', 'In-Unit Washer/Dryer', 'Dishwasher', 'Balcony/Patio', 'Gym Access', 'Pool Access'];
