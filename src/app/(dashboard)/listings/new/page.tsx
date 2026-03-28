@@ -1,7 +1,7 @@
 // src/app/(dashboard)/listings/new/page.tsx
 import { redirect } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
-import { ListingForm } from '@/components/listings/ListingForm';
+import ListingForm from '@/components/listings/ListingForm';
 
 export default async function NewListingPage() {
   const { orgId } = await auth();

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 
 /* ================= TYPES ================= */
 type User = {
@@ -14,6 +15,7 @@ type Membership = {
 };
 
 /* ================= HELPERS ================= */
+// Reusing your excellent security helper to ensure strict access control
 async function getAuthorizedOrgIds(): Promise<string[]> {
   const { userId } = await auth();
   if (!userId) return [];
@@ -37,126 +39,104 @@ async function getAuthorizedOrgIds(): Promise<string[]> {
   return (memberships ?? []).map((m) => m.organization_id);
 }
 
-/* ================= GET ================= */
-export async function GET(req: NextRequest) {
-  const supabase = createServerClient();
-  const orgId = req.nextUrl.searchParams.get('org_id');
-  const status = req.nextUrl.searchParams.get('status');
-  const unitId = req.nextUrl.searchParams.get('unit_id');
+/* ================= PATCH (Update Status/Data) ================= */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const resolvedParams = await params;
+    const listingId = resolvedParams.id;
+    
+    const body = await req.json();
+    
+    // We use the Admin client to bypass RLS, BUT we manually enforce security below
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-  if (!orgId) {
-    return NextResponse.json({ error: 'org_id is required' }, { status: 400 });
+    // 1. Fetch the listing to see who owns it
+    const { data: existingListing } = await supabaseAdmin
+      .from('listings')
+      .select('organization_id')
+      .eq('id', listingId)
+      .single();
+
+    if (!existingListing) {
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+    }
+
+    // 2. Enforce your security rules
+    const authorizedOrgs = await getAuthorizedOrgIds();
+    if (!authorizedOrgs.includes(existingListing.organization_id)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // 3. Perform the update
+    const { error } = await supabaseAdmin
+      .from('listings')
+      .update(body)
+      .eq('id', listingId);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('[LISTING_PATCH_ERROR]', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-
-  const authorizedOrgs = await getAuthorizedOrgIds();
-  if (!authorizedOrgs.includes(orgId)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  let query = supabase
-    .from('listings')
-    .select(`
-      *,
-      unit:units(
-        *,
-        buildings(id, name, address)
-      ),
-      images:listing_images(*)
-    `)
-    .eq('organization_id', orgId);
-
-  if (status) query = query.eq('status', status);
-  if (unitId) query = query.eq('unit_id', unitId);
-
-  const { data, error } = await query.order('created_at', { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ listings: data });
 }
 
-/* ================= POST ================= */
-export async function POST(req: NextRequest) {
-  const supabase = createServerClient();
-  const body = await req.json();
+/* ================= DELETE (Remove Listing) ================= */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const resolvedParams = await params;
+    const listingId = resolvedParams.id;
 
-  const {
-    organization_id,
-    unit_id,
-    title,
-    description,
-    price,
-    city,
-    area,
-    contact_phone,
-    status,
-  } = body;
-
-  if (!organization_id || !unit_id || !title || !price || !city || !contact_phone) {
-    return NextResponse.json(
-      { error: 'Missing required fields: organization_id, unit_id, title, price, city, contact_phone' },
-      { status: 400 }
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+
+    // 1. Fetch the listing to see who owns it
+    const { data: existingListing } = await supabaseAdmin
+      .from('listings')
+      .select('organization_id')
+      .eq('id', listingId)
+      .single();
+
+    if (!existingListing) {
+      return NextResponse.json({ error: 'Listing not found' }, { status: 404 });
+    }
+
+    // 2. Enforce your security rules
+    const authorizedOrgs = await getAuthorizedOrgIds();
+    if (!authorizedOrgs.includes(existingListing.organization_id)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // 3. Clean up related images first
+    await supabaseAdmin
+      .from('listing_images')
+      .delete()
+      .eq('listing_id', listingId);
+
+    // 4. Delete the actual listing
+    const { error } = await supabaseAdmin
+      .from('listings')
+      .delete()
+      .eq('id', listingId);
+
+    if (error) throw error;
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('[LISTING_DELETE_ERROR]', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-
-  const authorizedOrgs = await getAuthorizedOrgIds();
-  if (!authorizedOrgs.includes(organization_id)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  // 🔥 FIX 1 & 2: Explicitly type the unit query result to clear building_id and status errors
-  const { data: unit, error: unitError } = (await supabase
-    .from('units')
-    .select('id, building_id, status')
-    .eq('id', unit_id)
-    .single()) as { 
-      data: { id: string; building_id: string; status: string } | null; 
-      error: any 
-    };
-
-  if (unitError || !unit) {
-    return NextResponse.json({ error: 'Unit not found' }, { status: 404 });
-  }
-
-  // Verify building belongs to the organization
-  const { data: building, error: buildingError } = await supabase
-    .from('buildings')
-    .select('id')
-    .eq('id', unit.building_id)
-    .eq('organization_id', organization_id)
-    .single();
-
-  if (buildingError || !building) {
-    return NextResponse.json({ error: 'Unit does not belong to this organization' }, { status: 400 });
-  }
-
-  if (unit.status !== 'vacant') {
-    return NextResponse.json({ error: 'Unit must be vacant to create a listing' }, { status: 400 });
-  }
-
-  // 🔥 FIX 3: Cast the insert payload as `any` so TypeScript stops blocking it
-  const { data: listing, error: insertError } = await supabase
-    .from('listings')
-    .insert({
-      organization_id,
-      unit_id,
-      title,
-      description: description || null,
-      price,
-      city,
-      area: area || null,
-      contact_phone,
-      status: status || 'draft',
-    } as any)
-    .select()
-    .single();
-
-  if (insertError) {
-    return NextResponse.json({ error: insertError.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ listing }, { status: 201 });
 }
 

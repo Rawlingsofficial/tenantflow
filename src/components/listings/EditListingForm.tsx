@@ -1,6 +1,7 @@
+// src/components/listings/EditListingForm.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase/client';
 import { usePropertyType } from '@/hooks/usePropertyType';
@@ -14,97 +15,99 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImageUpload } from './ImageUpload';
 import { toast } from 'sonner';
-import { Briefcase, Home, Sparkles } from 'lucide-react';
+import { Briefcase, Home, Save, ArrowLeft } from 'lucide-react';
 
-interface ListingFormProps { organizationId: string; }
+interface EditListingFormProps {
+  listing: any;
+  organizationId: string;
+}
 
-export default function ListingForm({ organizationId }: ListingFormProps) {
+export default function EditListingForm({ listing, organizationId }: EditListingFormProps) {
   const router = useRouter();
   const supabase = createBrowserClient();
   const { propertyType } = usePropertyType();
   const isCommercial = propertyType === 'commercial';
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [vacantUnits, setVacantUnits] = useState<any[]>([]);
-  const [images, setImages] = useState<any[]>([]);
+  const [images, setImages] = useState<any[]>(
+    listing.images?.sort((a: any, b: any) => a.display_order - b.display_order) || []
+  );
 
   const [formData, setFormData] = useState({
-    unit_id: '', title: '', description: '', price: '', deposit_amount: '',
-    city: '', area: '', full_address: '', contact_phone: '',
-    bedrooms: '', bathrooms: '', square_footage: '', pet_policy: '',
-    lease_terms: '', available_date: '', features: [] as string[],
+    title: listing.title || '',
+    description: listing.description || '',
+    price: listing.price?.toString() || '',
+    deposit_amount: listing.deposit_amount?.toString() || '',
+    city: listing.city || '',
+    area: listing.area || '',
+    full_address: listing.full_address || '',
+    contact_phone: listing.contact_phone || '',
+    bedrooms: listing.bedrooms?.toString() || '',
+    bathrooms: listing.bathrooms?.toString() || '',
+    square_footage: listing.square_footage?.toString() || '',
+    pet_policy: listing.pet_policy || '',
+    lease_terms: listing.lease_terms || '12_months',
+    status: listing.status || 'draft',
+    features: listing.features_amenities?.items || [] as string[],
   });
-
-  // 1. Fetch Units WITH all their details
-  useEffect(() => {
-    async function fetchVacantUnits() {
-      if (!organizationId) return;
-      const { data } = await supabase
-        .from('units')
-        .select(`id, unit_code, bedrooms, bathrooms, default_rent, area_sqm, buildings!inner(name, address, organization_id)`)
-        .eq('status', 'vacant')
-        .eq('buildings.organization_id', organizationId);
-      if (data) setVacantUnits(data);
-    }
-    fetchVacantUnits();
-  }, [organizationId, supabase]);
-
-  // 2. AUTO-POPULATE MAGIC
-  const handleUnitSelect = (unitId: string) => {
-    const unit = vacantUnits.find(u => u.id === unitId);
-    if (!unit) return;
-
-    setFormData(prev => ({
-      ...prev,
-      unit_id: unitId,
-      price: unit.default_rent?.toString() || '',
-      bedrooms: unit.bedrooms?.toString() || '',
-      bathrooms: unit.bathrooms?.toString() || '',
-      square_footage: unit.area_sqm?.toString() || '',
-      full_address: unit.buildings.address || '',
-    }));
-    toast.success(
-      <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-amber-500"/> Auto-filled unit details!</div>
-    );
-  };
 
   const handleFeatureToggle = (feature: string) => {
     setFormData(prev => ({
       ...prev,
-      features: prev.features.includes(feature) ? prev.features.filter(f => f !== feature) : [...prev.features, feature]
+      features: prev.features.includes(feature) ? prev.features.filter((f: string) => f !== feature) : [...prev.features, feature]
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.unit_id) return toast.error('Please select a vacant unit.');
     setIsSubmitting(true);
     
     const payload = {
-      organization_id: organizationId, unit_id: formData.unit_id, title: formData.title,
-      description: formData.description, price: parseFloat(formData.price) || 0,
-      deposit_amount: parseFloat(formData.deposit_amount) || 0, city: formData.city, area: formData.area,
-      full_address: formData.full_address, contact_phone: formData.contact_phone, property_type: propertyType,
+      title: formData.title,
+      description: formData.description,
+      price: parseFloat(formData.price) || 0,
+      deposit_amount: parseFloat(formData.deposit_amount) || 0,
+      city: formData.city,
+      area: formData.area,
+      full_address: formData.full_address,
+      contact_phone: formData.contact_phone,
       bedrooms: isCommercial ? null : parseInt(formData.bedrooms) || null,
       bathrooms: isCommercial ? null : parseFloat(formData.bathrooms) || null,
-      square_footage: parseFloat(formData.square_footage) || null, pet_policy: isCommercial ? null : formData.pet_policy,
-      lease_terms: formData.lease_terms, available_date: formData.available_date || null,
-      features_amenities: { items: formData.features }, status: 'published'
+      square_footage: parseFloat(formData.square_footage) || null,
+      pet_policy: isCommercial ? null : formData.pet_policy,
+      lease_terms: formData.lease_terms,
+      status: formData.status,
+      features_amenities: { items: formData.features },
     };
 
     try {
-      const { data: listingData, error } = await supabase.from('listings').insert(payload).select('id').single();
-      if (error) throw error;
+      // 1. Update the Listing text data
+      const { error: listingError } = await supabase
+        .from('listings')
+        .update(payload)
+        .eq('id', listing.id);
+
+      if (listingError) throw listingError;
+
+      // 2. Sync Images (Delete old ones, insert new ones)
+      await supabase.from('listing_images').delete().eq('listing_id', listing.id);
+      
       if (images.length > 0) {
-        await supabase.from('listing_images').insert(images.map((img, idx) => ({
-          listing_id: listingData.id, url: img.url, display_order: idx
-        })));
+        const imagePayload = images.map((img, idx) => ({
+          listing_id: listing.id,
+          url: img.url,
+          display_order: idx
+        }));
+        await supabase.from('listing_images').insert(imagePayload);
       }
-      toast.success('Listing Published to Tenant App!');
+
+      toast.success('Listing updated successfully!');
       router.push('/listings');
     } catch (err: any) {
-      toast.error(err.message);
-    } finally { setIsSubmitting(false); }
+      toast.error(err.message || 'Failed to update listing');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const activeFeatures = isCommercial 
@@ -112,19 +115,36 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
     : ['Water Included', 'Electricity Included', 'High-Speed Internet', 'In-Unit Washer/Dryer', 'Dishwasher', 'Balcony/Patio', 'Gym Access', 'Pool Access'];
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-5xl mx-auto">
+    <form onSubmit={handleSubmit} className="max-w-5xl mx-auto p-8">
+      <button type="button" onClick={() => router.push('/listings')} className="flex items-center text-sm text-slate-500 hover:text-slate-800 mb-6 font-medium transition-colors">
+        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Listings
+      </button>
+
       <Card className="rounded-[2rem] shadow-xl border-none bg-white">
-        <CardHeader className="border-b border-gray-100 pb-6 px-8 pt-8">
+        <CardHeader className="border-b border-gray-100 pb-6 px-8 pt-8 flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`p-3 rounded-xl ${isCommercial ? 'bg-indigo-50 text-indigo-600' : 'bg-teal-50 text-teal-600'}`}>
               {isCommercial ? <Briefcase className="w-6 h-6" /> : <Home className="w-6 h-6" />}
             </div>
             <div>
-              <CardTitle className="text-3xl font-bold text-[#1F3A5F]">Create Public Listing</CardTitle>
-              <p className="text-gray-500 mt-1">Publish details to the Tenant Marketplace.</p>
+              <CardTitle className="text-3xl font-bold text-[#1F3A5F]">Edit Listing</CardTitle>
+              <p className="text-gray-500 mt-1">
+                {listing.unit?.buildings?.name} - {listing.unit?.unit_code}
+              </p>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+             <Select value={formData.status} onValueChange={(val) => setFormData(p => ({...p, status: val}))}>
+                <SelectTrigger className="w-36 rounded-xl font-semibold"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="unavailable">Unavailable</SelectItem>
+                </SelectContent>
+              </Select>
+          </div>
         </CardHeader>
+
         <CardContent className="p-8">
           <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-5 bg-gray-50 rounded-xl p-1 mb-8">
@@ -138,42 +158,36 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
             <TabsContent value="basic" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-[#1F3A5F] font-semibold">Select Vacant Unit</Label>
-                  {/* AUTO POPULATE TRIGGER */}
-                  <Select onValueChange={handleUnitSelect}>
-                    <SelectTrigger className="focus:ring-[#2BBE9A] rounded-xl"><SelectValue placeholder="Choose a vacant unit..." /></SelectTrigger>
-                    <SelectContent>
-                      {vacantUnits.length === 0 ? <SelectItem value="none" disabled>No vacant units</SelectItem>
-                      : vacantUnits.map(u => <SelectItem key={u.id} value={u.id}>{u.buildings.name} - {u.unit_code}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-[#1F3A5F] font-semibold">Locked Unit</Label>
+                  <Input disabled value={`${listing.unit?.buildings?.name} - ${listing.unit?.unit_code}`} className="rounded-xl bg-slate-50 text-slate-500 cursor-not-allowed" />
+                  <p className="text-[10px] text-slate-400">The unit tied to a listing cannot be changed.</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[#1F3A5F] font-semibold">Public Title</Label>
-                  <Input required placeholder={isCommercial ? "e.g., Premium Retail Space" : "e.g., Modern 2BR in Downtown"} className="rounded-xl" value={formData.title} onChange={e => setFormData(p => ({...p, title: e.target.value}))} />
+                  <Input required className="rounded-xl" value={formData.title} onChange={e => setFormData(p => ({...p, title: e.target.value}))} />
                 </div>
                 <div className="grid grid-cols-3 gap-4 md:col-span-2">
                   {!isCommercial && (
                     <>
                       <div className="space-y-2">
                         <Label className="text-[#1F3A5F] font-semibold">Beds</Label>
-                        <Input type="number" className="rounded-xl bg-slate-50 border-slate-200" value={formData.bedrooms} onChange={e => setFormData(p => ({...p, bedrooms: e.target.value}))} />
+                        <Input type="number" className="rounded-xl" value={formData.bedrooms} onChange={e => setFormData(p => ({...p, bedrooms: e.target.value}))} />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-[#1F3A5F] font-semibold">Baths</Label>
-                        <Input type="number" step="0.5" className="rounded-xl bg-slate-50 border-slate-200" value={formData.bathrooms} onChange={e => setFormData(p => ({...p, bathrooms: e.target.value}))} />
+                        <Input type="number" step="0.5" className="rounded-xl" value={formData.bathrooms} onChange={e => setFormData(p => ({...p, bathrooms: e.target.value}))} />
                       </div>
                     </>
                   )}
                   <div className="space-y-2">
                     <Label className="text-[#1F3A5F] font-semibold">{isCommercial ? 'Area (Sq Ft/Sqm)' : 'Sq Ft'}</Label>
-                    <Input type="number" className="rounded-xl bg-slate-50 border-slate-200" value={formData.square_footage} onChange={e => setFormData(p => ({...p, square_footage: e.target.value}))} />
+                    <Input type="number" className="rounded-xl" value={formData.square_footage} onChange={e => setFormData(p => ({...p, square_footage: e.target.value}))} />
                   </div>
                 </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-[#1F3A5F] font-semibold">Description</Label>
-                <Textarea placeholder="Highlight the best features..." className="h-32 rounded-xl" value={formData.description} onChange={e => setFormData(p => ({...p, description: e.target.value}))} />
+                <Textarea className="h-32 rounded-xl" value={formData.description} onChange={e => setFormData(p => ({...p, description: e.target.value}))} />
               </div>
             </TabsContent>
 
@@ -181,7 +195,7 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 md:col-span-2">
                   <Label className="text-[#1F3A5F] font-semibold">Full Address</Label>
-                  <Input className="rounded-xl bg-slate-50 border-slate-200" value={formData.full_address} onChange={e => setFormData(p => ({...p, full_address: e.target.value}))}/>
+                  <Input className="rounded-xl" value={formData.full_address} onChange={e => setFormData(p => ({...p, full_address: e.target.value}))}/>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[#1F3A5F] font-semibold">City *</Label>
@@ -198,11 +212,22 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-[#1F3A5F] font-semibold">Monthly Rent / Price *</Label>
-                  <Input required type="number" className="rounded-xl bg-slate-50 border-slate-200" value={formData.price} onChange={e => setFormData(p => ({...p, price: e.target.value}))} />
+                  <Input required type="number" className="rounded-xl" value={formData.price} onChange={e => setFormData(p => ({...p, price: e.target.value}))} />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[#1F3A5F] font-semibold">Security Deposit</Label>
                   <Input type="number" className="rounded-xl" value={formData.deposit_amount} onChange={e => setFormData(p => ({...p, deposit_amount: e.target.value}))}/>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[#1F3A5F] font-semibold">Lease Terms</Label>
+                  <Select value={formData.lease_terms} onValueChange={(val) => setFormData(p => ({...p, lease_terms: val}))}>
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select terms..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="12_months">12 Months</SelectItem>
+                      <SelectItem value="6_months">6 Months</SelectItem>
+                      <SelectItem value="negotiable">Negotiable</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[#1F3A5F] font-semibold">Contact Phone *</Label>
@@ -226,7 +251,7 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
               <div className="space-y-2">
                 <Label className="text-[#1F3A5F] font-semibold">Property Images</Label>
                 <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-200">
-                  <ImageUpload value={images} onChange={setImages} organizationId={organizationId} />
+                  <ImageUpload value={images} onChange={setImages} organizationId={organizationId} listingId={listing.id} />
                 </div>
               </div>
             </TabsContent>
@@ -235,9 +260,10 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
         </CardContent>
 
         <CardFooter className="flex justify-between border-t border-gray-100 px-8 py-6 bg-slate-50/30 rounded-b-[2rem]">
-          <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-xl px-6">Cancel</Button>
-          <Button type="submit" disabled={isSubmitting} className="bg-[#2BBE9A] hover:bg-[#239B7D] text-white rounded-xl px-8 shadow-md">
-            {isSubmitting ? 'Publishing...' : 'Publish Listing'}
+          <Button type="button" variant="outline" onClick={() => router.push('/listings')} className="rounded-xl px-6">Cancel</Button>
+          <Button type="submit" disabled={isSubmitting} className="bg-[#2BBE9A] hover:bg-[#239B7D] text-white rounded-xl px-8 shadow-md flex items-center gap-2">
+            <Save className="w-4 h-4" />
+            {isSubmitting ? 'Saving Changes...' : 'Update Listing'}
           </Button>
         </CardFooter>
       </Card>

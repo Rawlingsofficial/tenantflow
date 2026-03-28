@@ -1,3 +1,4 @@
+// src/components/buildings/BuildingsTable.tsx
 "use client";
 
 import { useRef, useState } from "react";

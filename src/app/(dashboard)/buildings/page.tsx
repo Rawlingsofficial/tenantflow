@@ -5,13 +5,12 @@ import { useAuth } from "@clerk/nextjs";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { AddBuildingDialog } from "@/components/buildings/AddBuildingDialog";
-import { AddUnitDialog } from "@/components/buildings/AddUnitDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { usePropertyType } from "@/hooks/usePropertyType";
 
-import { Search, Plus, Building2, Home, ChevronDown, ChevronUp, MapPin, ArrowUpRight, CheckCircle2, Wrench, Briefcase } from "lucide-react";
+import { Search, Plus, Building2, Home, MapPin, ArrowUpRight, Briefcase } from "lucide-react";
 
 type UnitFilter = "all" | "occupied" | "vacant" | "maintenance";
 
@@ -192,7 +191,7 @@ export default function BuildingsPage() {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-44 bg-white rounded-2xl border border-slate-200/80 animate-pulse" />
+              <div key={i} className="h-28 bg-white rounded-2xl border border-slate-200/80 animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -219,43 +218,63 @@ export default function BuildingsPage() {
   );
 }
 
-// Simplified BuildingCard without mixed logic
+// Completed BuildingCard 
 function BuildingCard({ building, isCommercial, onRefresh }: { building: BuildingWithStats; isCommercial: boolean; onRefresh: () => void }) {
   const router = useRouter();
-  const supabase = createBrowserClient();
-  const [addUnitOpen, setAddUnitOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const [units, setUnits] = useState<any[]>([]);
-  const [loadingUnits, setLoadingUnits] = useState(false);
 
+  // Dynamically set colors based on the context
   const accentColor = isCommercial
-    ? { bar: "bg-indigo-500", text: "text-indigo-600" }
-    : { bar: "bg-teal-500", text: "text-teal-600" };
-
-  const occupancyColor = building.occupancy_rate >= 80 ? accentColor.bar : building.occupancy_rate >= 50 ? "bg-amber-400" : "bg-red-400";
-  const occupancyTextColor = building.occupancy_rate >= 80 ? accentColor.text : building.occupancy_rate >= 50 ? "text-amber-500" : "text-red-500";
-
-  async function fetchUnits() {
-    setLoadingUnits(true);
-    const { data } = await supabase
-      .from("units")
-      .select(`id, unit_code, unit_type, bedrooms, bathrooms, default_rent, status, area_sqm, unit_purpose,
-        leases(id, tenant_id, lease_start, lease_end, status,
-          tenants(id, first_name, last_name, primary_phone))`)
-      .eq("building_id", building.id)
-      .order("unit_code");
-    setUnits(data || []);
-    setLoadingUnits(false);
-  }
-
-  function toggleUnits() {
-    if (!expanded) fetchUnits();
-    setExpanded((v) => !v);
-  }
+    ? { bar: "bg-[#1B3B6F]", text: "text-[#1B3B6F]", light: "bg-[#1B3B6F]/10" }
+    : { bar: "bg-[#2BBE9A]", text: "text-[#2BBE9A]", light: "bg-[#2BBE9A]/10" };
 
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden hover:shadow-md transition-shadow ${isCommercial ? "border-indigo-200/60" : "border-slate-200/80"}`}>
-      {/* The rest of the UI stays the same, remove all mixed logic */}
+    <div 
+      onClick={() => router.push(`/buildings/${building.id}`)}
+      className={`bg-white rounded-[1.5rem] border shadow-sm p-6 cursor-pointer hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${isCommercial ? "border-[#1B3B6F]/20 hover:border-[#1B3B6F]/40" : "border-slate-200/80 hover:border-teal-200"}`}
+    >
+      {/* Icon and Name */}
+      <div className="flex items-center gap-4">
+        <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${accentColor.light}`}>
+          {isCommercial ? <Briefcase className={`w-7 h-7 ${accentColor.text}`} /> : <Building2 className={`w-7 h-7 ${accentColor.text}`} />}
+        </div>
+        <div>
+          <h3 className="text-lg font-bold text-[#1F3A5F]">{building.name}</h3>
+          <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
+            <MapPin className="w-3.5 h-3.5" />
+            {building.address || 'No address provided'}
+          </p>
+        </div>
+      </div>
+
+      {/* Stats Section */}
+      <div className="flex items-center gap-6 md:gap-8">
+        <div className="text-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total {isCommercial ? "Spaces" : "Units"}</p>
+          <p className="text-lg font-bold text-[#1F3A5F]">{building.total_units}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Vacant</p>
+          <p className="text-lg font-bold text-[#1F3A5F]">{building.vacant_units}</p>
+        </div>
+        
+        {/* Occupancy Progress Bar */}
+        <div className="text-center hidden sm:block">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Occupancy</p>
+          <div className="flex items-center gap-2">
+            <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className={`h-full ${accentColor.bar} transition-all duration-1000`} style={{ width: `${building.occupancy_rate}%` }} />
+            </div>
+            <span className={`text-sm font-bold ${accentColor.text}`}>{building.occupancy_rate}%</span>
+          </div>
+        </div>
+        
+        {/* Action Button */}
+        <div className="pl-4 border-l border-slate-100 flex items-center">
+          <Button variant="ghost" className={`text-slate-400 hover:${accentColor.text} hover:${accentColor.light} rounded-xl`}>
+            Manage <ArrowUpRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 
 function val<T>(v: T): never { return v as never; }
 
@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 400 });
   }
 
-  const supabase   = createServerClient();
+  // Use service role to bypass RLS
+  const supabase   = createServiceRoleClient();
   const eventType: string = evt.type;
   const data       = evt.data;
 
@@ -50,7 +51,14 @@ export async function POST(req: NextRequest) {
       const full_name = [first_name, last_name].filter(Boolean).join(" ") || null;
 
       const { error } = await supabase.from("users").upsert(
-        val({ clerk_user_id: id, email, full_name, phone, status: "active" }),
+        val({ 
+          clerk_user_id: id, 
+          email, 
+          full_name, 
+          phone, 
+          status: "active",
+          app_role: "landlord"
+        }),
         { onConflict: "clerk_user_id" }
       );
       if (error) {

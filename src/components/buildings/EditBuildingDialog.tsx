@@ -1,3 +1,4 @@
+// src/components/buildings/EditBuildingDialog.tsx
 "use client";
 
 import { useEffect, useState } from "react";

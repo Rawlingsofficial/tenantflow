@@ -57,7 +57,7 @@ export function usePropertyType(): {
           .from("organizations")
           .select("id, name, property_type, country, plan_type")
           .eq("id", orgId)
-          .single();
+          .maybeSingle();
 
         if (orgError) throw orgError;
         if (!orgData) return;
@@ -82,7 +82,7 @@ export function usePropertyType(): {
             .from("users")
             .select("id")
             .eq("clerk_user_id", userId)
-            .single<UserRow>();
+            .maybeSingle<UserRow>();
 
           if (userError) throw userError;
 
@@ -93,7 +93,7 @@ export function usePropertyType(): {
                 .select("role")
                 .eq("organization_id", orgId)
                 .eq("user_id", userData.id)
-                .single<MembershipRow>();
+                .maybeSingle<MembershipRow>();
 
             if (membershipError) throw membershipError;
             if (membershipData) {

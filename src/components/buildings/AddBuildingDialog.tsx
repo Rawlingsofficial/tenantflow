@@ -1,3 +1,4 @@
+// src/components/buildings/AddBuildingDialog.tsx
 "use client";
 
 import { useState } from "react";

@@ -1,44 +1,48 @@
+// src/app/(dashboard)/listings/[id]/page.tsx
 import { redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
+import { createClient } from '@supabase/supabase-js';
+import EditListingForm from '@/components/listings/EditListingForm';
 
-type Listing = {
-  id: string;
-  organization_id: string;
-  title?: string;
-  [key: string]: any;
-};
+export default async function EditListingPage({ params }: { params: { id: string } }) {
+  // 1. Authenticate user
+  const { orgId } = await auth();
+  if (!orgId) redirect('/onboarding');
 
-async function getListing(id: string): Promise<Listing | null> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/listings/${id}`, {
-    cache: 'no-store',
-  });
+  // 2. Safely unwrap the ID parameter
+  const resolvedParams = await params;
+  const listingId = resolvedParams.id;
 
-  if (!res.ok) return null;
-
-  const data: { listing: Listing } = await res.json();
-  return data.listing;
-}
-
-export default async function ListingPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const listing = await getListing(params.id);
-
-  if (!listing) {
-    redirect('/dashboard/listings');
+  if (!listingId || listingId === 'undefined') {
+    redirect('/listings');
   }
 
-  const orgId = 'your-current-org-id'; // 🔥 replace with your real org logic
+  // 3. Fetch data directly with Admin Client
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
-  // ✅ FIXED (no more "never")
-  if (listing.organization_id !== orgId) {
-    redirect('/dashboard/listings');
+  // Grab the listing, its images, and the parent unit details
+  const { data: listing, error } = await supabaseAdmin
+    .from('listings')
+    .select(`
+      *,
+      images:listing_images(url, display_order),
+      unit:units(unit_code, buildings(name))
+    `)
+    .eq('id', listingId)
+    .single();
+
+  // Security Check: Make sure it exists and belongs to this landlord
+  if (error || !listing || listing.organization_id !== orgId) {
+    redirect('/listings');
   }
 
   return (
-    <div>
-      <h1>{listing.title}</h1>
+    <div className="min-h-screen bg-slate-50/70 pb-12 pt-8">
+       <EditListingForm listing={listing} organizationId={orgId} />
     </div>
   );
 }
+
