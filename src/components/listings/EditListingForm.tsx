@@ -61,8 +61,10 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     e.preventDefault();
     setIsSubmitting(true);
     
-    // 🔥 FIX 1: Explicit payload type
-    const payload: any = {
+    // We cast the client to any to bypass the strict "never" type matching on the build server
+    const supabaseAny = supabase as any;
+
+    const payload = {
       title: formData.title,
       description: formData.description,
       price: parseFloat(formData.price) || 0,
@@ -82,36 +84,39 @@ export default function EditListingForm({ listing, organizationId }: EditListing
 
     try {
       // 1. Update the Listing
-      const { error: listingError } = await (supabase
+      const { error: listingError } = await supabaseAny
         .from('listings')
-        .update(payload) as any)
+        .update(payload)
         .eq('id', listing.id);
 
       if (listingError) throw listingError;
 
       // 2. Sync Images (Delete old ones, insert new ones)
-      await (supabase.from('listing_images').delete() as any).eq('listing_id', listing.id);
+      await supabaseAny
+        .from('listing_images')
+        .delete()
+        .eq('listing_id', listing.id);
       
       if (images.length > 0) {
-        // 🔥 FIX 2: Explicit image payload type
-        const imagePayload: any[] = images.map((img, idx) => ({
+        const imagePayload = images.map((img, idx) => ({
           listing_id: listing.id,
           url: img.url,
           display_order: idx
         }));
-        await (supabase.from('listing_images').insert(imagePayload) as any);
+        await supabaseAny
+          .from('listing_images')
+          .insert(imagePayload);
       }
 
       toast.success('Listing updated successfully!');
       router.push('/listings');
-      router.refresh();
+      router.refresh(); 
     } catch (err: any) {
       toast.error(err.message || 'Failed to update listing');
     } finally {
       setIsSubmitting(false);
     }
   };
-
   const activeFeatures = isCommercial 
     ? ['Loading Dock', 'Freight Elevator', '24/7 Security', 'High-Voltage Power', 'HVAC Included', 'Conference Rooms']
     : ['Water Included', 'Electricity Included', 'High-Speed Internet', 'In-Unit Washer/Dryer', 'Dishwasher', 'Balcony/Patio', 'Gym Access', 'Pool Access'];
