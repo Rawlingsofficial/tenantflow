@@ -50,7 +50,10 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
   }, [organizationId, supabase]);
 
   // 2. AUTO-POPULATE MAGIC
-  const handleUnitSelect = (unitId: string) => {
+  // 🔥 FIX: Typed as 'any' to satisfy the UI component's strict event signatures
+  const handleUnitSelect = (unitId: any) => {
+    if (!unitId) return;
+
     const unit = vacantUnits.find(u => u.id === unitId);
     if (!unit) return;
 
@@ -169,7 +172,6 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label className="text-[#1F3A5F] font-semibold">Select Vacant Unit</Label>
-                  {/* AUTO POPULATE TRIGGER */}
                   <Select onValueChange={handleUnitSelect}>
                     <SelectTrigger className="focus:ring-[#2BBE9A] rounded-xl"><SelectValue placeholder="Choose a vacant unit..." /></SelectTrigger>
                     <SelectContent>
@@ -274,3 +276,5 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
     </form>
   );
 }
+
+//----------------------------------------testing snippets----------------------------------------
