@@ -24,10 +24,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+// Note: Ensure your local type definition includes region and division!
 import type { ListingWithDetails, ListingStatus } from '@/types';
 
 interface ListingsTableProps {
-  listings: ListingWithDetails[];
+  listings: any[]; // Relaxed type slightly in case types/index.ts isn't strictly updated yet
   onRefresh?: () => void;
 }
 
@@ -51,7 +52,6 @@ export function ListingsTable({ listings, onRefresh }: ListingsTableProps) {
     }
   };
 
-  // 🔥 NEW: Function to instantly toggle statuses
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       const res = await fetch(`/api/listings/${id}`, {
@@ -156,14 +156,24 @@ export function ListingsTable({ listings, onRefresh }: ListingsTableProps) {
                         {listing.title}
                       </h4>
                       <div className="flex items-center gap-3 mt-1 text-xs text-slate-400 font-medium">
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 shrink-0">
                           <Building2 className="w-3 h-3" />
                           {listing.unit?.buildings?.name} • {listing.unit?.unit_code}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {listing.city}
-                        </span>
+                        
+                        {/* 🔥 FULL LOCATION DISPLAY inline */}
+                        {(listing.city || listing.division || listing.region) && (
+                          <span className="flex items-center gap-1 truncate border-l border-slate-200 pl-3">
+                            <MapPin className="w-3 h-3 shrink-0" />
+                            <span className="truncate">
+                              {listing.city && <span className="text-slate-600">{listing.city}</span>}
+                              {listing.city && (listing.division || listing.region) && <span> • </span>}
+                              {listing.division && <span>{listing.division}</span>}
+                              {listing.division && listing.region && <span> • </span>}
+                              {listing.region && <span>{listing.region}</span>}
+                            </span>
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -178,7 +188,7 @@ export function ListingsTable({ listings, onRefresh }: ListingsTableProps) {
                 <td className="px-6 py-5">
                   <div className="flex flex-col">
                     <span className="text-[#1F3A5F] font-bold">
-                      ${listing.price.toLocaleString()}
+                      ${listing.price?.toLocaleString() || 0}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Per Month</span>
                   </div>
@@ -197,7 +207,6 @@ export function ListingsTable({ listings, onRefresh }: ListingsTableProps) {
                     </Button>
                     
                     <DropdownMenu>
-                      {/* 🔥 FIX: Styled the trigger directly instead of using asChild with Button */}
                       <DropdownMenuTrigger className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors focus:outline-none">
                         <MoreHorizontal className="w-4 h-4" />
                       </DropdownMenuTrigger>
@@ -212,7 +221,6 @@ export function ListingsTable({ listings, onRefresh }: ListingsTableProps) {
                         
                         <DropdownMenuSeparator className="my-1 bg-slate-50" />
                         
-                        {/* 🔥 NEW: Status Toggles */}
                         {listing.status !== 'published' && (
                           <DropdownMenuItem 
                             className="rounded-xl gap-2 font-medium text-teal-600 focus:text-teal-700 focus:bg-teal-50 cursor-pointer"
@@ -264,5 +272,3 @@ export function ListingsTable({ listings, onRefresh }: ListingsTableProps) {
     </div>
   );
 }
-
-//----------------------------------------testing snippets----------------------------------------

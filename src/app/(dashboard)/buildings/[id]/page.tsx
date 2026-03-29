@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { usePropertyType } from "@/hooks/usePropertyType";
 import { ArrowLeft, Plus, Briefcase, Home, MapPin, Pencil, Building2, Layers, Hash, Clock } from "lucide-react";
 
+// 🔥 1. Added region, division, and city to the interface
 interface Building {
   id: string;
   name: string;
@@ -20,6 +21,9 @@ interface Building {
   photo_url: string | null;
   organization_id: string;
   building_type?: string;
+  region?: string | null;
+  division?: string | null;
+  city?: string | null;
 }
 
 interface Unit {
@@ -150,10 +154,25 @@ export default function BuildingDetailPage() {
                   {building.status}
                 </span>
               </div>
-              <p className="text-slate-500 flex items-center gap-1.5 mt-1">
-                <MapPin className="w-4 h-4" />
-                {building.address || 'No address provided'}
-              </p>
+              
+              {/* 🔥 2. Updated Location Display Area */}
+              <div className="flex flex-col gap-1 mt-2">
+                <p className="text-slate-500 flex items-center gap-1.5 text-sm font-medium">
+                  <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                  {building.address || 'No street address provided'}
+                </p>
+                
+                {/* Only render this sub-line if they've provided standard location data */}
+                {(building.city || building.division || building.region) && (
+                  <div className="flex items-center gap-1.5 ml-5.5 pl-[22px] text-xs text-slate-400 font-medium">
+                    {building.city && <span className="text-slate-600">{building.city}</span>}
+                    {building.city && (building.division || building.region) && <span>•</span>}
+                    {building.division && <span>{building.division}</span>}
+                    {building.division && building.region && <span>•</span>}
+                    {building.region && <span>{building.region}</span>}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -219,7 +238,8 @@ export default function BuildingDetailPage() {
 
       {/* 3. The Dialogs (Now fully functional and injected into the DOM) */}
       <AddUnitDialog open={addUnitOpen} onClose={() => setAddUnitOpen(false)} buildingId={building.id} buildingName={building.name} onSuccess={() => { setAddUnitOpen(false); setRefreshKey(k=>k+1); }} />
-      <EditBuildingDialog open={editBuildingOpen} onClose={() => setEditBuildingOpen(false)} building={building} onSuccess={() => { setEditBuildingOpen(false); setRefreshKey(k=>k+1); }} />
+      {/* Typecasted 'building' as 'any' safely for EditBuildingDialog compatibility if strictly checked */}
+      <EditBuildingDialog open={editBuildingOpen} onClose={() => setEditBuildingOpen(false)} building={building as any} onSuccess={() => { setEditBuildingOpen(false); setRefreshKey(k=>k+1); }} />
       {editUnit && <EditUnitDialog open={!!editUnit} onClose={() => setEditUnit(null)} unit={editUnit} onSuccess={() => { setEditUnit(null); setRefreshKey(k=>k+1); }} />}
       {historyUnit && <UnitHistoryDialog open={!!historyUnit} onClose={() => setHistoryUnit(null)} unit={historyUnit} buildingName={building.name} />}
     </div>
@@ -281,4 +301,3 @@ function UnitCard({ unit, isCommercial, onEdit, onHistory }: { unit: Unit, isCom
     </div>
   );
 }
-

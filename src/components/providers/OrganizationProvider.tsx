@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useUser, useOrganization } from '@clerk/nextjs';
-import { useOrgStore } from '@/hooks/useOrg';
+import { useOrgStore } from '@/store/orgStore';
 import { createServerClient } from '@/lib/supabase/server';
 
 // We fetch org data via an API route so we can use the service role key server-side

@@ -8,7 +8,9 @@ import OrgSettings from "@/components/settings/OrgSettings";
 import TeamSettings from "@/components/settings/TeamSettings";
 import PermissionsSettings from "@/components/settings/PermissionsSettings";
 import BillingSettings from "@/components/settings/BillingSettings";
-import { User, Building2, Users, ShieldCheck, CreditCard } from "lucide-react";
+import SecuritySettings from "@/components/settings/SecuritySettings";
+import AuditLogSettings from "@/components/settings/AuditLogSettings";
+import { User, Building2, Users, ShieldCheck, CreditCard, Shield, Activity } from "lucide-react";
 import type { Permission } from "@/lib/permissions";
 
 const TABS = [
@@ -34,6 +36,18 @@ const TABS = [
     id: "permissions"  as const,
     label: "Permissions",
     icon: ShieldCheck,
+    permission: "settings.view" as Permission,
+  },
+  {
+    id: "security"     as const,
+    label: "Security",
+    icon: Shield,
+    permission: "settings.view" as Permission,
+  },
+  {
+    id: "audit"        as const,
+    label: "Audit Logs",
+    icon: Activity,
     permission: "settings.view" as Permission,
   },
   {
@@ -140,6 +154,8 @@ export default function SettingsPage() {
             {resolvedTab === "organization" && <OrgSettings />}
             {resolvedTab === "team"         && <TeamSettings />}
             {resolvedTab === "permissions"  && <PermissionsSettings />}
+            {resolvedTab === "security"     && <SecuritySettings />}
+            {resolvedTab === "audit"        && <AuditLogSettings />}
             {resolvedTab === "billing"      && <BillingSettings />}
           </main>
 

@@ -1,3 +1,4 @@
+// src/components/listings/ListingForm.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -14,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImageUpload } from './ImageUpload';
 import { toast } from 'sonner';
-import { Briefcase, Home, Sparkles } from 'lucide-react';
+import { Briefcase, Home, Sparkles, Map } from 'lucide-react';
 
 interface ListingFormProps { organizationId: string; }
 
@@ -30,18 +31,18 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
 
   const [formData, setFormData] = useState({
     unit_id: '', title: '', description: '', price: '', deposit_amount: '',
-    city: '', area: '', full_address: '', contact_phone: '',
+    region: '', division: '', city: '', area: '', full_address: '', contact_phone: '',
     bedrooms: '', bathrooms: '', square_footage: '', pet_policy: '',
     lease_terms: '', available_date: '', features: [] as string[],
   });
 
-  // 1. Fetch Units WITH all their details
+  // 1. Fetch Units WITH all their details including the building's location
   useEffect(() => {
     async function fetchVacantUnits() {
       if (!organizationId) return;
       const { data } = await supabase
         .from('units')
-        .select(`id, unit_code, bedrooms, bathrooms, default_rent, area_sqm, buildings!inner(name, address, organization_id)`)
+        .select(`id, unit_code, bedrooms, bathrooms, default_rent, area_sqm, buildings!inner(name, address, organization_id, region, division, city)`)
         .eq('status', 'vacant')
         .eq('buildings.organization_id', organizationId);
       if (data) setVacantUnits(data);
@@ -50,7 +51,6 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
   }, [organizationId, supabase]);
 
   // 2. AUTO-POPULATE MAGIC
-  // 🔥 FIX: Typed as 'any' to satisfy the UI component's strict event signatures
   const handleUnitSelect = (unitId: any) => {
     if (!unitId) return;
 
@@ -65,9 +65,12 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
       bathrooms: unit.bathrooms?.toString() || '',
       square_footage: unit.area_sqm?.toString() || '',
       full_address: unit.buildings.address || '',
+      region: unit.buildings.region || '',
+      division: unit.buildings.division || '',
+      city: unit.buildings.city || '',
     }));
     toast.success(
-      <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-amber-500"/> Auto-filled unit details!</div>
+      <div className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-amber-500"/> Auto-filled property details!</div>
     );
   };
 
@@ -83,8 +86,6 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
     if (!formData.unit_id) return toast.error('Please select a vacant unit.');
     setIsSubmitting(true);
     
-    // 🔥 THE ULTIMATE FIX: Create an untyped reference to the client
-    // This completely bypasses all schema validation errors during the build
     const db = supabase as any;
 
     const payload = {
@@ -94,8 +95,10 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
       description: formData.description, 
       price: parseFloat(formData.price) || 0,
       deposit_amount: parseFloat(formData.deposit_amount) || 0, 
+      region: formData.region,
+      division: formData.division,
       city: formData.city, 
-      area: formData.area,
+      area: formData.area, // This is the user-typed Quarter/Neighborhood
       full_address: formData.full_address, 
       contact_phone: formData.contact_phone, 
       property_type: propertyType,
@@ -110,7 +113,6 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
     };
 
     try {
-      // ✅ Use 'db' instead of 'supabase' AND cast payload to 'any'
       const { data: listingData, error } = await db
         .from('listings')
         .insert(payload as any)
@@ -125,8 +127,6 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
           url: img.url, 
           display_order: idx
         }));
-        
-        // ✅ Use 'db' here as well and cast the image payload
         await db.from('listing_images').insert(imagePayload as any);
       }
       
@@ -168,6 +168,7 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
               <TabsTrigger value="media" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">Media</TabsTrigger>
             </TabsList>
 
+            {/* Basic Info Tab remains the same */}
             <TabsContent value="basic" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -209,23 +210,46 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
               </div>
             </TabsContent>
 
+            {/* 🔥 UPDATED Location Tab */}
             <TabsContent value="location" className="space-y-6">
+              
+              <div className="p-4 bg-slate-50/80 border border-slate-100 rounded-2xl space-y-4 mb-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Map className="w-4 h-4 text-slate-400" />
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Building Location (Read Only)</h4>
+                </div>
+                <p className="text-[10px] text-slate-400 -mt-3">This data is automatically synced from the building profile.</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[#1F3A5F] font-semibold text-xs">Region</Label>
+                    <Input disabled className="rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={formData.region} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[#1F3A5F] font-semibold text-xs">Division</Label>
+                    <Input disabled className="rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={formData.division} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[#1F3A5F] font-semibold text-xs">City</Label>
+                    <Input disabled className="rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={formData.city} />
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="text-[#1F3A5F] font-semibold">Full Address</Label>
+                <div className="space-y-2 md:col-span-1">
+                  <Label className="text-[#1F3A5F] font-semibold">Quarter / Neighborhood</Label>
+                  <Input placeholder="e.g. Bonapriso, Bastos" className="rounded-xl" value={formData.area} onChange={e => setFormData(p => ({...p, area: e.target.value}))}/>
+                  <p className="text-[10px] text-slate-400">Specify the exact neighborhood for search filters.</p>
+                </div>
+                <div className="space-y-2 md:col-span-1">
+                  <Label className="text-[#1F3A5F] font-semibold">Street Address</Label>
                   <Input className="rounded-xl bg-slate-50 border-slate-200" value={formData.full_address} onChange={e => setFormData(p => ({...p, full_address: e.target.value}))}/>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[#1F3A5F] font-semibold">City *</Label>
-                  <Input required className="rounded-xl" value={formData.city} onChange={e => setFormData(p => ({...p, city: e.target.value}))}/>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[#1F3A5F] font-semibold">Neighborhood / Area</Label>
-                  <Input className="rounded-xl" value={formData.area} onChange={e => setFormData(p => ({...p, area: e.target.value}))}/>
                 </div>
               </div>
             </TabsContent>
 
+            {/* Financial Tab remains the same */}
             <TabsContent value="financial" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -276,5 +300,3 @@ export default function ListingForm({ organizationId }: ListingFormProps) {
     </form>
   );
 }
-
-//----------------------------------------testing snippets----------------------------------------

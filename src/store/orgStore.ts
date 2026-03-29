@@ -17,7 +17,7 @@ export interface OrgData {
 interface OrgState {
   currentOrg: OrgData | null
   userRole: Role | null
-  setCurrentOrg: (org: OrgData) => void
+  setCurrentOrg: (org: OrgData | null) => void
   setUserRole: (role: Role | null) => void
   /** @deprecated alias → setUserRole */
   setCurrentRole: (role: Role | null) => void

@@ -39,6 +39,7 @@ export default function AddTenantDialog({ open, onClose, onSaved, organizationId
   const [showOptional, setShowOptional] = useState(false)
 
   const [form, setForm] = useState({
+    user_id: editTenant?.user_id ?? '',
     first_name: editTenant?.first_name ?? '',
     last_name: editTenant?.last_name ?? '',
     primary_phone: editTenant?.primary_phone ?? '',
@@ -63,6 +64,7 @@ export default function AddTenantDialog({ open, onClose, onSaved, organizationId
     setLoading(true)
     setError('')
     const payload = {
+      user_id: form.user_id.trim() || null,
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim() || null,
       primary_phone: form.primary_phone.trim() || null,
@@ -129,6 +131,14 @@ export default function AddTenantDialog({ open, onClose, onSaved, organizationId
           <div>
             <SectionHeader icon={User} label="Basic Information" />
             <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Label className="text-[11px] font-semibold text-teal-600 uppercase tracking-wider mb-1.5 block">
+                  System ID (Tenant App ID)
+                </Label>
+                <Input placeholder="Enter the Tenant's Clerk ID from their app..." value={form.user_id}
+                  onChange={(e) => set('user_id', e.target.value)} className={`${inputClass} border-teal-100 bg-teal-50/30`} />
+                <p className="text-[10px] text-slate-400 mt-1">Linking this ID allows the tenant to access their lease and payments in the tenant app.</p>
+              </div>
               <div>
                 <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">
                   First Name <span className="text-red-400">*</span>

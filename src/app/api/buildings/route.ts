@@ -1,9 +1,10 @@
+// src/app/api/buildings/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 
 // GET /api/buildings?org_id=xxx
 export async function GET(req: NextRequest) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient(); // Note: added await for Next 15
   const orgId = req.nextUrl.searchParams.get("org_id");
 
   if (!orgId) {
@@ -13,7 +14,8 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabase
     .from("buildings")
     .select(`
-      id, name, address, status, photo_url, organization_id,
+      id, name, address, status, photo_url, organization_id, building_type,
+      region, division, city,  /* 🔥 FETCH NEW ANALYTICS COLUMNS */
       units(id, status)
     `)
     .eq("organization_id", orgId)
@@ -36,6 +38,10 @@ export async function GET(req: NextRequest) {
       status: b.status,
       photo_url: b.photo_url,
       organization_id: b.organization_id,
+      building_type: b.building_type,
+      region: b.region,         // 🔥 RETURN TO UI
+      division: b.division,     // 🔥 RETURN TO UI
+      city: b.city,             // 🔥 RETURN TO UI
       total_units: total,
       occupied_units: occupied,
       vacant_units: vacant,
@@ -49,10 +55,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/buildings
 export async function POST(req: NextRequest) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const body = await req.json();
 
-  const { organization_id, name, address, status, photo_url } = body;
+  const { organization_id, name, address, status, photo_url, building_type, region, division, city } = body;
 
   if (!organization_id || !name) {
     return NextResponse.json(
@@ -67,6 +73,10 @@ export async function POST(req: NextRequest) {
     address: address ?? null,
     status: status ?? "active",
     photo_url: photo_url ?? null,
+    building_type: building_type ?? "residential",
+    region: region ?? null,       // 🔥 INSERT TO DB
+    division: division ?? null,   // 🔥 INSERT TO DB
+    city: city ?? null            // 🔥 INSERT TO DB
   };
 
   const { data, error } = await supabase
@@ -81,4 +91,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ building: data }, { status: 201 });
 }
-

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { AddBuildingDialog } from "@/components/buildings/AddBuildingDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Search, Plus, Building2, Home, MapPin, ArrowUpRight, Briefcase } from "
 
 type UnitFilter = "all" | "occupied" | "vacant" | "maintenance";
 
+// 🔥 1. Added location fields to the interface
 interface BuildingWithStats {
   id: string;
   name: string;
@@ -22,6 +23,9 @@ interface BuildingWithStats {
   photo_url: string | null;
   organization_id: string;
   building_type: string;
+  region?: string | null;
+  division?: string | null;
+  city?: string | null;
   total_units: number;
   occupied_units: number;
   vacant_units: number;
@@ -66,7 +70,7 @@ export default function BuildingsPage() {
     try {
       const { data, error } = await supabase
         .from("buildings")
-        .select("id, name, address, status, photo_url, organization_id, building_type, units(id, status)")
+        .select("id, name, address, status, photo_url, organization_id, building_type, region, division, city, units(id, status)")
         .eq("organization_id", orgId!)
         .order("name");
 
@@ -86,6 +90,9 @@ export default function BuildingsPage() {
           photo_url: b.photo_url,
           organization_id: b.organization_id,
           building_type: b.building_type ?? "residential",
+          region: b.region,         // Grab from DB
+          division: b.division,     // Grab from DB
+          city: b.city,             // Grab from DB
           total_units: total,
           occupied_units: occupied,
           vacant_units: vacant,
@@ -101,13 +108,21 @@ export default function BuildingsPage() {
     }
   }
 
-  // Only filter by propertyType and unit filter
+  // 🔥 2. Supercharged Filter: Now searches Name, Address, City, Division, AND Region!
   const filtered = buildings
     .filter((b) =>
       propertyType === "commercial" ? b.building_type === "commercial" : b.building_type !== "commercial"
     )
     .filter((b) => {
-      const matchSearch = !search || b.name.toLowerCase().includes(search.toLowerCase()) || (b.address || "").toLowerCase().includes(search.toLowerCase());
+      const searchTerm = search.toLowerCase();
+      const matchSearch = 
+        !search || 
+        b.name.toLowerCase().includes(searchTerm) || 
+        (b.address || "").toLowerCase().includes(searchTerm) ||
+        (b.city || "").toLowerCase().includes(searchTerm) ||
+        (b.division || "").toLowerCase().includes(searchTerm) ||
+        (b.region || "").toLowerCase().includes(searchTerm);
+        
       if (!matchSearch) return false;
       if (unitFilter === "occupied") return b.occupied_units > 0;
       if (unitFilter === "vacant") return b.vacant_units > 0;
@@ -153,10 +168,10 @@ export default function BuildingsPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
-                placeholder="Search buildings…"
+                placeholder="Search buildings, cities..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 w-52 bg-white border-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-teal-400/25"
+                className="pl-9 h-9 w-64 bg-white border-slate-200 text-sm rounded-xl focus:ring-2 focus:ring-teal-400/25"
               />
             </div>
 
@@ -233,21 +248,36 @@ function BuildingCard({ building, isCommercial, onRefresh }: { building: Buildin
       className={`bg-white rounded-[1.5rem] border shadow-sm p-6 cursor-pointer hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${isCommercial ? "border-[#1B3B6F]/20 hover:border-[#1B3B6F]/40" : "border-slate-200/80 hover:border-teal-200"}`}
     >
       {/* Icon and Name */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-1">
         <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${accentColor.light}`}>
           {isCommercial ? <Briefcase className={`w-7 h-7 ${accentColor.text}`} /> : <Building2 className={`w-7 h-7 ${accentColor.text}`} />}
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-[#1F3A5F]">{building.name}</h3>
-          <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-            <MapPin className="w-3.5 h-3.5" />
-            {building.address || 'No address provided'}
-          </p>
+        
+        {/* 🔥 3. Updated Location Display on the Card */}
+        <div className="min-w-0">
+          <h3 className="text-lg font-bold text-[#1F3A5F] truncate pr-4">{building.name}</h3>
+          
+          <div className="flex flex-col mt-1">
+            <p className="text-sm text-slate-500 flex items-center gap-1.5 font-medium truncate">
+              <MapPin className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{building.address || 'No street address'}</span>
+            </p>
+            
+            {(building.city || building.division || building.region) && (
+              <div className="flex items-center gap-1.5 ml-5 text-xs text-slate-400 font-medium truncate mt-0.5">
+                {building.city && <span className="text-slate-600 shrink-0">{building.city}</span>}
+                {building.city && (building.division || building.region) && <span className="shrink-0">•</span>}
+                {building.division && <span className="shrink-0">{building.division}</span>}
+                {building.division && building.region && <span className="shrink-0">•</span>}
+                {building.region && <span className="truncate">{building.region}</span>}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Stats Section */}
-      <div className="flex items-center gap-6 md:gap-8">
+      <div className="flex items-center gap-6 md:gap-8 shrink-0 mt-4 md:mt-0">
         <div className="text-center">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total {isCommercial ? "Spaces" : "Units"}</p>
           <p className="text-lg font-bold text-[#1F3A5F]">{building.total_units}</p>
@@ -269,7 +299,7 @@ function BuildingCard({ building, isCommercial, onRefresh }: { building: Buildin
         </div>
         
         {/* Action Button */}
-        <div className="pl-4 border-l border-slate-100 flex items-center">
+        <div className="pl-4 border-l border-slate-100 flex items-center h-full">
           <Button variant="ghost" className={`text-slate-400 hover:${accentColor.text} hover:${accentColor.light} rounded-xl`}>
             Manage <ArrowUpRight className="w-4 h-4 ml-1" />
           </Button>

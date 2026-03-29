@@ -25,7 +25,7 @@ export default function EditTenantDialog({ open, onClose, onSaved, tenant }: Pro
   const [showOptional, setShowOptional] = useState(false)
 
   const [form, setForm] = useState({
-    first_name: '', last_name: '', primary_phone: '', secondary_phone: '',
+    user_id: '', first_name: '', last_name: '', primary_phone: '', secondary_phone: '',
     email: '', country: '', occupation: '', employment_type: '',
     employer_name: '', work_address: '', date_of_birth: '', marital_status: '', notes: '',
   })
@@ -33,6 +33,7 @@ export default function EditTenantDialog({ open, onClose, onSaved, tenant }: Pro
   useEffect(() => {
     if (open && tenant) {
       setForm({
+        user_id: tenant.user_id ?? '',
         first_name: tenant.first_name ?? '', last_name: tenant.last_name ?? '',
         primary_phone: tenant.primary_phone ?? '', secondary_phone: tenant.secondary_phone ?? '',
         email: tenant.email ?? '', country: tenant.country ?? '',
@@ -53,6 +54,7 @@ export default function EditTenantDialog({ open, onClose, onSaved, tenant }: Pro
     try {
       const { data, error: err } = await (supabase as any)
         .from('tenants').update({
+          user_id: form.user_id.trim() || null,
           first_name: form.first_name.trim(), last_name: form.last_name.trim() || null,
           primary_phone: form.primary_phone.trim() || null, secondary_phone: form.secondary_phone.trim() || null,
           email: form.email.trim() || null, country: form.country.trim() || null,
@@ -92,6 +94,15 @@ export default function EditTenantDialog({ open, onClose, onSaved, tenant }: Pro
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+          <div>
+            <Label className="text-[11px] font-semibold text-teal-600 uppercase tracking-wider mb-1.5 block">
+              System ID (Tenant App ID)
+            </Label>
+            <Input placeholder="Enter the Tenant's Clerk ID from their app..." value={form.user_id}
+              onChange={(e) => set('user_id', e.target.value)} className={`${inputClass} border-teal-100 bg-teal-50/30`} />
+            <p className="text-[10px] text-slate-400 mt-1">Linking this ID allows the tenant to access their lease and payments in the tenant app.</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             {[
               { label: 'First name *', field: 'first_name', placeholder: 'John' },

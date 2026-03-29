@@ -53,10 +53,10 @@ export default function CreateInvoiceDialog({ open, onClose, onSaved, preselecte
   async function loadLeases() {
     const { data } = await (supabase as any)
       .from('leases')
-      .select(`*, tenants(company_name, contact_person, tenant_type), units(unit_code, buildings(name))`)
+      .select(`*, tenants(first_name, last_name, company_name, contact_person, tenant_type, user_id), units(unit_code, buildings(name))`)
       .eq('organization_id', orgId!)
       .eq('status', 'active')
-    setLeases((data ?? []).filter((l: any) => l.tenants?.tenant_type === 'company'))
+    setLeases(data ?? [])
   }
 
   async function handleSave() {
@@ -68,7 +68,7 @@ export default function CreateInvoiceDialog({ open, onClose, onSaved, preselecte
       const sc = Number(form.service_charge) || 0
       const now = new Date()
       const invNum = `INV-${format(now, 'yyyyMM')}-${Math.floor(Math.random() * 900 + 100)}`
-      const { error: e } = await (supabase as any).from('invoices').insert(dbVal({
+      const { error: e } = await (supabase as any).from('invoices').insert({
         organization_id: orgId!,
         lease_id: selectedLeaseId,
         invoice_number: invNum,
@@ -79,7 +79,7 @@ export default function CreateInvoiceDialog({ open, onClose, onSaved, preselecte
         total_amount: rent + sc,
         status: 'draft',
         notes: form.notes || null,
-      }))
+      })
       if (e) throw new Error(e.message)
       onSaved()
       setForm({
@@ -106,13 +106,15 @@ export default function CreateInvoiceDialog({ open, onClose, onSaved, preselecte
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div>
-            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Company / Lease *</Label>
+            <Label className="text-xs font-medium text-gray-600 mb-1.5 block">Tenant / Lease *</Label>
             <select value={selectedLeaseId} onChange={e => setSelectedLeaseId(e.target.value)}
               className="w-full h-10 text-sm rounded-lg border border-gray-200 bg-white px-3">
               <option value="">Select a lease...</option>
               {leases.map(l => (
                 <option key={l.id} value={l.id}>
-                  {l.tenants?.company_name ?? l.tenants?.contact_person} — {l.units?.unit_code} ({l.units?.buildings?.name})
+                  {l.tenants?.tenant_type === 'company' 
+                    ? (l.tenants?.company_name ?? l.tenants?.contact_person)
+                    : `${l.tenants?.first_name} ${l.tenants?.last_name}`} — {l.units?.unit_code} ({l.units?.buildings?.name})
                 </option>
               ))}
             </select>
@@ -120,8 +122,21 @@ export default function CreateInvoiceDialog({ open, onClose, onSaved, preselecte
 
           {selectedLease && (
             <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs">
-              <p className="font-semibold text-blue-800">{selectedLease.tenants?.company_name}</p>
-              <p className="text-blue-600">{selectedLease.units?.unit_code} · {selectedLease.units?.buildings?.name}</p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-semibold text-blue-800">
+                    {selectedLease.tenants?.tenant_type === 'company' 
+                      ? selectedLease.tenants?.company_name 
+                      : `${selectedLease.tenants?.first_name} ${selectedLease.tenants?.last_name}`}
+                  </p>
+                  <p className="text-blue-600">{selectedLease.units?.unit_code} · {selectedLease.units?.buildings?.name}</p>
+                </div>
+                {selectedLease.tenants?.user_id && (
+                  <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-[10px] font-bold uppercase tracking-wider">
+                    App User
+                  </Badge>
+                )}
+              </div>
             </div>
           )}
 

@@ -1,3 +1,4 @@
+// src/types/index.ts
 // ─── Database row types ───────────────────────────────────────────────
 
 export type OrgStatus = 'active' | 'inactive'
@@ -48,6 +49,9 @@ export interface Building {
   status: OrgStatus
   photo_url: string | null
   building_type: string | null
+  region?: string | null
+  division?: string | null
+  city?: string | null
 }
 
 export interface Unit {
@@ -67,6 +71,7 @@ export interface Unit {
 export interface Tenant {
   id: string
   organization_id: string
+  user_id: string | null            // Clerk User ID from tenant app
   first_name: string | null
   last_name: string | null
   primary_phone: string | null
@@ -164,6 +169,40 @@ export interface Notification {
   type: string | null
   message: string | null
   is_read: boolean
+}
+
+export interface MaintenanceRequest {
+  id: string
+  organization_id: string
+  tenant_id: string
+  unit_id: string | null
+  category: string | null
+  description: string
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  status: 'open' | 'in_progress' | 'scheduled' | 'completed' | 'cancelled'
+  created_at: string
+  updated_at: string
+}
+
+export interface MaintenanceUpdate {
+  id: string
+  request_id: string
+  status: string | null
+  note: string | null
+  created_at: string
+}
+
+export interface Lead {
+  id: string
+  organization_id: string
+  first_name: string
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  message: string | null
+  source: string | null
+  status: 'new' | 'contacted' | 'qualified' | 'lost' | 'converted'
+  created_at: string
 }
 
 export interface AuditLog {
@@ -289,6 +328,9 @@ export type Database = {
           status?: OrgStatus
           photo_url?: string | null
           building_type?: string | null
+          region?: string | null     // ADDED
+          division?: string | null   // ADDED
+          city?: string | null       // ADDED
         }
         Update: Partial<Building>
       }
@@ -312,6 +354,7 @@ export type Database = {
         Row: Tenant
         Insert: {
           organization_id: string
+          user_id?: string | null
           first_name?: string | null
           last_name?: string | null
           primary_phone?: string | null
@@ -436,6 +479,45 @@ export type Database = {
           entity_id?: string | null
         }
         Update: Partial<AuditLog>
+      }
+
+      maintenance_requests: {
+        Row: MaintenanceRequest
+        Insert: {
+          organization_id: string
+          tenant_id: string
+          unit_id?: string | null
+          category?: string | null
+          description: string
+          priority?: 'low' | 'medium' | 'high' | 'urgent'
+          status?: 'open' | 'in_progress' | 'scheduled' | 'completed' | 'cancelled'
+        }
+        Update: Partial<MaintenanceRequest>
+      }
+
+      maintenance_updates: {
+        Row: MaintenanceUpdate
+        Insert: {
+          request_id: string
+          status?: string | null
+          note?: string | null
+        }
+        Update: Partial<MaintenanceUpdate>
+      }
+
+      leads: {
+        Row: Lead
+        Insert: {
+          organization_id: string
+          first_name: string
+          last_name?: string | null
+          email?: string | null
+          phone?: string | null
+          message?: string | null
+          source?: string | null
+          status?: 'new' | 'contacted' | 'qualified' | 'lost' | 'converted'
+        }
+        Update: Partial<Lead>
       }
 
       listings: {

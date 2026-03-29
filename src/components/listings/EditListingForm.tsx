@@ -1,3 +1,4 @@
+//src/components/listings/EditListingForm.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -14,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ImageUpload } from './ImageUpload';
 import { toast } from 'sonner';
-import { Briefcase, Home, Save, ArrowLeft } from 'lucide-react';
+import { Briefcase, Home, Save, ArrowLeft, Map } from 'lucide-react';
 
 interface EditListingFormProps {
   listing: any;
@@ -37,6 +38,8 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     description: listing.description || '',
     price: listing.price?.toString() || '',
     deposit_amount: listing.deposit_amount?.toString() || '',
+    region: listing.region || '',
+    division: listing.division || '',
     city: listing.city || '',
     area: listing.area || '',
     full_address: listing.full_address || '',
@@ -61,18 +64,15 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     e.preventDefault();
     setIsSubmitting(true);
     
-    // 🔥 THE ULTIMATE FIX: Create an untyped reference to the client
-    // This completely bypasses all schema validation errors during the build
     const db = supabase as any;
 
-    // Notice we only include fields that can actually be edited!
-    // No unit_id, organization_id, or property_type here.
+    // We do NOT include region, division, or city in the update payload. 
+    // They are controlled by the building profile.
     const payload = {
       title: formData.title,
       description: formData.description,
       price: parseFloat(formData.price) || 0,
       deposit_amount: parseFloat(formData.deposit_amount) || 0,
-      city: formData.city,
       area: formData.area,
       full_address: formData.full_address,
       contact_phone: formData.contact_phone,
@@ -86,7 +86,6 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     };
 
     try {
-      // 1. Update the Listing text data using the untyped client
       const { error: listingError } = await db
         .from('listings')
         .update(payload)
@@ -94,11 +93,7 @@ export default function EditListingForm({ listing, organizationId }: EditListing
 
       if (listingError) throw listingError;
 
-      // 2. Sync Images (Delete old ones, insert new ones)
-      await db
-        .from('listing_images')
-        .delete()
-        .eq('listing_id', listing.id);
+      await db.from('listing_images').delete().eq('listing_id', listing.id);
       
       if (images.length > 0) {
         const imagePayload = images.map((img, idx) => ({
@@ -200,19 +195,39 @@ export default function EditListingForm({ listing, organizationId }: EditListing
               </div>
             </TabsContent>
 
+            {/* 🔥 UPDATED Location Tab */}
             <TabsContent value="location" className="space-y-6">
+              <div className="p-4 bg-slate-50/80 border border-slate-100 rounded-2xl space-y-4 mb-6">
+                <div className="flex items-center gap-2 mb-1">
+                  <Map className="w-4 h-4 text-slate-400" />
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Building Location (Read Only)</h4>
+                </div>
+                <p className="text-[10px] text-slate-400 -mt-3">To change this data, edit the Building profile.</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-[#1F3A5F] font-semibold text-xs">Region</Label>
+                    <Input disabled className="rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={formData.region} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[#1F3A5F] font-semibold text-xs">Division</Label>
+                    <Input disabled className="rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={formData.division} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-[#1F3A5F] font-semibold text-xs">City</Label>
+                    <Input disabled className="rounded-xl bg-slate-100 text-slate-500 cursor-not-allowed" value={formData.city} />
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="text-[#1F3A5F] font-semibold">Full Address</Label>
-                  <Input className="rounded-xl" value={formData.full_address} onChange={e => setFormData(p => ({...p, full_address: e.target.value}))}/>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[#1F3A5F] font-semibold">City *</Label>
-                  <Input required className="rounded-xl" value={formData.city} onChange={e => setFormData(p => ({...p, city: e.target.value}))}/>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[#1F3A5F] font-semibold">Neighborhood / Area</Label>
+                <div className="space-y-2 md:col-span-1">
+                  <Label className="text-[#1F3A5F] font-semibold">Quarter / Neighborhood</Label>
                   <Input className="rounded-xl" value={formData.area} onChange={e => setFormData(p => ({...p, area: e.target.value}))}/>
+                </div>
+                <div className="space-y-2 md:col-span-1">
+                  <Label className="text-[#1F3A5F] font-semibold">Street Address</Label>
+                  <Input className="rounded-xl bg-slate-50 border-slate-200" value={formData.full_address} onChange={e => setFormData(p => ({...p, full_address: e.target.value}))}/>
                 </div>
               </div>
             </TabsContent>
@@ -260,7 +275,6 @@ export default function EditListingForm({ listing, organizationId }: EditListing
               <div className="space-y-2">
                 <Label className="text-[#1F3A5F] font-semibold">Property Images</Label>
                 <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-200">
-                  {/* 🔥 FIX 3: Proper image upload props */}
                   <ImageUpload 
                     value={images} 
                     onChange={setImages} 
@@ -284,5 +298,3 @@ export default function EditListingForm({ listing, organizationId }: EditListing
     </form>
   );
 }
-
-//----------------------------------------testing snippets----------------------------------------
