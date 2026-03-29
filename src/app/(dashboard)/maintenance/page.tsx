@@ -10,13 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  Wrench, Search, Filter, Clock, CheckCircle2, 
+import { Wrench, Search, Filter, Clock, CheckCircle2, 
   AlertCircle, MessageSquare, User, Building2,
   MoreVertical, ChevronRight, AlertTriangle
 } from 'lucide-react'
 import type { MaintenanceRequest, Tenant, Unit } from '@/types'
 import { format } from 'date-fns'
+import MaintenanceUpdateDialog from '@/components/maintenance/MaintenanceUpdateDialog'
 
 interface RequestWithDetails extends MaintenanceRequest {
   tenant: Pick<Tenant, 'first_name' | 'last_name' | 'primary_phone'>
@@ -33,6 +33,10 @@ export default function MaintenancePage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+
+  // Dialog State
+  const [selectedRequest, setSelectedRequest] = useState<MaintenanceRequest | null>(null)
+  const [isUpdateOpen, setIsUpdateOpen] = useState(false)
 
   useEffect(() => {
     if (orgId) loadRequests()
@@ -224,7 +228,15 @@ export default function MaintenancePage() {
                   </div>
 
                   <div className="flex items-center gap-3 lg:border-l lg:border-slate-100 lg:pl-6">
-                    <Button variant="outline" size="sm" className="h-9 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-9 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 gap-2"
+                      onClick={() => {
+                        setSelectedRequest(r);
+                        setIsUpdateOpen(true);
+                      }}
+                    >
                       <MessageSquare className="h-4 w-4" />
                       Update Status
                     </Button>
@@ -238,6 +250,13 @@ export default function MaintenancePage() {
           )}
         </div>
       </div>
+
+      <MaintenanceUpdateDialog
+        open={isUpdateOpen}
+        onClose={() => setIsUpdateOpen(false)}
+        onSuccess={loadRequests}
+        request={selectedRequest}
+      />
     </div>
   )
 }

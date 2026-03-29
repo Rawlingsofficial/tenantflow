@@ -8,10 +8,12 @@ import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, Search, Receipt, CheckCircle2, Clock, AlertCircle, XCircle, Send } from 'lucide-react'
+import { Plus, Search, Receipt, CheckCircle2, Clock, AlertCircle, XCircle, Send, Play, Loader2 } from 'lucide-react'
 import CreateInvoiceDialog from '@/components/invoices/CreateInvoiceDialog'
 import { usePropertyType } from '@/hooks/usePropertyType'
 import { format } from 'date-fns'
+import { toast } from 'sonner'
+import { generateMonthlyInvoices } from '@/lib/billing-engine'
 
 type Tab = 'all' | 'draft' | 'sent' | 'paid' | 'overdue'
 
@@ -34,8 +36,30 @@ export default function InvoicesPage() {
   const [tab, setTab] = useState<Tab>('all')
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [runningBilling, setRunningBilling] = useState(false)
 
   useEffect(() => { if (orgId) load() }, [orgId, propertyType])
+
+  async function handleRunBilling() {
+    if (!orgId) return
+    setRunningBilling(true)
+    const promise = generateMonthlyInvoices(supabase, orgId)
+    
+    toast.promise(promise, {
+      loading: 'Generating monthly invoices...',
+      success: (data) => {
+        load()
+        return `Billing complete: ${data.created} created, ${data.skipped} skipped.`
+      },
+      error: 'Failed to run billing engine'
+    })
+    
+    try {
+      await promise
+    } finally {
+      setRunningBilling(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -92,10 +116,21 @@ export default function InvoicesPage() {
             ${totalPaid.toLocaleString()} collected · ${totalOverdue.toLocaleString()} overdue
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}
-          className="h-9 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg gap-1.5 px-4">
-          <Plus className="h-4 w-4" /> Create Invoice
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={handleRunBilling}
+            disabled={runningBilling}
+            className="h-9 border-slate-200 text-slate-600 text-sm font-medium rounded-lg gap-1.5 px-4"
+          >
+            {runningBilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            Run Billing
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}
+            className="h-9 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg gap-1.5 px-4">
+            <Plus className="h-4 w-4" /> Create Invoice
+          </Button>
+        </div>
       </div>
 
       <div className="px-6 grid grid-cols-4 gap-3 mb-5">
