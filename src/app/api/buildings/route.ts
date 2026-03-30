@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 
 // GET /api/buildings?org_id=xxx
 export async function GET(req: NextRequest) {
-  const supabase = await createServerClient(); // Note: added await for Next 15
+  const supabase = createServerClient();
   const orgId = req.nextUrl.searchParams.get("org_id");
 
   if (!orgId) {
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/buildings
 export async function POST(req: NextRequest) {
-  const supabase = await createServerClient();
+  const supabase = createServerClient();
   const body = await req.json();
 
   const { organization_id, name, address, status, photo_url, building_type, region, division, city } = body;

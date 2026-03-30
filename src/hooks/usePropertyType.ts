@@ -1,117 +1,33 @@
 // src/hooks/usePropertyType.ts
 'use client';
 
-import { useEffect } from "react";
-import { useAuth } from "@clerk/nextjs";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { useOrgStore, type OrgData } from "@/store/orgStore";
+import { useOrgStore } from "@/store/orgStore";
 import {
   isFeatureAllowedForPropertyType,
   getAllowedReportSections,
 } from "@/lib/permissions";
 
-// ONLY residential or commercial
 export type PropertyType = "residential" | "commercial";
 
-interface OrgRow {
-  id: string;
-  name: string;
-  property_type: string | null;
-  country: string | null;
-  plan_type: string | null;
-}
-
-interface UserRow {
-  id: string;
-}
-
-interface MembershipRow {
-  role: string;
-}
-
+/**
+ * usePropertyType hook
+ * Returns the current organization's property type and related helpers.
+ * Relies on OrganizationProvider for store hydration.
+ */
 export function usePropertyType(): {
   propertyType: PropertyType;
   loading: boolean;
   isResidential: boolean;
   isCommercial: boolean;
-
   canView: (feature: PropertyType) => boolean;
   allowedSections: PropertyType[];
 } {
-  const { orgId, userId } = useAuth();
   const currentOrg = useOrgStore((s) => s.currentOrg);
-  const setCurrentOrg = useOrgStore((s) => s.setCurrentOrg);
-  const setUserRole = useOrgStore((s) => s.setUserRole);
+  
+  // If we have an org ID but the store isn't populated yet, we're loading
+  const loading = !currentOrg;
 
-  const loading = !currentOrg && !!orgId;
-
-  useEffect(() => {
-    if (!orgId) return;
-    if (currentOrg?.id === orgId) return;
-
-    const supabase = getSupabaseBrowserClient();
-
-    const loadData = async () => {
-      try {
-        const { data: orgData, error: orgError } = await supabase
-          .from("organizations")
-          .select("id, name, property_type, country, plan_type")
-          .eq("id", orgId)
-          .maybeSingle();
-
-        if (orgError) throw orgError;
-        if (!orgData) return;
-
-        const row = orgData as OrgRow;
-
-        // sanitize property type to only residential or commercial
-        const propType: PropertyType =
-          row.property_type === "commercial" ? "commercial" : "residential";
-
-        const org: OrgData = {
-          id: row.id,
-          name: row.name,
-          property_type: propType,
-          country: row.country ?? null,
-          plan_type: row.plan_type ?? null,
-        };
-        setCurrentOrg(org);
-
-        if (userId) {
-          const { data: userData, error: userError } = await supabase
-            .from("users")
-            .select("id")
-            .eq("clerk_user_id", userId)
-            .maybeSingle<UserRow>();
-
-          if (userError) throw userError;
-
-          if (userData) {
-            const { data: membershipData, error: membershipError } =
-              await supabase
-                .from("organization_memberships")
-                .select("role")
-                .eq("organization_id", orgId)
-                .eq("user_id", userData.id)
-                .maybeSingle<MembershipRow>();
-
-            if (membershipError) throw membershipError;
-            if (membershipData) {
-              setUserRole(
-                membershipData.role as "owner" | "admin" | "manager" | "viewer"
-              );
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error loading organization or membership:", error);
-      }
-    };
-
-    loadData();
-  }, [orgId, userId, currentOrg?.id, setCurrentOrg, setUserRole]);
-
-  // default to residential
+  // Default to residential if not loaded or not set
   const propertyType: PropertyType =
     currentOrg?.property_type === "commercial" ? "commercial" : "residential";
 

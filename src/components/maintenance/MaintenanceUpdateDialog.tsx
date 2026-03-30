@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useAuth } from '@clerk/nextjs'
 import { Loader2, X, MessageSquare, CheckCircle2, Clock, Wrench, AlertCircle, Ban } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -26,7 +27,7 @@ const STATUS_OPTIONS = [
 ]
 
 export default function MaintenanceUpdateDialog({ open, onClose, onSuccess, request }: Props) {
-  const supabase = getSupabaseBrowserClient()
+  const { getToken } = useAuth()
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<string>('')
   const [note, setNote] = useState('')
@@ -43,6 +44,9 @@ export default function MaintenanceUpdateDialog({ open, onClose, onSuccess, requ
     setLoading(true)
     
     try {
+      const token = await getToken({ template: 'supabase' })
+      const supabase = getSupabaseBrowserClient(token ?? undefined)
+
       // 1. Add update log
       const { error: updateErr } = await (supabase as any).from('maintenance_updates').insert({
         request_id: request.id,
@@ -103,7 +107,7 @@ export default function MaintenanceUpdateDialog({ open, onClose, onSuccess, requ
           {/* Status selector */}
           <div className="space-y-2">
             <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">New Status</Label>
-            <Select value={status} onValueChange={setStatus}>
+            <Select value={status} onValueChange={(val) => { if (val) setStatus(val); }}>
               <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white">
                 <SelectValue placeholder="Select status..." />
               </SelectTrigger>

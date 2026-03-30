@@ -1,3 +1,4 @@
+//src/app/onboarding/actions.ts
 'use server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';

@@ -26,8 +26,7 @@ interface RequestWithDetails extends MaintenanceRequest {
 type StatusFilter = 'all' | 'open' | 'in_progress' | 'scheduled' | 'completed'
 
 export default function MaintenancePage() {
-  const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const { orgId, getToken } = useAuth()
 
   const [requests, setRequests] = useState<RequestWithDetails[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,6 +44,8 @@ export default function MaintenancePage() {
   async function loadRequests() {
     setLoading(true)
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       const { data, error } = await supabase
         .from('maintenance_requests')
         .select(`

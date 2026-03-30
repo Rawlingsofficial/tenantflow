@@ -28,9 +28,14 @@ const ROLE_DESC: Record<Role, string> = {
 export default function PermissionsSettings() {
   const { role: myRole, loading } = useRole();
 
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   if (loading) return <SettingsSkeleton />;
 
-  const canManage = myRole
+  const canManage = mounted && myRole
     ? hasPermission(myRole, "settings.manage_permissions")
     : false;
 

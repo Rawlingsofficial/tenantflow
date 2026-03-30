@@ -23,10 +23,9 @@ type Action = null | 'extend' | 'renew' | 'end' | 'terminate' | 'payment'
 const IC    = "h-9 text-sm rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400"
 
 export default function LeaseDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const { orgId } = useAuth()
-  const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const { id } = useParams<{ id: string }>();
+  const { orgId, getToken } = useAuth();
+  const router = useRouter();
 
   const [lease,  setLease]  = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -43,6 +42,8 @@ export default function LeaseDetailPage() {
 
   async function loadLease() {
     setLoading(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data } = await supabase
       .from('leases')
       .select(`*, tenants(id, first_name, last_name, primary_phone, email, photo_url, occupation, tenant_type, company_name, industry, contact_person),
@@ -64,6 +65,8 @@ export default function LeaseDetailPage() {
     if (!payForm.amount) { setError('Amount required'); return }
     setSaving(true); setError('')
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       const { error: e } = await supabase.from('rent_payments').insert(val({
         lease_id: id, amount: parseFloat(payForm.amount), payment_date: payForm.payment_date,
         method: payForm.method, reference: payForm.reference || null, status: 'completed'
@@ -76,6 +79,8 @@ export default function LeaseDetailPage() {
     if (!extendForm.new_end_date) { setError('New end date required'); return }
     setSaving(true); setError('')
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       const rent = extendForm.no_rent_change ? lease.rent_amount : parseFloat(extendForm.new_rent)
       const { error: e } = await supabase.from('leases').update(val({ lease_end: extendForm.new_end_date, rent_amount: rent })).eq('id', id)
       if (e) throw e
@@ -86,6 +91,8 @@ export default function LeaseDetailPage() {
     if (!renewForm.rent_amount || !renewForm.lease_start) { setError('Rent and start date required'); return }
     setSaving(true); setError('')
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       await supabase.from('leases').update(val({ status: 'ended' })).eq('id', id)
       await supabase.from('leases').insert(val({
         organization_id: orgId, tenant_id: lease.tenant_id, unit_id: lease.unit_id,
@@ -98,6 +105,8 @@ export default function LeaseDetailPage() {
   async function handleEnd() {
     setSaving(true); setError('')
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       await supabase.from('leases').update(val({ status: 'ended', lease_end: new Date().toISOString().split('T')[0] })).eq('id', id)
       await supabase.from('units').update(val({ status: 'vacant' })).eq('id', lease.unit_id)
       await loadLease(); setAction(null)
@@ -106,6 +115,8 @@ export default function LeaseDetailPage() {
   async function handleTerminate() {
     setSaving(true); setError('')
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       await supabase.from('leases').update(val({ status: 'terminated' })).eq('id', id)
       await supabase.from('units').update(val({ status: 'vacant' })).eq('id', lease.unit_id)
       await loadLease(); setAction(null)

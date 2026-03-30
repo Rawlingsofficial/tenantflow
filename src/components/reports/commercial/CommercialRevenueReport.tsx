@@ -13,15 +13,28 @@ import { format, subMonths } from 'date-fns'
 import type { PortfolioData } from '@/types/reports'
 
 export default function CommercialRevenueReport() {
-  const { orgId } = useAuth()
+  const { orgId, getToken } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
   const [data, setData] = useState<PortfolioData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (orgId) loadPortfolioData(supabase, orgId).then(d => { setData(d); setLoading(false) })
-  }, [orgId])
+    async function load() {
+      if (!orgId) return
+      setLoading(true)
+      try {
+        const token = await getToken({ template: 'supabase' })
+        const supabase = getSupabaseBrowserClient(token ?? undefined)
+        const d = await loadPortfolioData(supabase, orgId)
+        setData(d)
+      } catch (err) {
+        console.error('Error loading commercial revenue data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [orgId, getToken])
 
   if (loading) return (
     <div className="min-h-screen bg-[#080a0f] p-6 space-y-4">

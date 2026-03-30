@@ -169,6 +169,7 @@ export interface Notification {
   type: string | null
   message: string | null
   is_read: boolean
+  created_at?: string
 }
 
 export interface MaintenanceRequest {
@@ -260,6 +261,8 @@ export interface Listing {
   city: string;
   area: string | null;
   contact_phone: string;
+  division?: string | null;
+  region?: string | null;
   created_at: string;
   updated_at: string;
 }

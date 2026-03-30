@@ -26,7 +26,7 @@ interface SearchResult {
 // ── Global Search ─────────────────────────────────────────────
 function GlobalSearch({ orgId }: { orgId: string }) {
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const { getToken } = useAuth()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
@@ -63,6 +63,8 @@ function GlobalSearch({ orgId }: { orgId: string }) {
 
   async function doSearch(q: string) {
     setSearching(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const term = `%${q}%`
     const found: SearchResult[] = []
     const db = supabase as any
@@ -175,7 +177,7 @@ function GlobalSearch({ orgId }: { orgId: string }) {
 // ── Notifications ─────────────────────────────────────────────
 function NotificationsBell({ orgId }: { orgId: string }) {
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const { getToken } = useAuth()
   const [open, setOpen] = useState(false)
   const [expiringLeases, setExpiringLeases] = useState<any[]>([])
   const [vacantCount, setVacantCount] = useState(0)
@@ -192,6 +194,8 @@ function NotificationsBell({ orgId }: { orgId: string }) {
   }, [])
 
   async function load() {
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const db = supabase as any
     const today = new Date().toISOString().split('T')[0]
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
@@ -300,6 +304,11 @@ function UserMenu() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
@@ -308,11 +317,11 @@ function UserMenu() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  const initials = user?.fullName
+  const initials = mounted && user?.fullName
     ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : '?'
 
-  const roleInfo = userRole ? { owner: 'Owner', admin: 'Admin', manager: 'Manager', viewer: 'Viewer' }[userRole] : null
+  const roleInfo = mounted && userRole ? { owner: 'Owner', admin: 'Admin', manager: 'Manager', viewer: 'Viewer' }[userRole] : null
 
   return (
     <div ref={ref} className="relative">
@@ -325,7 +334,7 @@ function UserMenu() {
           </AvatarFallback>
         </Avatar>
         <div className="hidden sm:block text-left">
-          <p className="text-[12px] font-semibold text-gray-200 leading-tight">{user?.fullName ?? 'Account'}</p>
+          <p className="text-[12px] font-semibold text-gray-200 leading-tight">{mounted ? (user?.fullName ?? 'Account') : '...'}</p>
         </div>
         <ChevronDown className={`h-3 w-3 text-gray-500 hidden sm:block transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>

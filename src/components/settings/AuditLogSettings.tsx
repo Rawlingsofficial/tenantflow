@@ -16,8 +16,7 @@ type AuditLogWithUser = AuditLog & {
 };
 
 export default function AuditLogSettings() {
-  const { orgId } = useAuth();
-  const supabase = getSupabaseBrowserClient();
+  const { orgId, getToken } = useAuth();
 
   const [logs, setLogs] = useState<AuditLogWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +26,9 @@ export default function AuditLogSettings() {
     if (!orgId) return;
     setLoading(true);
     try {
+      const token = await getToken({ template: "supabase" });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
+
       const { data, error } = await (supabase as any)
         .from("audit_logs")
         .select("*, users ( full_name, email )")
@@ -41,7 +43,7 @@ export default function AuditLogSettings() {
     } finally {
       setLoading(false);
     }
-  }, [orgId]);
+  }, [orgId, getToken]);
 
   useEffect(() => {
     fetchLogs();

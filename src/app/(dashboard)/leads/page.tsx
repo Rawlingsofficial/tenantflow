@@ -20,8 +20,7 @@ import { format } from 'date-fns'
 type LeadStatus = 'new' | 'contacted' | 'qualified' | 'lost' | 'converted'
 
 export default function LeadsPage() {
-  const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const { orgId, getToken } = useAuth()
 
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +34,8 @@ export default function LeadsPage() {
   async function loadLeads() {
     setLoading(true)
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       const { data, error } = await supabase
         .from('leads')
         .select('*')

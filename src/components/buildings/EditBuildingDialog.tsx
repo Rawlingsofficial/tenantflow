@@ -127,7 +127,7 @@ export function EditBuildingDialog({ open, building, onClose, onSuccess }: EditB
             <div className="space-y-3">
               <div>
                 <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Region <span className="text-red-400">*</span></Label>
-                <Select value={region} onValueChange={(val: Region) => { setRegion(val); setDivision(""); setCity(""); }} disabled={saving}>
+                <Select value={region} onValueChange={(val) => { if (val) { setRegion(val as Region); setDivision(""); setCity(""); } }} disabled={saving}>
                   <SelectTrigger className="h-9 text-sm bg-white rounded-xl"><SelectValue placeholder="Select Region" /></SelectTrigger>
                   <SelectContent>{regions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                 </Select>
@@ -136,14 +136,14 @@ export function EditBuildingDialog({ open, building, onClose, onSuccess }: EditB
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Division <span className="text-red-400">*</span></Label>
-                  <Select disabled={!region || saving} value={division} onValueChange={(val) => { setDivision(val); setCity(""); }}>
+                  <Select disabled={!region || saving} value={division} onValueChange={(val) => { if (val) { setDivision(val); setCity(""); } }}>
                     <SelectTrigger className="h-9 text-sm bg-white rounded-xl"><SelectValue placeholder="Select Division" /></SelectTrigger>
                     <SelectContent>{divisions.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">City/Council <span className="text-red-400">*</span></Label>
-                  <Select disabled={!division || saving} value={city} onValueChange={setCity}>
+                  <Select disabled={!division || saving} value={city} onValueChange={(val) => { if (val) setCity(val); }}>
                     <SelectTrigger className="h-9 text-sm bg-white rounded-xl"><SelectValue placeholder="Select City" /></SelectTrigger>
                     <SelectContent>{cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
@@ -162,7 +162,7 @@ export function EditBuildingDialog({ open, building, onClose, onSuccess }: EditB
 
           <div>
             <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Status</Label>
-            <Select value={form.status} onValueChange={(v: string) => setForm((p) => ({ ...p, status: v }))} disabled={saving}>
+            <Select value={form.status} onValueChange={(v) => { if (v) setForm((p) => ({ ...p, status: v })) }} disabled={saving}>
               <SelectTrigger className="h-9 text-sm rounded-xl border-slate-200"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="active"><div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-teal-500" /> Active</div></SelectItem>

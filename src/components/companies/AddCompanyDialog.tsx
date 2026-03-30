@@ -37,8 +37,7 @@ function SectionHeader({ icon: Icon, label }: { icon: any; label: string }) {
 }
 
 export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
-  const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const { orgId, getToken } = useAuth()
 
   const [form, setForm] = useState({
     company_name: '', company_reg_number: '', vat_number: '',
@@ -54,6 +53,9 @@ export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
     if (!form.company_name.trim()) { setError('Company name is required'); return }
     setSaving(true); setError('')
     try {
+      const token = await getToken({ template: 'supabase' })
+      const supabase = getSupabaseBrowserClient(token ?? undefined)
+      
       const { error: e } = await supabase.from('tenants').insert(dbVal({
         organization_id: orgId!,
         tenant_type: 'company',

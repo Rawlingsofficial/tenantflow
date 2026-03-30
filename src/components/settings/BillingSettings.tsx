@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { CheckCircle2, AlertCircle, CreditCard, Zap, ArrowRight, ShieldCheck } from "lucide-react";
 import { Section, SettingsSkeleton } from "./AccountSettings";
 import { Button } from "@/components/ui/button";
@@ -57,8 +57,7 @@ const PLANS: {
 ];
 
 export default function BillingSettings() {
-  const { orgId, isLoaded } = useAuth();
-  const supabase = createBrowserClient();
+  const { orgId, isLoaded, getToken } = useAuth();
 
   const [org, setOrg] = useState<OrgData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,6 +68,9 @@ export default function BillingSettings() {
     const fetchOrg = async () => {
       setLoading(true);
       try {
+        const token = await getToken({ template: "supabase" });
+        const supabase = getSupabaseBrowserClient(token ?? undefined);
+
         const { data, error } = await supabase
           .from("organizations")
           .select("plan_type, unit_limit, user_limit, status, units_used, users_used")
@@ -76,7 +78,7 @@ export default function BillingSettings() {
           .maybeSingle();
 
         if (error) throw error;
-        setOrg(data as OrgData);
+        setOrg(data as OrgData | null);
       } catch (err: any) {
         console.error("Failed to fetch org:", err);
       } finally {
@@ -85,7 +87,7 @@ export default function BillingSettings() {
     };
 
     fetchOrg();
-  }, [orgId, isLoaded]);
+  }, [orgId, isLoaded, getToken]);
 
   if (loading) return <SettingsSkeleton />;
   if (!org) return <p className="text-sm text-gray-500 p-6">Organization billing profile not initialized.</p>;

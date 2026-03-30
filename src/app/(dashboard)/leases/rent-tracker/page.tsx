@@ -20,9 +20,8 @@ import { usePropertyType } from '@/hooks/usePropertyType'
 type FilterTab = 'all' | 'paid' | 'unpaid'
 
 export default function RentTrackerPage() {
-  const { orgId } = useAuth()
+  const { orgId, getToken } = useAuth()
   const router    = useRouter()
-  const supabase  = getSupabaseBrowserClient()
   const { propertyType } = usePropertyType() // renamed from 'type'
 
   const isCommercial = propertyType === 'commercial'
@@ -38,6 +37,8 @@ export default function RentTrackerPage() {
 
   async function load() {
     setLoading(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data } = await supabase
       .from('leases')
       .select(`*, tenants(id, first_name, last_name, primary_phone, photo_url, tenant_type, company_name),

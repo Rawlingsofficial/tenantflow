@@ -19,7 +19,7 @@ export function useSyncClerkToSupabase() {
 
     const syncUser = async () => {
       console.log("[Sync] Syncing user:", userId);
-      const token = await getToken();
+      const token = await getToken({ template: 'supabase' });
       if (!token) {
         console.error("[Sync] No token");
         return;
@@ -64,7 +64,7 @@ export function useSyncClerkToSupabase() {
 
     const syncOrgAndMembership = async () => {
       console.log("[Sync] Syncing org and membership:", orgId);
-      const token = await getToken();
+      const token = await getToken({ template: 'supabase' });
       if (!token) {
         console.error("[Sync] No token");
         return;

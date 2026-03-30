@@ -8,7 +8,7 @@ import { ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function OrgSwitcher() {
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const { currentOrg, setCurrentOrg, setUserRole } = useOrgStore();
   const [orgs, setOrgs] = useState<Array<{ id: string; name: string; property_type: string | null }>>([]);
   const [open, setOpen] = useState(false);
@@ -16,13 +16,15 @@ export function OrgSwitcher() {
 
   useEffect(() => {
     const fetchOrgs = async () => {
-      const token = await getToken();
+      if (!userId) return;
+      const token = await getToken({ template: 'supabase' });
       if (!token) return;
       const supabase = getSupabaseBrowserClient(token);
 
       const { data: userData, error: userError } = (await supabase
         .from('users')
         .select('id')
+        .eq('clerk_user_id', userId)
         .single()) as { data: { id: string } | null; error: any };
 
       if (userError || !userData) {

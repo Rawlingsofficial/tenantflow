@@ -1,21 +1,27 @@
-'use client';
+// src/app/(dashboard)/layout.tsx  ← server component (no 'use client')
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
+import { createServerClient } from '@/lib/supabase/server'
+import DashboardShell from './_shell'   // ← see below
 
-import Sidebar from '@/components/layout/Sidebar';
-import TopNav from '@/components/layout/TopNav';
-import { OrganizationProvider } from '@/components/providers/OrganizationProvider';
+export default async function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const { userId, orgId } = await auth()
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <OrganizationProvider>
-      <div className="flex h-screen w-full overflow-hidden bg-[#0d1117]">
-        <Sidebar />
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <TopNav />
-          <main className="flex-1 overflow-y-auto bg-[#F4F6F9]">
-            {children}
-          </main>
-        </div>
-      </div>
-    </OrganizationProvider>
-  );
+  if (!userId) redirect('/sign-in')
+  if (!orgId)  redirect('/onboarding')
+
+  const supabase = createServerClient()
+  const { data: org } = await (supabase
+    .from('organizations')
+    .select('property_type')
+    .eq('id', orgId)
+    .maybeSingle() as any)
+
+  if (!org?.property_type) redirect('/onboarding')
+
+  return <DashboardShell>{children}</DashboardShell>
 }

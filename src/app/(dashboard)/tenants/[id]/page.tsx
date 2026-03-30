@@ -15,8 +15,7 @@ import type {
 
 export default function TenantProfilePage() {
   const { id } = useParams<{ id: string }>()
-  const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const { orgId, getToken } = useAuth()
 
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [leases, setLeases] = useState<LeaseWithDetails[]>([])
@@ -33,6 +32,8 @@ export default function TenantProfilePage() {
 
   async function loadAll() {
     setLoading(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
 
     const [tenantRes, leasesRes, contactsRes, docsRes] = await Promise.all([
       supabase
@@ -75,6 +76,8 @@ export default function TenantProfilePage() {
 
   async function handleArchive() {
   if (!tenant) return
+  const token = await getToken({ template: 'supabase' });
+  const supabase = getSupabaseBrowserClient(token ?? undefined);
   await (supabase as any)
     .from('tenants')
     .update({ status: 'inactive' })

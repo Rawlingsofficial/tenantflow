@@ -45,8 +45,7 @@ const PROPERTY_TYPES: {
 ];
 
 export default function OrgSettings() {
-  const { orgId } = useAuth();
-  const supabase = getSupabaseBrowserClient();
+  const { orgId, getToken } = useAuth();
   const { currentOrg, setCurrentOrg } = useOrgStore();
   const { role, loading: roleLoading } = useRole();
 
@@ -68,6 +67,9 @@ export default function OrgSettings() {
   async function fetchOrg() {
     setLoading(true);
     try {
+      const token = await getToken({ template: "supabase" });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
+
       const { data, error } = await (supabase as any)
         .from("organizations")
         .select("name, country, property_type")
@@ -91,6 +93,9 @@ export default function OrgSettings() {
     if (!orgId) return;
     setSaving(true);
     try {
+      const token = await getToken({ template: "supabase" });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
+
       const { error } = await (supabase as any)
         .from("organizations")
         .update({ name, country, property_type: propertyType })

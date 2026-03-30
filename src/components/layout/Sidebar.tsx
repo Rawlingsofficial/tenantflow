@@ -1,12 +1,13 @@
 'use client'
 
-import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, FileText, User,
   Receipt, BarChart3, Settings, CreditCard,
   ChevronRight, Globe, Wrench, MessageSquare,
 } from 'lucide-react'
+import Link from 'next/link'
 import { usePropertyType } from '@/hooks/usePropertyType'
 
 import { cn } from '@/lib/utils'
@@ -84,8 +85,13 @@ function NavItem({ item, active }: { item: typeof RESIDENTIAL_NAV[0]; active: bo
 export default function Sidebar() {
   const pathname = usePathname()
   const { propertyType, loading } = usePropertyType()
+  const [mounted, setMounted] = useState(false)
 
-  const isCommercial = propertyType === 'commercial'
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isCommercial = mounted && propertyType === 'commercial'
   const nav = isCommercial ? COMMERCIAL_NAV : RESIDENTIAL_NAV
 
   function isActive(href: string) {

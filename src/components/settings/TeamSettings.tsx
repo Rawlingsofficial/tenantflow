@@ -68,10 +68,14 @@ const ROLE_COLORS: Record<Role, string> = {
 };
 
 export default function TeamSettings() {
-  const { orgId } = useAuth();
+  const { orgId, getToken } = useAuth();
   const { user } = useUser();
-  const supabase = getSupabaseBrowserClient();
   const { role: myRole } = useRole();
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const canManage = myRole
     ? hasPermission(myRole, "settings.manage_team")
@@ -88,6 +92,9 @@ export default function TeamSettings() {
     if (!orgId) return;
     setLoading(true);
     try {
+      const token = await getToken({ template: "supabase" });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
+
       const { data, error } = await (supabase as any)
         .from("organization_memberships")
         .select(`id, user_id, role, status, users ( full_name, email, phone )`)
@@ -102,7 +109,7 @@ export default function TeamSettings() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, supabase]);
+  }, [orgId, getToken]);
 
   useEffect(() => {
     fetchMembers();
@@ -125,6 +132,9 @@ export default function TeamSettings() {
 
   async function handleRoleChange(memberId: string, newRole: Role) {
     try {
+      const token = await getToken({ template: "supabase" });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
+
       const { error } = await (supabase as any)
         .from("organization_memberships")
         .update({ role: newRole })
@@ -141,6 +151,9 @@ export default function TeamSettings() {
   async function handleRemove(memberId: string) {
     if (!confirm("Are you sure you want to remove this member?")) return;
     try {
+      const token = await getToken({ template: "supabase" });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
+
       const { error } = await (supabase as any)
         .from("organization_memberships")
         .update({ status: "inactive" })
@@ -177,9 +190,9 @@ export default function TeamSettings() {
             <tbody className="divide-y divide-slate-100">
               {members.map((m) => {
                 const isOwner = m.role === "owner";
-                const isSelf = m.users.email === myEmail;
-                const canEditRole = canManage && (isOwner ? myRole === "owner" : true) && !isSelf;
-                const canRemove = canManage && (isOwner ? myRole === "owner" : true) && !isSelf;
+                const isSelf = mounted && m.users.email === myEmail;
+                const canEditRole = mounted && canManage && (isOwner ? myRole === "owner" : true) && !isSelf;
+                const canRemove = mounted && canManage && (isOwner ? myRole === "owner" : true) && !isSelf;
 
                 return (
                   <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
@@ -200,13 +213,12 @@ export default function TeamSettings() {
                     <td className="px-5 py-4">
                       {canEditRole ? (
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                          <DropdownMenuTrigger>
                             <button className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider transition-colors ${ROLE_COLORS[m.role]}`}>
                               {m.role}
                               <MoreVertical className="w-3 h-3 opacity-50" />
                             </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-40 rounded-xl">
+                          </DropdownMenuTrigger>                          <DropdownMenuContent align="start" className="w-40 rounded-xl">
                             {ROLE_OPTIONS.filter(opt => opt.value !== "owner" || myRole === "owner").map((opt) => (
                               <DropdownMenuItem 
                                 key={opt.value} 
@@ -256,7 +268,7 @@ export default function TeamSettings() {
         >
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
             <div className="md:col-span-5 space-y-2">
-              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</Label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
@@ -269,7 +281,7 @@ export default function TeamSettings() {
               </div>
             </div>
             <div className="md:col-span-4 space-y-2">
-              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Initial Role</Label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Initial Role</label>
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value as Role)}

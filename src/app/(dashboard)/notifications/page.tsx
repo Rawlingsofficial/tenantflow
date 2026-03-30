@@ -17,8 +17,7 @@ import type { Tenant, Notification } from '@/types'
 import { format } from 'date-fns'
 
 export default function NotificationsPage() {
-  const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const { orgId, getToken } = useAuth()
 
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -39,6 +38,8 @@ export default function NotificationsPage() {
   async function loadData() {
     setLoading(true)
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       const [tenantsRes, notificationsRes] = await Promise.all([
         supabase.from('tenants').select('*').eq('organization_id', orgId!).eq('status', 'active'),
         supabase.from('notifications').select('*').eq('organization_id', orgId!).order('created_at', { ascending: false }).limit(20)
@@ -61,6 +62,8 @@ export default function NotificationsPage() {
     setStatus(null)
 
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = getSupabaseBrowserClient(token ?? undefined);
       let targets = tenants.filter(t => t.user_id) // Only tenants linked to the app
       if (targetType === 'specific') {
         targets = targets.filter(t => selectedTenantIds.includes(t.id))

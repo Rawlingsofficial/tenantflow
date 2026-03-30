@@ -26,9 +26,8 @@ const STATUS: Record<string, { icon: any; label: string; cls: string }> = {
 }
 
 export default function InvoicesPage() {
-  const { orgId } = useAuth()
+  const { orgId, getToken } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
   const { propertyType } = usePropertyType()
 
   const [invoices, setInvoices] = useState<any[]>([])
@@ -43,6 +42,8 @@ export default function InvoicesPage() {
   async function handleRunBilling() {
     if (!orgId) return
     setRunningBilling(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const promise = generateMonthlyInvoices(supabase, orgId)
     
     toast.promise(promise, {
@@ -63,6 +64,8 @@ export default function InvoicesPage() {
 
   async function load() {
     setLoading(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data } = await (supabase as any)
       .from('invoices')
       .select(`*, leases(rent_amount, service_charge, tenant_id, unit_id,
@@ -79,6 +82,8 @@ export default function InvoicesPage() {
 
   async function quickUpdate(id: string, status: string, e: React.MouseEvent) {
     e.stopPropagation()
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     await (supabase as any).from('invoices').update({
       status,
       ...(status === 'paid' ? { paid_date: new Date().toISOString().split('T')[0] } : {})

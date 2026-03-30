@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -12,13 +12,16 @@ export default function AccountSettings() {
   const { openUserProfile } = useClerk();
   const supabase = getSupabaseBrowserClient();
 
-  const [fullName, setFullName] = useState(
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ?? ""
-  );
-  const [phone, setPhone] = useState(
-    user?.primaryPhoneNumber?.phoneNumber ?? ""
-  );
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFullName([user.firstName, user.lastName].filter(Boolean).join(" "));
+      setPhone(user.primaryPhoneNumber?.phoneNumber ?? "");
+    }
+  }, [user]);
 
   if (!isLoaded) return <SettingsSkeleton />;
 

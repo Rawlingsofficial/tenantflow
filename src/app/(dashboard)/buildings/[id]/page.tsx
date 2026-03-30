@@ -56,8 +56,7 @@ function SegmentBadge({ buildingType }: { buildingType: string }) {
 export default function BuildingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { orgId } = useAuth();
-  const supabase = createBrowserClient();
+  const { orgId, getToken } = useAuth();
   const { propertyType } = usePropertyType();
 
   const isCommercial = propertyType === "commercial";
@@ -77,6 +76,9 @@ export default function BuildingDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = createBrowserClient(token ?? undefined);
+
       const { data: bData } = await supabase
         .from("buildings")
         .select("*")
@@ -96,7 +98,7 @@ export default function BuildingDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, supabase]);
+  }, [id, getToken]);
 
   useEffect(() => {
     fetchData();

@@ -49,10 +49,8 @@ function SegmentBadge({ type }: { type: string }) {
 }
 
 export default function BuildingsPage() {
-  const { orgId } = useAuth();
+  const { orgId, getToken } = useAuth();
   const { propertyType } = usePropertyType();
-  const supabase = createBrowserClient();
-
   const [buildings, setBuildings] = useState<BuildingWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -66,8 +64,12 @@ export default function BuildingsPage() {
   }, [orgId, refreshKey]);
 
   async function fetchBuildings() {
+    if (!orgId) return;
     setLoading(true);
     try {
+      const token = await getToken({ template: 'supabase' });
+      const supabase = createBrowserClient(token ?? undefined);
+      
       const { data, error } = await supabase
         .from("buildings")
         .select("id, name, address, status, photo_url, organization_id, building_type, region, division, city, units(id, status)")

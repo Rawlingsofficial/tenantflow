@@ -29,8 +29,7 @@ interface TenantRow extends Tenant {
 }
 
 export default function TenantsPage() {
-  const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const { orgId, getToken } = useAuth()
   const router = useRouter()
 
   const [tenants, setTenants] = useState<TenantRow[]>([])
@@ -45,6 +44,8 @@ export default function TenantsPage() {
 
   async function loadTenants() {
     setLoading(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data } = await supabase
       .from('tenants')
       .select(`*, leases(id, rent_amount, lease_start, lease_end, status,

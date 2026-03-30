@@ -58,9 +58,8 @@ function PortfolioTag({ buildingType }: { buildingType?: string | null }) {
 }
 
 export default function PaymentsPage() {
-  const { orgId } = useAuth()
+  const { orgId, getToken } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +72,8 @@ export default function PaymentsPage() {
 
   async function load() {
     setLoading(true)
+    const token = await getToken({ template: 'supabase' });
+    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data: leaseRows } = await supabase
       .from('leases')
       .select(`id, rent_amount,
