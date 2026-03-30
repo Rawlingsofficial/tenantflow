@@ -8,11 +8,11 @@ import { OrganizationProvider } from '@/components/providers/OrganizationProvide
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <OrganizationProvider>
-      <div className="flex h-screen w-full overflow-hidden bg-[#0d1117]">
+      <div className="flex h-screen w-full overflow-hidden bg-white">
         <Sidebar />
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
           <TopNav />
-          <main className="flex-1 overflow-y-auto bg-[#F4F6F9]">
+          <main className="flex-1 overflow-y-auto bg-slate-50">
             {children}
           </main>
         </div>
