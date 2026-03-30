@@ -216,7 +216,7 @@ export default function ReportsOverviewPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1, duration: 0.5, ease: 'easeOut' }}
-                whileHover={{ y: -4, shadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
+                whileHover={{ y: -4, boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
                 className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm transition-all h-full flex flex-col cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-4">

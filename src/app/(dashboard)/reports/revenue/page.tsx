@@ -250,7 +250,7 @@ export default function RevenueReportPage() {
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 600 }} tickFormatter={(v) => `$${v / 1000}k`} />
                   <Tooltip 
                     contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                    formatter={(value: any) => [`$${Number(value || 0).toLocaleString()}`, '']}
                   />
                   <Bar dataKey="collected" fill="#14b8a6" radius={[6, 6, 0, 0]} name="Collected" isAnimationActive={true} barSize={32} />
                   <Line type="monotone" dataKey="expected" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Expected" isAnimationActive={true} />

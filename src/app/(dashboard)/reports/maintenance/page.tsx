@@ -1,4 +1,4 @@
-//src/app/(dashboard)/reports/leases/page.tsx
+//src/app/(dashboard)/reports/maintenance/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -90,7 +90,7 @@ export default function MaintenanceReportPage() {
     return {
       month: monthStr,
       requests: currentRequestsInMonth.length,
-      resolved: currentRequestsInMonth.filter(m => m.status === 'resolved' || m.status === 'completed').length
+      resolved: currentRequestsInMonth.filter(m => m.status === 'completed').length
     }
   })
 
@@ -296,7 +296,7 @@ export default function MaintenanceReportPage() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50/50">
                   <tr>
-                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest">Category & Title</th>
+                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest">Category & Description</th>
                     <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest">Unit & Building</th>
                     <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">Date Logged</th>
                     <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">Priority</th>
@@ -307,7 +307,7 @@ export default function MaintenanceReportPage() {
                   {maintenanceData?.current.map((m, i) => (
                     <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-8 py-5">
-                        <p className="font-bold text-slate-900">{m.title}</p>
+                        <p className="font-bold text-slate-900 truncate max-w-md">{m.description}</p>
                         <p className="text-[10px] text-slate-400 font-bold uppercase">{m.category}</p>
                       </td>
                       <td className="px-8 py-5">
@@ -328,7 +328,7 @@ export default function MaintenanceReportPage() {
                       <td className="px-8 py-5 text-center">
                         <span className={cn(
                           "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
-                          m.status === 'completed' || m.status === 'resolved' ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                          m.status === 'completed' ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
                         )}>
                           {m.status}
                         </span>

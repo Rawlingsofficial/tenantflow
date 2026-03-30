@@ -53,7 +53,7 @@ export default function NotificationsPage() {
       const today = new Date()
 
       // 1. Lease Expirations
-      data.leases.forEach(lease => {
+      data.leases.forEach((lease: any) => {
         if (lease.status !== 'active' || !lease.lease_end) return
         const endDate = new Date(lease.lease_end)
         const daysLeft = differenceInDays(endDate, today)
@@ -86,7 +86,7 @@ export default function NotificationsPage() {
       })
 
       // 2. Vacant Units
-      data.units.forEach(unit => {
+      data.units.forEach((unit: any) => {
         if (unit.status === 'vacant') {
           generated.push({
             id: `unit-vacant-${unit.id}`,
@@ -102,7 +102,7 @@ export default function NotificationsPage() {
       })
 
       // 3. Recent Payments
-      data.payments.slice(0, 10).forEach(payment => {
+      data.payments.slice(0, 10).forEach((payment: any) => {
         generated.push({
           id: `pay-${payment.id}`,
           type: 'payment',

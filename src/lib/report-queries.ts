@@ -72,7 +72,7 @@ export async function getOccupancyData(
         .lte('created_at', e)
 
       if (error) throw error
-      return data.map((u: any) => ({
+      return (data as any[]).map((u: any) => ({
         id: u.id,
         status: u.status,
         created_at: u.created_at,
@@ -135,7 +135,7 @@ export async function getResidentialRevenue(
         .lte('payment_date', e)
 
       if (error) throw error
-      return data.map((item: any) => ({
+      return (data as any[]).map((item: any) => ({
         amount: item.amount,
         payment_date: item.payment_date,
         status: item.status,
@@ -198,7 +198,7 @@ export async function getCommercialRevenue(
         .lte('invoice_date', e)
 
       if (error) throw error
-      return data.map((item: any) => ({
+      return (data as any[]).map((item: any) => ({
         invoice_date: item.invoice_date,
         paid_date: item.paid_date,
         rent_amount: item.rent_amount,
@@ -258,7 +258,7 @@ export async function getLeasesData(
         .lte('lease_start', e)
 
       if (error) throw error
-      return data.map((l: any) => ({
+      return (data as any[]).map((l: any) => ({
         ...l,
         first_name: l.tenants?.first_name || null,
         last_name: l.tenants?.last_name || null,
@@ -319,7 +319,7 @@ export async function getMaintenanceData(
         .lte('created_at', e)
 
       if (error) throw error
-      return data.map((m: any) => ({
+      return (data as any[]).map((m: any) => ({
         ...m,
         unit_code: m.units?.unit_code,
         building_name: m.units?.buildings?.name,
@@ -390,18 +390,18 @@ export async function getResidentialKPIs(
       .gte('created_at', s)
       .lte('created_at', e)
 
-    const totalCollected = (payments || []).reduce((acc, p) => acc + p.amount, 0)
-    const totalUnitsCount = (units || []).length
-    const occupiedUnitsCount = (units || []).filter(u => u.status === 'occupied').length
-    const activeLeasesCount = (leases || []).length
+    const totalCollected = ((payments as any[]) || []).reduce((acc, p) => acc + p.amount, 0);
+    const totalUnitsCount = ((units as any[]) || []).length;
+    const occupiedUnitsCount = ((units as any[]) || []).filter(u => u.status === 'occupied').length;
+    const activeLeasesCount = ((leases as any[]) || []).length;
     const avgRent = activeLeasesCount > 0 
-      ? (leases || []).reduce((acc, l) => acc + l.rent_amount, 0) / activeLeasesCount 
-      : 0
-    const openMaint = (maint || []).filter(m => m.status !== 'completed').length
+      ? ((leases as any[]) || []).reduce((acc, l) => acc + l.rent_amount, 0) / activeLeasesCount 
+      : 0;
+    const openMaint = ((maint as any[]) || []).filter(m => m.status !== 'completed').length;
 
-    let totalDays = 0
-    let resolvedCount = 0
-    maint?.forEach(m => {
+    let totalDays = 0;
+    let resolvedCount = 0;
+    ((maint as any[]) || []).forEach(m => {
       const resolvedUpdate = m.maintenance_updates?.find((u: any) => u.status === 'resolved')
       if (resolvedUpdate) {
         const start = new Date(m.created_at)
@@ -409,7 +409,7 @@ export async function getResidentialKPIs(
         totalDays += (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
         resolvedCount++
       }
-    })
+    });
     const avgResTime = resolvedCount > 0 ? totalDays / resolvedCount : 0
 
     return {
@@ -464,11 +464,11 @@ export async function getCommercialKPIs(
       .gte('invoice_date', s)
       .lte('invoice_date', e)
       .filter('lease_id', 'in', 
-        (await supabase.from('leases').select('id').eq('organization_id', organizationId)).data?.map(l => l.id) || []
+        ((await supabase.from('leases').select('id').eq('organization_id', organizationId)).data as any[])?.map((l: any) => l.id) || []
       )
 
     // 2. Occupancy rate % by sqm
-    const buildingIds = (await supabase.from('buildings').select('id').eq('organization_id', organizationId)).data?.map(b => b.id) || []
+    const buildingIds = ((await supabase.from('buildings').select('id').eq('organization_id', organizationId)).data as any[])?.map((b: any) => b.id) || []
     const { data: units } = await supabase
       .from('units')
       .select('id, status, area_sqm')
@@ -493,30 +493,30 @@ export async function getCommercialKPIs(
       .gte('created_at', s)
       .lte('created_at', e)
 
-    const totalRevenue = (invoices || []).reduce((acc, inv) => acc + inv.total_amount, 0)
-    const totalServiceCharges = (invoices || []).reduce((acc, inv) => acc + inv.service_charge, 0)
+    const totalRevenue = ((invoices as any[]) || []).reduce((acc, inv) => acc + inv.total_amount, 0);
+    const totalServiceCharges = ((invoices as any[]) || []).reduce((acc, inv) => acc + inv.service_charge, 0);
 
-    const totalSqm = (units || []).reduce((acc, u) => acc + (u.area_sqm || 0), 0)
-    const occupiedSqm = (units || []).filter(u => u.status === 'occupied').reduce((acc, u) => acc + (u.area_sqm || 0), 0)
+    const totalSqm = ((units as any[]) || []).reduce((acc, u) => acc + (u.area_sqm || 0), 0);
+    const occupiedSqm = ((units as any[]) || []).filter(u => u.status === 'occupied').reduce((acc, u) => acc + (u.area_sqm || 0), 0);
 
-    const activeLeasesCount = (leases || []).length
+    const activeLeasesCount = ((leases as any[]) || []).length;
     const avgEscalationRate = activeLeasesCount > 0
-      ? (leases || []).reduce((acc, l) => acc + (l.escalation_rate || 0), 0) / activeLeasesCount
-      : 0
+      ? ((leases as any[]) || []).reduce((acc, l) => acc + (l.escalation_rate || 0), 0) / activeLeasesCount
+      : 0;
 
-    let totalDurationMonths = 0
-    leases?.forEach(l => {
+    let totalDurationMonths = 0;
+    ((leases as any[]) || []).forEach(l => {
       if (l.lease_start && l.lease_end) {
         totalDurationMonths += diffInMonths(l.lease_start, l.lease_end)
       }
-    })
+    });
     const avgLeaseDuration = activeLeasesCount > 0 ? totalDurationMonths / activeLeasesCount : 0
 
-    const openMaint = (maint || []).filter(m => m.status !== 'completed').length
+    const openMaint = ((maint as any[]) || []).filter(m => m.status !== 'completed').length;
 
-    let totalResDays = 0
-    let resolvedCount = 0
-    maint?.forEach(m => {
+    let totalResDays = 0;
+    let resolvedCount = 0;
+    ((maint as any[]) || []).forEach(m => {
       const resolvedUpdate = m.maintenance_updates?.find((u: any) => u.status === 'resolved')
       if (resolvedUpdate) {
         const start = new Date(m.created_at)
@@ -524,7 +524,7 @@ export async function getCommercialKPIs(
         totalResDays += (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
         resolvedCount++
       }
-    })
+    });
     const avgResTime = resolvedCount > 0 ? totalResDays / resolvedCount : 0
 
     return {
@@ -581,7 +581,7 @@ export async function getOccupancyKPIs(
 
   const fetchMetrics = async (s: string, e: string) => {
     // Get buildings for this org
-    const buildingIds = (await supabase.from('buildings').select('id').eq('organization_id', organizationId)).data?.map(b => b.id) || []
+    const buildingIds = ((await supabase.from('buildings').select('id').eq('organization_id', organizationId)).data as any[])?.map((b: any) => b.id) || []
     
     // Get units in those buildings
     const { data: units } = await supabase
@@ -592,12 +592,12 @@ export async function getOccupancyKPIs(
     // Calculate rate based on propertyType
     let rate = 0
     if (propertyType === 'commercial') {
-      const totalSqm = units?.reduce((acc, u) => acc + (u.area_sqm || 0), 0) || 0
-      const occupiedSqm = units?.filter(u => u.status === 'occupied').reduce((acc, u) => acc + (u.area_sqm || 0), 0) || 0
+      const totalSqm = ((units as any[]) || [])?.reduce((acc, u) => acc + (u.area_sqm || 0), 0) || 0
+      const occupiedSqm = ((units as any[]) || [])?.filter(u => u.status === 'occupied').reduce((acc, u) => acc + (u.area_sqm || 0), 0) || 0
       rate = totalSqm > 0 ? (occupiedSqm / totalSqm) * 100 : 0
     } else {
-      const totalUnits = units?.length || 0
-      const occupiedUnits = units?.filter(u => u.status === 'occupied').length || 0
+      const totalUnits = ((units as any[]) || [])?.length || 0
+      const occupiedUnits = ((units as any[]) || [])?.filter(u => u.status === 'occupied').length || 0
       rate = totalUnits > 0 ? (occupiedUnits / totalUnits) * 100 : 0
     }
 
@@ -605,13 +605,13 @@ export async function getOccupancyKPIs(
     // Since we don't have a history table, we use created_at as a proxy for new units, 
     // or simply count vacant units. For a real report, we'd need a 'unit_status_history' table.
     // We'll use a more realistic calculation: average days since created_at for vacant units.
-    const vacantUnits = units?.filter(u => u.status === 'vacant') || []
-    let totalVacantDays = 0
-    const now = new Date()
+    const vacantUnits = ((units as any[]) || [])?.filter(u => u.status === 'vacant') || [];
+    let totalVacantDays = 0;
+    const now = new Date();
     vacantUnits.forEach(u => {
       const created = new Date(u.created_at)
       totalVacantDays += Math.max(0, (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-    })
+    });
     const avgVacancy = vacantUnits.length > 0 ? totalVacantDays / vacantUnits.length : 0
 
     return { rate, avgVacancy }
@@ -659,13 +659,13 @@ export async function getMaintenanceKPIs(
       .gte('created_at', s)
       .lte('created_at', e)
 
-    const totalRequests = maint?.length || 0
-    const openRequests = maint?.filter(m => m.status !== 'completed' && m.status !== 'resolved').length || 0
-    const completedRequests = maint?.filter(m => m.status === 'completed' || m.status === 'resolved').length || 0
+    const totalRequests = ((maint as any[]) || [])?.length || 0;
+    const openRequests = ((maint as any[]) || [])?.filter(m => m.status !== 'completed' && m.status !== 'resolved').length || 0;
+    const completedRequests = ((maint as any[]) || [])?.filter(m => m.status === 'completed' || m.status === 'resolved').length || 0;
     
-    let totalResDays = 0
-    let resolvedCount = 0
-    maint?.forEach(m => {
+    let totalResDays = 0;
+    let resolvedCount = 0;
+    ((maint as any[]) || [])?.forEach(m => {
       const resolvedUpdate = m.maintenance_updates?.find((u: any) => u.status === 'resolved' || u.status === 'completed')
       if (resolvedUpdate) {
         const start = new Date(m.created_at)
@@ -673,7 +673,7 @@ export async function getMaintenanceKPIs(
         totalResDays += (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
         resolvedCount++
       }
-    })
+    });
 
     return {
       openRequests,
@@ -727,19 +727,19 @@ export async function getLeasesKPIs(
       .gte('lease_start', s)
       .lte('lease_start', e)
 
-    const activeCount = leases?.length || 0
+    const activeCount = ((leases as any[]) || [])?.length || 0;
     
-    let totalRent = 0
-    let totalMonths = 0
-    let totalEscalation = 0
+    let totalRent = 0;
+    let totalMonths = 0;
+    let totalEscalation = 0;
 
-    leases?.forEach(l => {
+    ((leases as any[]) || [])?.forEach(l => {
       totalRent += l.rent_amount || 0
       totalEscalation += l.escalation_rate || 0
       if (l.lease_start && l.lease_end) {
         totalMonths += diffInMonths(l.lease_start, l.lease_end)
       }
-    })
+    });
 
     return {
       activeCount,
