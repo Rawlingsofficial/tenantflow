@@ -1,20 +1,22 @@
+//src/components/reports/residential/ResidentialReportsOverview.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import { loadPortfolioData } from '@/lib/report-queries'
+import { loadPortfolioData, getResidentialKPIs, getResidentialRevenue } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KpiCard } from '@/components/ui/kpi-card'
 import { RevenueChart } from '@/components/reports/RevenueChart'
+import { DateRangePicker } from '@/components/shared/DateRangePicker'
 import {
   TrendingUp, Building2, Users, FileText,
   DollarSign, AlertCircle, ChevronRight,
   CheckCircle2, Clock, Home,
 } from 'lucide-react'
 import { format, subMonths, differenceInDays } from 'date-fns'
-import type { PortfolioData } from '@/types/reports'
+import type { PortfolioData, ResidentialKPIs, RevenueResidentialData, DateRangeState } from '@/types/reports'
 
 function ReportNavCard({
   title, sub, stat, statLabel, href, accent, icon: Icon, router,
@@ -54,27 +56,43 @@ export default function ResidentialReportsOverview() {
   const { orgId, getToken } = useAuth()
   const router = useRouter()
   const [data, setData] = useState<PortfolioData | null>(null)
+  const [kpis, setKpis] = useState<ResidentialKPIs | null>(null)
+  const [revenueData, setRevenueData] = useState<{ current: RevenueResidentialData[] } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [dateRange, setDateRange] = useState<DateRangeState>({
+    preset: 'last_12_months',
+    startDate: subMonths(new Date(), 12).toISOString(),
+    endDate: new Date().toISOString()
+  })
+
+  const loadData = useCallback(async () => {
+    if (!orgId) return
+    setLoading(true)
+    try {
+      const token = await getToken({ template: 'supabase' })
+      const supabase = getSupabaseBrowserClient(token ?? undefined)
+      
+      const [portfolio, kpiData, rev] = await Promise.all([
+        loadPortfolioData(supabase, orgId),
+        getResidentialKPIs(orgId, dateRange.startDate, dateRange.endDate),
+        getResidentialRevenue(orgId, dateRange.startDate, dateRange.endDate)
+      ])
+      
+      setData(portfolio)
+      setKpis(kpiData)
+      setRevenueData(rev)
+    } catch (err) {
+      console.error('Error loading residential reports data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [orgId, getToken, dateRange])
 
   useEffect(() => {
-    async function load() {
-      if (!orgId) return
-      setLoading(true)
-      try {
-        const token = await getToken({ template: 'supabase' })
-        const supabase = getSupabaseBrowserClient(token ?? undefined)
-        const d = await loadPortfolioData(supabase, orgId)
-        setData(d)
-      } catch (err) {
-        console.error('Error loading portfolio data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [orgId, getToken])
+    loadData()
+  }, [loadData])
 
-  if (loading) return (
+  if (loading && !data) return (
     <div className="min-h-screen bg-[#F4F6F9] p-6 space-y-4">
       <Skeleton className="h-10 w-56 rounded-xl" />
       <div className="grid grid-cols-4 gap-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}</div>
@@ -85,37 +103,30 @@ export default function ResidentialReportsOverview() {
 
   const now = new Date()
   const thisMonth = format(now, 'yyyy-MM')
-  const lastMonth = format(subMonths(now, 1), 'yyyy-MM')
 
   const totalUnits = data.units.length
   const occupiedUnits = data.units.filter(u => u.status === 'occupied').length
   const vacantUnits = data.units.filter(u => u.status === 'vacant').length
-  const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0
-
+  
   const activeLeases = data.leases.filter(l => l.status === 'active')
   const monthlyRunRate = activeLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
   const portfolioValue = data.units.reduce((s, u) => s + Number(u.default_rent ?? 0), 0)
 
-  const completedPayments = data.payments.filter(p => p.status === 'completed')
-  const collectedThisMonth = completedPayments.filter(p => p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
-  const collectedLastMonth = completedPayments.filter(p => p.payment_date?.startsWith(lastMonth)).reduce((s, p) => s + Number(p.amount), 0)
-  const revTrend = collectedLastMonth > 0 ? Math.round(((collectedThisMonth - collectedLastMonth) / collectedLastMonth) * 100) : 0
-  const collectionRate = monthlyRunRate > 0 ? Math.round((collectedThisMonth / monthlyRunRate) * 100) : 0
-
   const chartData = Array.from({ length: 12 }, (_, i) => {
     const m = subMonths(now, 11 - i)
     const ms = format(m, 'yyyy-MM')
-    const value = completedPayments.filter(p => p.payment_date?.startsWith(ms)).reduce((s, p) => s + Number(p.amount), 0)
+    const value = revenueData?.current.filter(p => p.payment_date?.startsWith(ms)).reduce((s, p) => s + Number(p.amount), 0) || 0
     return { label: format(m, 'MMM'), month: ms, value }
   })
-  const avgMonthly = Math.round(chartData.reduce((s, d) => s + d.value, 0) / 12)
+  const avgMonthly = chartData.length > 0 ? Math.round(chartData.reduce((s, d) => s + d.value, 0) / chartData.length) : 0
+  const allTimeCollected = revenueData?.current.reduce((s, p) => s + Number(p.amount), 0) || 0
 
   const buildingStats = data.buildings.map(b => {
     const bUnits = data.units.filter(u => u.building_id === b.id)
     const bOccupied = bUnits.filter(u => u.status === 'occupied').length
     const bMonthly = data.leases.filter(l => l.status === 'active' && bUnits.some(u => u.id === l.unit_id)).reduce((s, l) => s + Number(l.rent_amount), 0)
     const bLeaseIds = data.leases.filter(l => bUnits.some(u => u.id === l.unit_id)).map(l => l.id)
-    const bCollected = completedPayments.filter(p => bLeaseIds.includes(p.lease_id) && p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
+    const bCollected = (revenueData?.current || []).filter(p => bLeaseIds.includes((p as any).lease_id) && p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
     return {
       ...b, total: bUnits.length, occupied: bOccupied, monthly: bMonthly, collected: bCollected,
       occupancyPct: bUnits.length > 0 ? Math.round((bOccupied / bUnits.length) * 100) : 0,
@@ -125,7 +136,7 @@ export default function ResidentialReportsOverview() {
 
   const expiredLeases = activeLeases.filter(l => l.lease_end && differenceInDays(new Date(l.lease_end), now) < 0)
   const unpaidThisMonth = activeLeases.filter(l =>
-    !data.payments.some(p => p.lease_id === l.id && p.status === 'completed' && p.payment_date?.startsWith(thisMonth))
+    !(revenueData?.current || []).some(p => (p as any).lease_id === l.id && p.status === 'completed' && p.payment_date?.startsWith(thisMonth))
   )
 
   return (
@@ -141,9 +152,12 @@ export default function ResidentialReportsOverview() {
             <h1 className="text-[22px] font-bold tracking-tight text-gray-900">Reports</h1>
             <p className="text-[12px] text-gray-400 mt-0.5">{format(now, 'MMMM yyyy')} · {data.buildings.length} buildings · {totalUnits} units</p>
           </div>
-          <div className="text-right">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wider">Monthly run rate</p>
-            <p className="text-2xl font-bold text-gray-900 mt-0.5">${monthlyRunRate.toLocaleString()}</p>
+          <div className="flex flex-col items-end gap-3">
+            <DateRangePicker onRangeChange={setDateRange} initialRange={dateRange} />
+            <div className="text-right">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider">Monthly run rate</p>
+              <p className="text-2xl font-bold text-gray-900 mt-0.5">${monthlyRunRate.toLocaleString()}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -175,29 +189,29 @@ export default function ResidentialReportsOverview() {
         <KpiCard label="Portfolio Value" value={`$${portfolioValue.toLocaleString()}`}
           sub="total default rent capacity" accent="gray" icon={Building2} />
         <KpiCard label="Monthly Run Rate" value={`$${monthlyRunRate.toLocaleString()}`}
-          sub={`${activeLeases.length} active leases`} accent="blue" icon={TrendingUp} />
-        <KpiCard label="Collection Rate" value={`${collectionRate}%`}
-          sub={`$${collectedThisMonth.toLocaleString()} of $${monthlyRunRate.toLocaleString()}`}
-          accent={collectionRate >= 90 ? 'emerald' : 'amber'} icon={CheckCircle2}
-          trend={{ value: revTrend, label: 'vs last month' }} />
-        <KpiCard label="Occupancy Rate" value={`${occupancyRate}%`}
+          sub={`${kpis?.activeLeasesCount.current || 0} active leases`} accent="blue" icon={TrendingUp} />
+        <KpiCard label="Rent Collected" value={`$${(kpis?.totalRentCollected.current || 0).toLocaleString()}`}
+          sub="total for selected period"
+          accent={(kpis?.totalRentCollected.delta || 0) >= 0 ? 'emerald' : 'amber'} icon={CheckCircle2}
+          trend={kpis?.totalRentCollected.delta !== undefined ? { value: Math.round(kpis.totalRentCollected.delta), label: 'vs prev period' } : undefined} />
+        <KpiCard label="Occupancy Rate" value={`${Math.round(kpis?.occupancyRate.current || 0)}%`}
           sub={`${occupiedUnits} of ${totalUnits} units`}
-          accent={occupancyRate >= 80 ? 'emerald' : 'amber'} icon={Home} />
+          accent={(kpis?.occupancyRate.current || 0) >= 80 ? 'emerald' : 'amber'} icon={Home} />
       </div>
 
       {/* Report nav cards */}
       <div className="px-6 grid grid-cols-4 gap-3 mb-5">
         <ReportNavCard title="Revenue" sub="Collections, outstanding & trends"
-          stat={`$${collectedThisMonth.toLocaleString()}`} statLabel="collected this month"
+          stat={`$${(kpis?.totalRentCollected.current || 0).toLocaleString()}`} statLabel="collected in period"
           href="/reports/revenue" accent="emerald" icon={DollarSign} router={router} />
         <ReportNavCard title="Occupancy" sub="Vacancies, turnaround & health"
-          stat={`${occupancyRate}%`} statLabel="occupied"
+          stat={`${Math.round(kpis?.occupancyRate.current || 0)}%`} statLabel="occupied"
           href="/reports/occupancy" accent="blue" icon={Home} router={router} />
         <ReportNavCard title="Tenants" sub="Payment habits & reliability"
           stat={`${data.tenants.filter(t => t.status === 'active').length}`} statLabel="active"
           href="/reports/tenants" accent="violet" icon={Users} router={router} />
         <ReportNavCard title="Lease Health" sub="Expirations, renewals & rent"
-          stat={`${activeLeases.length}`} statLabel="active leases"
+          stat={`${kpis?.activeLeasesCount.current || 0}`} statLabel="active leases"
           href="/reports/leases" accent="amber" icon={FileText} router={router} />
       </div>
 
@@ -206,14 +220,14 @@ export default function ResidentialReportsOverview() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_4px_rgba(0,0,0,0.04)] p-6">
           <div className="flex items-center justify-between mb-5">
             <div>
-              <p className="text-[13px] font-bold text-gray-900">Revenue — Last 12 Months</p>
+              <p className="text-[13px] font-bold text-gray-900">Revenue Trend</p>
               <p className="text-[11px] text-gray-400 mt-0.5">Collected per month · avg ${avgMonthly.toLocaleString()}/mo</p>
             </div>
             <div className="text-right">
               <p className="text-lg font-bold text-emerald-600">
-                ${completedPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}
+                ${allTimeCollected.toLocaleString()}
               </p>
-              <p className="text-[10px] text-gray-400">all-time collected</p>
+              <p className="text-[10px] text-gray-400">total collected</p>
             </div>
           </div>
           <RevenueChart data={chartData} currentMonth={thisMonth} variant="light" height={120} showAvg />
@@ -273,10 +287,10 @@ export default function ResidentialReportsOverview() {
                 <tr className="border-t border-gray-100 bg-gray-50/50">
                   <td className="px-5 py-2.5 text-[11px] font-semibold text-gray-500">Total</td>
                   <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700">{totalUnits}</td>
-                  <td className="px-4 py-2.5 text-[11px] font-semibold text-emerald-600">{occupancyRate}%</td>
+                  <td className="px-4 py-2.5 text-[11px] font-semibold text-emerald-600">{Math.round(kpis?.occupancyRate.current || 0)}%</td>
                   <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700">${monthlyRunRate.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-[11px] font-semibold text-emerald-600">${collectedThisMonth.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700">{collectionRate}%</td>
+                  <td className="px-4 py-2.5 text-[11px] font-semibold text-emerald-600">${(kpis?.totalRentCollected.current || 0).toLocaleString()}</td>
+                  <td className="px-4 py-2.5 text-[11px] font-semibold text-gray-700">{Math.round((kpis?.totalRentCollected.current || 0) / monthlyRunRate * 100) || 0}%</td>
                   <td />
                 </tr>
               </tfoot>
@@ -299,7 +313,7 @@ export default function ResidentialReportsOverview() {
               {[
                 { label: 'Vacant Units', value: vacantUnits, color: 'text-amber-600', bg: 'bg-amber-50' },
                 { label: 'Maintenance', value: data.units.filter(u => u.status === 'maintenance').length, color: 'text-red-500', bg: 'bg-red-50' },
-                { label: 'Occupancy', value: `${occupancyRate}%`, color: occupancyRate >= 80 ? 'text-emerald-600' : 'text-amber-600', bg: occupancyRate >= 80 ? 'bg-emerald-50' : 'bg-amber-50' },
+                { label: 'Occupancy', value: `${Math.round(kpis?.occupancyRate.current || 0)}%`, color: (kpis?.occupancyRate.current || 0) >= 80 ? 'text-emerald-600' : 'text-amber-600', bg: (kpis?.occupancyRate.current || 0) >= 80 ? 'bg-emerald-50' : 'bg-amber-50' },
               ].map(k => (
                 <div key={k.label} className={`${k.bg} rounded-xl p-4 text-center`}>
                   <p className={`text-2xl font-bold ${k.color}`}>{k.value}</p>

@@ -1,3 +1,4 @@
+//src/components/reports/shared/RevenueChart.tsx
 'use client'
 
 import React from 'react'

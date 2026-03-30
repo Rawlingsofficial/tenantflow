@@ -1,20 +1,22 @@
+//src/components/reports/commercial/CommercialReportsOverview.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import { loadPortfolioData } from '@/lib/report-queries'
+import { loadPortfolioData, getCommercialKPIs, getCommercialRevenue } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KpiCard } from '@/components/ui/kpi-card'
 import { RevenueChart } from '@/components/reports/RevenueChart'
+import { DateRangePicker } from '@/components/shared/DateRangePicker'
 import {
   DollarSign, Building2, Users, Layers, Clock,
   AlertCircle, ChevronRight, MapPin, Activity, TrendingUp,
-  FileText   // ✅ Added missing import
+  FileText
 } from 'lucide-react'
 import { format, subMonths, differenceInDays, differenceInMonths } from 'date-fns'
-import type { PortfolioData } from '@/types/reports'
+import type { PortfolioData, CommercialKPIs, RevenueCommercialData, DateRangeState } from '@/types/reports'
 
 function SparkBar({ value, max, color = '#6366f1' }: { value: number; max: number; color?: string }) {
   return (
@@ -28,27 +30,43 @@ export default function CommercialReportsOverview() {
   const { orgId, getToken } = useAuth()
   const router = useRouter()
   const [data, setData] = useState<PortfolioData | null>(null)
+  const [kpis, setKpis] = useState<CommercialKPIs | null>(null)
+  const [revenueData, setRevenueData] = useState<{ current: RevenueCommercialData[] } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [dateRange, setDateRange] = useState<DateRangeState>({
+    preset: 'last_12_months',
+    startDate: subMonths(new Date(), 12).toISOString(),
+    endDate: new Date().toISOString()
+  })
+
+  const loadData = useCallback(async () => {
+    if (!orgId) return
+    setLoading(true)
+    try {
+      const token = await getToken({ template: 'supabase' })
+      const supabase = getSupabaseBrowserClient(token ?? undefined)
+      
+      const [portfolio, kpiData, rev] = await Promise.all([
+        loadPortfolioData(supabase, orgId),
+        getCommercialKPIs(orgId, dateRange.startDate, dateRange.endDate),
+        getCommercialRevenue(orgId, dateRange.startDate, dateRange.endDate)
+      ])
+      
+      setData(portfolio)
+      setKpis(kpiData)
+      setRevenueData(rev)
+    } catch (err) {
+      console.error('Error loading commercial reports data:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [orgId, getToken, dateRange])
 
   useEffect(() => {
-    async function load() {
-      if (!orgId) return
-      setLoading(true)
-      try {
-        const token = await getToken({ template: 'supabase' })
-        const supabase = getSupabaseBrowserClient(token ?? undefined)
-        const d = await loadPortfolioData(supabase, orgId)
-        setData(d)
-      } catch (err) {
-        console.error('Error loading portfolio data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [orgId, getToken])
+    loadData()
+  }, [loadData])
 
-  if (loading) return (
+  if (loading && !data) return (
     <div className="min-h-screen bg-[#080a0f] p-6 space-y-4">
       {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-20 rounded-2xl bg-white/[0.04]" />)}
     </div>
@@ -57,20 +75,16 @@ export default function CommercialReportsOverview() {
 
   const now = new Date()
   const thisMonth = format(now, 'yyyy-MM')
-  const lastMonth = format(subMonths(now, 1), 'yyyy-MM')
 
   const activeLeases = data.leases.filter(l => l.status === 'active')
-  const completedPayments = data.payments.filter(p => p.status === 'completed')
 
   const totalUnits = data.units.length
   const occupiedUnits = data.units.filter(u => u.status === 'occupied').length
-  const vacantUnits = data.units.filter(u => u.status === 'vacant').length
   const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0
 
   // Total Leasable Area
   const totalGLA = data.units.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
   const occupiedGLA = data.units.filter(u => u.status === 'occupied').reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
-  const glaOccRate = totalGLA > 0 ? Math.round((occupiedGLA / totalGLA) * 100) : 0
 
   // Revenue
   const totalBaseRent = activeLeases.reduce((s, l) => s + Number(l.rent_amount), 0)
@@ -78,43 +92,14 @@ export default function CommercialReportsOverview() {
   const monthlyRunRate = totalBaseRent + totalNNN
   const rentPSM = occupiedGLA > 0 ? Math.round((totalBaseRent / occupiedGLA) * 10) / 10 : 0
 
-  const collectedThisMonth = completedPayments.filter(p => p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
-  const collectedLastMonth = completedPayments.filter(p => p.payment_date?.startsWith(lastMonth)).reduce((s, p) => s + Number(p.amount), 0)
-  const collectionRate = monthlyRunRate > 0 ? Math.round((collectedThisMonth / monthlyRunRate) * 100) : 0
-  const revDelta = collectedLastMonth > 0 ? Math.round(((collectedThisMonth - collectedLastMonth) / collectedLastMonth) * 100) : 0
-
-  // WALT
-  const walt = activeLeases.length > 0
-    ? Math.round(activeLeases.reduce((s, l) => {
-        const remaining = l.lease_end ? Math.max(0, differenceInMonths(new Date(l.lease_end), now)) : 24
-        return s + (remaining * Number(l.rent_amount))
-      }, 0) / Math.max(totalBaseRent, 1))
-    : 0
-
-  // Expiry exposure ≤12mo
-  const expiryExposureRent = activeLeases
-    .filter(l => l.lease_end && differenceInDays(new Date(l.lease_end), now) <= 365 && differenceInDays(new Date(l.lease_end), now) >= 0)
-    .reduce((s, l) => s + Number(l.rent_amount), 0)
-  const expiryPct = totalBaseRent > 0 ? Math.round((expiryExposureRent / totalBaseRent) * 100) : 0
-
-  // Tenant concentration
-  const tenantRentMap = activeLeases.reduce((acc: Record<string, number>, l) => {
-    acc[l.tenant_id] = (acc[l.tenant_id] ?? 0) + Number(l.rent_amount)
-    return acc
-  }, {})
-  const topTenantId = Object.entries(tenantRentMap).sort((a, b) => b[1] - a[1])[0]?.[0]
-  const topTenantRent = topTenantId ? tenantRentMap[topTenantId] : 0
-  const topTenantPct = totalBaseRent > 0 ? Math.round((topTenantRent / totalBaseRent) * 100) : 0
-  const topTenant = data.tenants.find(t => t.id === topTenantId)
-  const topTenantName = topTenant?.company_name ?? `${topTenant?.first_name ?? ''} ${topTenant?.last_name ?? ''}`.trim()
-
   // Chart data
   const chartData = Array.from({ length: 12 }, (_, i) => {
     const m = subMonths(now, 11 - i)
     const ms = format(m, 'yyyy-MM')
-    const value = completedPayments.filter(p => p.payment_date?.startsWith(ms)).reduce((s, p) => s + Number(p.amount), 0)
+    const value = revenueData?.current.filter(p => p.invoice_date?.startsWith(ms)).reduce((s, p) => s + Number(p.total_amount), 0) || 0
     return { label: format(m, 'MMM'), month: ms, value }
   })
+  const allTimeCollected = revenueData?.current.reduce((s, p) => s + Number(p.total_amount), 0) || 0
 
   // Industries
   const industries = data.tenants.reduce((acc: Record<string, { count: number; rent: number }>, t) => {
@@ -144,7 +129,7 @@ export default function CommercialReportsOverview() {
     const bArea = bUnits.reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
     const bOccArea = bUnits.filter(u => u.status === 'occupied').reduce((s, u) => s + Number(u.area_sqm ?? 0), 0)
     const bLeaseIds = bLeases.map(l => l.id)
-    const bCollected = completedPayments.filter(p => bLeaseIds.includes(p.lease_id) && p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
+    const bCollected = (revenueData?.current || []).filter(p => bLeaseIds.includes((p as any).lease_id) && p.invoice_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.total_amount), 0)
     const bWalt = bLeases.length > 0
       ? Math.round(bLeases.reduce((s, l) => {
           const rem = l.lease_end ? Math.max(0, differenceInMonths(new Date(l.lease_end), now)) : 24
@@ -161,14 +146,11 @@ export default function CommercialReportsOverview() {
     }
   }).sort((a, b) => b.rent - a.rent)
 
-  const concentrationAlert = topTenantPct >= 25
-  const expiryAlert = expiryPct >= 30
-
   const reportNav = [
-    { title: 'Revenue Intelligence', sub: 'NNN collections, CAM, cash flow', stat: `$${collectedThisMonth.toLocaleString()}`, statSub: 'collected this month', href: '/reports/revenue', icon: DollarSign, color: 'emerald' },
-    { title: 'Occupancy & GLA', sub: 'Area utilisation, vacancy cost', stat: `${glaOccRate > 0 ? glaOccRate : occupancyRate}%`, statSub: totalGLA > 0 ? 'GLA occupied' : 'units occupied', href: '/reports/occupancy', icon: Building2, color: 'blue' },
+    { title: 'Revenue Intelligence', sub: 'NNN collections, CAM, cash flow', stat: `$${(kpis?.totalRevenue.current || 0).toLocaleString()}`, statSub: 'in period', href: '/reports/revenue', icon: DollarSign, color: 'emerald' },
+    { title: 'Occupancy & GLA', sub: 'Area utilisation, vacancy cost', stat: `${Math.round(kpis?.occupancyRateByArea.current || 0)}%`, statSub: 'GLA occupied', href: '/reports/occupancy', icon: Building2, color: 'blue' },
     { title: 'Tenants', sub: 'Industries, concentration, reliability', stat: `${data.tenants.filter(t => t.status === 'active').length}`, statSub: 'active tenants', href: '/reports/tenants', icon: Users, color: 'violet' },
-    { title: 'Lease Health', sub: 'Expiry, WALT, rent deviation', stat: `${activeLeases.length}`, statSub: 'active leases', href: '/reports/leases', icon: FileText, color: 'amber' },
+    { title: 'Lease Health', sub: 'Expiry, WALT, rent deviation', stat: `${kpis?.activeLeasesCount.current || 0}`, statSub: 'active leases', href: '/reports/leases', icon: FileText, color: 'amber' },
   ]
 
   return (
@@ -184,56 +166,41 @@ export default function CommercialReportsOverview() {
             <h1 className="text-2xl font-bold tracking-tight text-white">Reports & Analytics</h1>
             <p className="text-sm text-gray-500 mt-1">{format(now, 'MMMM yyyy')} · {data.buildings.length} assets · {totalUnits} units</p>
           </div>
-          <div className="text-right">
-            <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Monthly Run Rate</p>
-            <p className="text-3xl font-bold text-white tracking-tight">${monthlyRunRate.toLocaleString()}</p>
-            {totalNNN > 0 && <p className="text-[11px] text-indigo-400 mt-0.5">incl. ${totalNNN.toLocaleString()} NNN/CAM</p>}
+          <div className="flex flex-col items-end gap-4">
+            <DateRangePicker onRangeChange={setDateRange} initialRange={dateRange} />
+            <div className="text-right">
+              <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Monthly Run Rate</p>
+              <p className="text-3xl font-bold text-white tracking-tight">${monthlyRunRate.toLocaleString()}</p>
+              {totalNNN > 0 && <p className="text-[11px] text-indigo-400 mt-0.5">incl. ${totalNNN.toLocaleString()} NNN/CAM</p>}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Alerts */}
-      {(concentrationAlert || expiryAlert) && (
-        <div className="px-6 pt-4 space-y-2">
-          {concentrationAlert && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 text-[12px]">
-              <AlertCircle className="h-4 w-4 text-amber-400 flex-shrink-0" />
-              <span className="text-amber-300"><strong>Concentration risk:</strong> {topTenantName} = {topTenantPct}% of base rent</span>
-            </div>
-          )}
-          {expiryAlert && (
-            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-rose-500/20 bg-rose-500/5 text-[12px]">
-              <Clock className="h-4 w-4 text-rose-400 flex-shrink-0" />
-              <span className="text-rose-300"><strong>Expiry exposure:</strong> {expiryPct}% of income expires within 12 months</span>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Primary KPIs */}
       <div className="px-6 pt-5 grid grid-cols-4 gap-3 mb-4">
-        <KpiCard variant="dark" label="Gross Collected" value={`$${collectedThisMonth.toLocaleString()}`}
-          sub={`${collectionRate}% of run rate`} trend={{ value: revDelta, label: 'vs last month' }} accent="emerald" icon={DollarSign} />
-        <KpiCard variant="dark" label="NNN / CAM Charges" value={`$${totalNNN.toLocaleString()}`}
-          sub={`${activeLeases.filter(l => Number(l.service_charge ?? 0) > 0).length} leases with NNN`} accent="blue" icon={Layers} />
+        <KpiCard variant="dark" label="Gross Revenue" value={`$${(kpis?.totalRevenue.current || 0).toLocaleString()}`}
+          sub="total for selected period" trend={kpis?.totalRevenue.delta !== undefined ? { value: Math.round(kpis.totalRevenue.delta), label: 'vs prev period' } : undefined} accent="emerald" icon={DollarSign} />
+        <KpiCard variant="dark" label="NNN / CAM Charges" value={`$${(kpis?.totalServiceCharges.current || 0).toLocaleString()}`}
+          sub="total service charges" accent="blue" icon={Layers} />
         <KpiCard variant="dark" label="Unit Occupancy" value={`${occupancyRate}%`}
           sub={`${occupiedUnits} of ${totalUnits} units`}
           accent={occupancyRate >= 90 ? 'emerald' : occupancyRate >= 75 ? 'amber' : 'rose'} icon={Building2} />
-        <KpiCard variant="dark" label="WALT" value={`${walt}mo`}
-          sub="Weighted avg lease term" accent={walt >= 24 ? 'emerald' : walt >= 12 ? 'amber' : 'rose'} icon={Clock} />
+        <KpiCard variant="dark" label="WALT" value={`${Math.round(kpis?.avgLeaseDuration.current || 0)}mo`}
+          sub="Weighted avg lease term" accent={(kpis?.avgLeaseDuration.current || 0) >= 24 ? 'emerald' : (kpis?.avgLeaseDuration.current || 0) >= 12 ? 'amber' : 'rose'} icon={Clock} />
       </div>
 
       {/* Secondary KPIs */}
       <div className="px-6 grid grid-cols-4 gap-3 mb-5">
         <KpiCard variant="dark" label="Rent PSM" value={totalGLA > 0 ? `$${rentPSM}/m²` : '—'}
           sub={`${totalGLA.toLocaleString()} m² total GLA`} accent="violet" icon={MapPin} />
-        <KpiCard variant="dark" label="GLA Occupancy" value={totalGLA > 0 ? `${glaOccRate}%` : '—'}
+        <KpiCard variant="dark" label="GLA Occupancy" value={`${Math.round(kpis?.occupancyRateByArea.current || 0)}%`}
           sub={`${occupiedGLA.toLocaleString()} m² let`}
-          accent={glaOccRate >= 90 ? 'emerald' : glaOccRate >= 75 ? 'amber' : 'rose'} icon={Activity} />
-        <KpiCard variant="dark" label="Expiry Exposure" value={`${expiryPct}%`}
-          sub="of income expiring ≤12mo" accent={expiryPct >= 30 ? 'rose' : expiryPct >= 15 ? 'amber' : 'emerald'} icon={AlertCircle} />
-        <KpiCard variant="dark" label="Top Tenant %" value={`${topTenantPct}%`}
-          sub={topTenantName || '—'} accent={topTenantPct >= 25 ? 'amber' : 'gray'} icon={Users} />
+          accent={(kpis?.occupancyRateByArea.current || 0) >= 90 ? 'emerald' : (kpis?.occupancyRateByArea.current || 0) >= 75 ? 'amber' : 'rose'} icon={Activity} />
+        <KpiCard variant="dark" label="Avg Escalation" value={`${kpis?.avgEscalationRate.current.toFixed(1)}%`}
+          sub="avg annual escalation" accent="emerald" icon={TrendingUp} />
+        <KpiCard variant="dark" label="Active Leases" value={`${kpis?.activeLeasesCount.current || 0}`}
+          sub="total for selected period" accent="gray" icon={Users} />
       </div>
 
       {/* Report nav cards */}
@@ -271,12 +238,12 @@ export default function CommercialReportsOverview() {
         <div className="rounded-2xl bg-[#0f1117] border border-white/[0.06] p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-[13px] font-bold text-white">Revenue — Last 12 Months</p>
+              <p className="text-[13px] font-bold text-white">Revenue Trend</p>
               <p className="text-[11px] text-gray-600 mt-0.5">Total collections including NNN/CAM</p>
             </div>
             <p className="text-lg font-bold text-white">
-              ${completedPayments.reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}
-              <span className="text-[11px] text-gray-600 font-normal ml-1">all-time</span>
+              ${allTimeCollected.toLocaleString()}
+              <span className="text-[11px] text-gray-600 font-normal ml-1">total</span>
             </p>
           </div>
           <RevenueChart data={chartData} currentMonth={thisMonth} variant="dark" height={120} />
@@ -333,12 +300,12 @@ export default function CommercialReportsOverview() {
                 <tr className="border-t border-white/[0.06] bg-white/[0.01]">
                   <td className="px-6 py-2.5 text-[10px] font-semibold text-gray-500">TOTAL / AVG</td>
                   <td className="px-4 py-2.5 text-[10px] font-semibold text-gray-400">{totalGLA.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-[10px] font-semibold text-indigo-400">{glaOccRate || occupancyRate}%</td>
+                  <td className="px-4 py-2.5 text-[10px] font-semibold text-indigo-400">{Math.round(kpis?.occupancyRateByArea.current || 0)}%</td>
                   <td className="px-4 py-2.5 text-[10px] font-semibold text-gray-300">${totalBaseRent.toLocaleString()}</td>
                   <td className="px-4 py-2.5 text-[10px] font-semibold text-sky-400">${totalNNN.toLocaleString()}</td>
                   <td className="px-4 py-2.5 text-[10px] font-semibold text-gray-400">{rentPSM > 0 ? `$${rentPSM}/m²` : '—'}</td>
-                  <td className="px-4 py-2.5 text-[10px] font-semibold text-gray-400">{walt}mo</td>
-                  <td className="px-4 py-2.5 text-[10px] font-semibold text-gray-300">{collectionRate}%</td>
+                  <td className="px-4 py-2.5 text-[10px] font-semibold text-gray-400">{Math.round(kpis?.avgLeaseDuration.current || 0)}mo</td>
+                  <td className="px-4 py-2.5 text-[10px] font-semibold text-gray-300">{Math.round((kpis?.totalRevenue.current || 0) / monthlyRunRate * 100) || 0}%</td>
                 </tr>
               )}
             </tbody>

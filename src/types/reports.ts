@@ -1,89 +1,124 @@
-// Central types for all report pages and components
-// Source of truth — import ONLY from here
+// src/types/reports.ts
+import { 
+  Lease, MaintenanceRequest 
+} from './index'
 
-export interface ReportBuilding {
-  id: string
-  name: string
-  address?: string | null
-  building_type?: string | null   // ✅ added for segment classification
+/**
+ * DATE RANGE & COMPARISON STATE
+ */
+export type DateRangePreset = 
+  | 'last_30_days' 
+  | 'last_3_months' 
+  | 'last_6_months' 
+  | 'last_12_months' 
+  | 'this_year' 
+  | 'last_year' 
+  | 'all_time' 
+  | 'custom'
+
+export interface DateRangeState {
+  preset: DateRangePreset
+  startDate: string // ISO
+  endDate: string   // ISO
 }
 
-export interface ReportUnit {
-  id: string
-  unit_code: string
-  unit_type?: string | null
-  status: 'vacant' | 'occupied' | 'maintenance' | string
-  default_rent?: number | null
-  building_id: string
-  buildings?: ReportBuilding | null
-  area_sqm?: number
+export type ComparisonType = 'previous_period' | 'same_period_last_year' | 'custom' | 'none'
+
+export interface ComparisonState {
+  enabled: boolean
+  type: ComparisonType
+  startDate?: string
+  endDate?: string
 }
 
-export interface ReportTenant {
+/**
+ * QUERY RESULT TYPES (Canonical Queries)
+ */
+
+export interface OccupancyData {
   id: string
-  first_name?: string | null
-  last_name?: string | null
-  photo_url?: string | null
-  primary_phone?: string | null
-  occupation?: string | null
-  employment_type?: string | null
-  country?: string | null
-  date_of_birth?: string | null
   status: string
-  company_name?: string | null
-  industry?: string | null
+  created_at: string
+  area_sqm: number | null
+  bedrooms: number | null
+  bathrooms: number | null
+  building_name: string
+  lease_start: string | null
+  lease_end: string | null
+  lease_status: string | null
 }
 
-export interface ReportPayment {
-  id: string
+export interface RevenueResidentialData {
   amount: number
   payment_date: string
   status: string
-  method?: string | null
-  reference?: string | null
-  lease_id: string
-}
-
-export interface ReportLease {
-  id: string
-  organization_id: string
-  tenant_id: string
-  unit_id: string
+  method: string | null
   rent_amount: number
-  lease_start: string
-  lease_end?: string | null
-  renewal_date?: string | null
+  organization_id: string
+}
+
+export interface RevenueCommercialData {
+  invoice_date: string
+  paid_date: string | null
+  rent_amount: number
+  service_charge: number
+  total_amount: number
   status: string
-  service_charge?: number | null   // ✅ added for NNN/CAM
-  // joined
-  tenants?: ReportTenant | null
-  units?: (ReportUnit & { buildings?: ReportBuilding | null }) | null
+  escalation_rate: number | null
+  organization_id: string
 }
 
-// The full data bundle loaded once and shared across report pages
+export interface LeaseReportData extends Lease {
+  first_name: string | null
+  last_name: string | null
+  company_name: string | null
+  tenant_type: string | null
+  unit_code: string
+  area_sqm: number | null
+  building_name: string
+}
+
+export interface MaintenanceReportData extends MaintenanceRequest {
+  unit_code: string
+  building_name: string
+  resolved_at: string | null
+}
+
+/**
+ * KPI CARD DATA
+ */
+
+export interface KPICardValue {
+  current: number
+  comparison?: number
+  delta?: number // percentage
+  isImprovement?: boolean
+}
+
+export interface ResidentialKPIs {
+  totalRentCollected: KPICardValue
+  occupancyRate: KPICardValue
+  activeLeasesCount: KPICardValue
+  avgRentPerUnit: KPICardValue
+  openMaintenanceRequests: KPICardValue
+  avgResolutionTime: KPICardValue
+}
+
+export interface CommercialKPIs {
+  totalRevenue: KPICardValue
+  totalServiceCharges: KPICardValue
+  occupancyRateByArea: KPICardValue
+  activeLeasesCount: KPICardValue
+  avgLeaseDuration: KPICardValue
+  avgEscalationRate: KPICardValue
+  openMaintenanceRequests: KPICardValue
+  avgResolutionTime: KPICardValue
+}
+
 export interface PortfolioData {
-  buildings: ReportBuilding[]
-  units: ReportUnit[]
-  leases: ReportLease[]
-  payments: ReportPayment[]
-  tenants: ReportTenant[]
-}
-
-// Legacy aliases (keep for backward compat with existing components)
-export type LeaseItem = ReportLease
-export type PaymentItem = ReportPayment
-export type BuildingItem = ReportBuilding
-export type UnitItem = ReportUnit
-export type TenantItem = ReportTenant
-
-export interface ReportData {
-  tenants: ReportTenant[]
-  allLeases: ReportLease[]
-  allPayments: ReportPayment[]
-  occupancyRate: number
-  totalBuildings: number
-  totalUnits: number
-  occupiedUnits: number
-  vacantUnits: number
-  maintenanceUnits: number
+  buildings: any[]
+  units: any[]
+  leases: any[]
+  payments: any[]
+  tenants: any[]
 }

@@ -1,3 +1,4 @@
+//src/components/reports/LeasesReportSwitcher.tsx
 'use client'
 
 import { Skeleton } from '@/components/ui/skeleton'

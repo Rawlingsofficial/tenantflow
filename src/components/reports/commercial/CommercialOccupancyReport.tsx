@@ -1,3 +1,4 @@
+//src/components/reports/commercial/CommercialOccupancyReport.tsx
 'use client'
 
 // This re-exports the original occupancy report logic, now as a named component

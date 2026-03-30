@@ -1,3 +1,4 @@
+//src/app/(dashboard)/reports/mixed/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'

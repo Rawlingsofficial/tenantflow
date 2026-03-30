@@ -1,14 +1,14 @@
 //src/app/(dashboard)/reports/leases/page.tsx
 'use client'
+
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@clerk/nextjs'
 import { useOrgStore } from '@/store/orgStore'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
-  FileText, ArrowLeft, ArrowUpRight, ArrowDownRight, 
-  Calendar, FileSpreadsheet, Building2, User, Building,
-  Scale, Clock, TrendingUp
+  Wrench, ArrowLeft, ArrowUpRight, ArrowDownRight, 
+  Clock, FileSpreadsheet, CheckCircle2, AlertCircle, Timer
 } from 'lucide-react'
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -19,11 +19,11 @@ import { subMonths, format, eachMonthOfInterval, isSameMonth } from 'date-fns'
 import { DateRangePicker } from '@/components/shared/DateRangePicker'
 import { CompareToggle } from '@/components/shared/CompareToggle'
 import { EmptyState } from '@/components/shared/EmptyState'
-import { getLeasesData, getLeasesKPIs } from '@/lib/report-queries'
-import { DateRangeState, ComparisonState, LeaseReportData } from '@/types/reports'
+import { getMaintenanceData, getMaintenanceKPIs } from '@/lib/report-queries'
+import { DateRangeState, ComparisonState, MaintenanceReportData } from '@/types/reports'
 import { cn } from '@/lib/utils'
 
-export default function LeasesReportPage() {
+export default function MaintenanceReportPage() {
   const { orgId } = useAuth()
   const { currentOrg } = useOrgStore()
   const [loading, setLoading] = useState(true)
@@ -40,35 +40,33 @@ export default function LeasesReportPage() {
   })
 
   // State for Data
-  const [leasesData, setLeasesData] = useState<{ current: LeaseReportData[], comparison?: LeaseReportData[] } | null>(null)
+  const [maintenanceData, setMaintenanceData] = useState<{ current: MaintenanceReportData[], comparison?: MaintenanceReportData[] } | null>(null)
   const [kpis, setKpis] = useState<any>(null)
 
   const fetchData = useCallback(async () => {
     if (!orgId || !currentOrg) return
     setLoading(true)
     try {
-      const propertyType = currentOrg.property_type === 'commercial' ? 'commercial' : 'residential'
       const [data, kpiData] = await Promise.all([
-        getLeasesData(
+        getMaintenanceData(
           orgId,
           dateRange.startDate,
           dateRange.endDate,
           comparison.enabled ? comparison.startDate : undefined,
           comparison.enabled ? comparison.endDate : undefined
         ),
-        getLeasesKPIs(
+        getMaintenanceKPIs(
           orgId,
-          propertyType,
           dateRange.startDate,
           dateRange.endDate,
           comparison.enabled ? comparison.startDate : undefined,
           comparison.enabled ? comparison.endDate : undefined
         )
       ])
-      setLeasesData(data)
+      setMaintenanceData(data)
       setKpis(kpiData)
     } catch (error) {
-      console.error('Error fetching leases data:', error)
+      console.error('Error fetching maintenance data:', error)
     } finally {
       setLoading(false)
     }
@@ -80,8 +78,6 @@ export default function LeasesReportPage() {
 
   if (!currentOrg) return null
 
-  const isCommercial = currentOrg.property_type === 'commercial'
-
   // Prepare Chart Data
   const months = eachMonthOfInterval({
     start: new Date(dateRange.startDate),
@@ -90,54 +86,41 @@ export default function LeasesReportPage() {
 
   const chartData = months.map(month => {
     const monthStr = format(month, 'MMM')
-    const currentLeasesInMonth = leasesData?.current.filter(l => isSameMonth(new Date(l.lease_start), month)) || []
+    const currentRequestsInMonth = maintenanceData?.current.filter(m => isSameMonth(new Date(m.created_at), month)) || []
     return {
       month: monthStr,
-      count: currentLeasesInMonth.length
+      requests: currentRequestsInMonth.length,
+      resolved: currentRequestsInMonth.filter(m => m.status === 'resolved' || m.status === 'completed').length
     }
   })
 
   const kpiCards = [
     {
-      id: 'activeLeases',
-      label: 'Active Leases',
-      value: kpis?.activeLeases?.current || 0,
-      delta: kpis?.activeLeases?.delta,
-      isImprovement: kpis?.activeLeases?.isImprovement,
-      icon: FileText,
-      color: 'bg-teal-50 text-teal-600'
-    },
-    isCommercial ? {
-      id: 'avgDuration',
-      label: 'Avg Lease Duration',
-      value: `${Math.round(kpis?.avgDuration?.current || 0)} mo`,
-      delta: kpis?.avgDuration?.delta,
-      isImprovement: kpis?.avgDuration?.isImprovement,
-      icon: Clock,
-      color: 'bg-indigo-50 text-indigo-600'
-    } : {
-      id: 'avgRent',
-      label: 'Avg Rent Per Unit',
-      value: `$${Math.round(kpis?.avgRent?.current || 0).toLocaleString()}`,
-      delta: kpis?.avgRent?.delta,
-      isImprovement: kpis?.avgRent?.isImprovement,
-      icon: TrendingUp,
-      color: 'bg-emerald-50 text-emerald-600'
-    },
-    isCommercial ? {
-      id: 'avgEscalation',
-      label: 'Avg Escalation Rate',
-      value: `${(kpis?.avgEscalation?.current || 0).toFixed(1)}%`,
-      delta: kpis?.avgEscalation?.delta,
-      isImprovement: kpis?.avgEscalation?.isImprovement,
-      icon: TrendingUp,
+      id: 'openRequests',
+      label: 'Open Requests',
+      value: kpis?.openRequests?.current || 0,
+      delta: kpis?.openRequests?.delta,
+      isImprovement: kpis?.openRequests?.isImprovement,
+      icon: AlertCircle,
       color: 'bg-amber-50 text-amber-600'
-    } : {
-      id: 'activeCount',
-      label: 'Portfolio Count',
-      value: leasesData?.current.length || 0,
-      icon: Building,
-      color: 'bg-blue-50 text-blue-600'
+    },
+    {
+      id: 'avgResolutionTime',
+      label: 'Avg Resolution Time',
+      value: `${Math.round(kpis?.avgResolutionTime?.current || 0)} d`,
+      delta: kpis?.avgResolutionTime?.delta,
+      isImprovement: kpis?.avgResolutionTime?.isImprovement,
+      icon: Timer,
+      color: 'bg-indigo-50 text-indigo-600'
+    },
+    {
+      id: 'completionRate',
+      label: 'Completion Rate',
+      value: `${Math.round(kpis?.completionRate?.current || 0)}%`,
+      delta: kpis?.completionRate?.delta,
+      isImprovement: kpis?.completionRate?.isImprovement,
+      icon: CheckCircle2,
+      color: 'bg-emerald-50 text-emerald-600'
     }
   ]
 
@@ -153,9 +136,9 @@ export default function LeasesReportPage() {
                 <ArrowLeft className="h-4 w-4" /> Back to Reports
               </Link>
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                {isCommercial ? 'Commercial Leases & CAM' : 'Lease Portfolio Analytics'}
+                Maintenance & Capex Analytics
               </h1>
-              <p className="text-sm text-slate-500 mt-1">Deep analysis of lease terms, renewals, and durations</p>
+              <p className="text-sm text-slate-500 mt-1">Portfolio health and resolution efficiency</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <DateRangePicker onRangeChange={setDateRange} initialRange={dateRange} />
@@ -215,31 +198,35 @@ export default function LeasesReportPage() {
           ))}
         </div>
 
-        {/* Leases Chart */}
+        {/* Requests Chart */}
         <div className="bg-white border border-slate-100 rounded-[32px] p-8 shadow-sm">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 tracking-tight">New Lease Velocity</h3>
-              <p className="text-sm text-slate-500">Volume of lease start dates over the selected period</p>
+              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Request Volume & Resolution</h3>
+              <p className="text-sm text-slate-500">New requests vs completed tasks</p>
             </div>
           </div>
 
           <div className="h-[350px] w-full">
             {loading ? (
               <Skeleton className="h-full w-full rounded-2xl" />
-            ) : chartData.length === 0 || chartData.every(d => d.count === 0) ? (
+            ) : chartData.length === 0 || chartData.every(d => d.requests === 0) ? (
               <EmptyState 
-                icon={FileText} 
-                title="No lease activity" 
-                description="No leases were started during this period. Try selecting a different date range." 
+                icon={Wrench} 
+                title="No maintenance data" 
+                description="No maintenance requests were found for this period." 
               />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
-                    <linearGradient id="colorLeases" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.15}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.01}/>
+                    <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.01}/>
+                    </linearGradient>
+                    <linearGradient id="colorResolved" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0.01}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -259,18 +246,27 @@ export default function LeasesReportPage() {
                     contentStyle={{ 
                       borderRadius: '20px', 
                       border: 'none', 
-                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-                      padding: '12px 16px'
+                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'
                     }}
                   />
                   <Area 
                     type="monotone" 
-                    dataKey="count" 
-                    stroke="#8b5cf6" 
+                    dataKey="requests" 
+                    stroke="#f59e0b" 
                     strokeWidth={4} 
                     fillOpacity={1} 
-                    fill="url(#colorLeases)" 
-                    activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 3 }} 
+                    fill="url(#colorRequests)" 
+                    name="New Requests"
+                    isAnimationActive={true} 
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="resolved" 
+                    stroke="#10b981" 
+                    strokeWidth={4} 
+                    fillOpacity={1} 
+                    fill="url(#colorResolved)" 
+                    name="Resolved"
                     isAnimationActive={true} 
                   />
                 </AreaChart>
@@ -279,12 +275,12 @@ export default function LeasesReportPage() {
           </div>
         </div>
 
-        {/* Lease Inventory Table */}
+        {/* Maintenance Log Table */}
         <div className="bg-white border border-slate-100 rounded-[32px] overflow-hidden flex flex-col shadow-sm">
           <div className="p-8 border-b border-slate-50 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Active Inventory</h3>
-              <p className="text-sm text-slate-500 mt-1">Detailed breakdown of active lease agreements</p>
+              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Recent Activity Log</h3>
+              <p className="text-sm text-slate-500 mt-1">Detailed list of recent requests and their status</p>
             </div>
           </div>
           <div className="flex-1 overflow-auto">
@@ -292,57 +288,49 @@ export default function LeasesReportPage() {
               <div className="p-8 space-y-4">
                 {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)}
               </div>
-            ) : leasesData?.current.length === 0 ? (
+            ) : maintenanceData?.current.length === 0 ? (
               <div className="h-64 flex items-center justify-center">
-                <p className="text-slate-400 font-medium italic text-sm">No active leases found in this period.</p>
+                <p className="text-slate-400 font-medium italic text-sm">No maintenance requests found in this period.</p>
               </div>
             ) : (
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50/50">
                   <tr>
-                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest">Tenant / Company</th>
+                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest">Category & Title</th>
                     <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest">Unit & Building</th>
-                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">Start Date</th>
-                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">Expiry</th>
-                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-right">Rent</th>
+                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">Date Logged</th>
+                    <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">Priority</th>
                     <th className="px-8 py-4 font-bold text-slate-400 text-[10px] uppercase tracking-widest text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {leasesData?.current.map((lease, i) => (
+                  {maintenanceData?.current.map((m, i) => (
                     <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                            {lease.tenant_type === 'company' ? <Building2 className="h-4 w-4 text-slate-500" /> : <User className="h-4 w-4 text-slate-500" />}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">
-                              {lease.tenant_type === 'company' ? lease.company_name : `${lease.first_name} ${lease.last_name}`}
-                            </p>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">{lease.tenant_type}</p>
-                          </div>
-                        </div>
+                        <p className="font-bold text-slate-900">{m.title}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">{m.category}</p>
                       </td>
                       <td className="px-8 py-5">
-                        <p className="font-bold text-slate-900">{lease.unit_code}</p>
-                        <p className="text-xs text-slate-400 font-medium">{lease.building_name}</p>
+                        <p className="font-bold text-slate-900">{m.unit_code}</p>
+                        <p className="text-xs text-slate-400 font-medium">{m.building_name}</p>
                       </td>
                       <td className="px-8 py-5 text-center font-medium text-slate-600">
-                        {format(new Date(lease.lease_start), 'MMM dd, yyyy')}
+                        {format(new Date(m.created_at), 'MMM dd, yyyy')}
                       </td>
-                      <td className="px-8 py-5 text-center font-medium text-slate-600">
-                        {lease.lease_end ? format(new Date(lease.lease_end), 'MMM dd, yyyy') : 'Ongoing'}
-                      </td>
-                      <td className="px-8 py-5 text-right font-black text-slate-900">
-                        ${lease.rent_amount.toLocaleString()}
+                      <td className="px-8 py-5 text-center">
+                        <span className={cn(
+                          "px-2 py-1 rounded-lg text-[10px] font-bold uppercase",
+                          m.priority === 'high' ? "bg-rose-50 text-rose-700" : m.priority === 'medium' ? "bg-amber-50 text-amber-700" : "bg-teal-50 text-teal-700"
+                        )}>
+                          {m.priority}
+                        </span>
                       </td>
                       <td className="px-8 py-5 text-center">
                         <span className={cn(
                           "px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
-                          lease.status === 'active' ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
+                          m.status === 'completed' || m.status === 'resolved' ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-600"
                         )}>
-                          {lease.status}
+                          {m.status}
                         </span>
                       </td>
                     </tr>

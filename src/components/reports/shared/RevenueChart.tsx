@@ -1,3 +1,4 @@
+//src/components/reports/shared/RevenueChart.tsx
 'use client'
 
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell, YAxis, CartesianGrid } from 'recharts'

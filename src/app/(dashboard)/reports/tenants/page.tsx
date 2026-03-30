@@ -1,3 +1,4 @@
+//src/app/(dashboard)/reports/tenants/page.tsx
 'use client'
 export const dynamic = 'force-dynamic'
 
