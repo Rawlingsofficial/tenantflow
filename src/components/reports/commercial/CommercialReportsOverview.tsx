@@ -4,7 +4,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { loadPortfolioData, getCommercialKPIs, getCommercialRevenue } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KpiCard } from '@/components/ui/kpi-card'
@@ -43,11 +42,8 @@ export default function CommercialReportsOverview() {
     if (!orgId) return
     setLoading(true)
     try {
-      const token = await getToken({ template: 'supabase' })
-      const supabase = getSupabaseBrowserClient(token ?? undefined)
-      
       const [portfolio, kpiData, rev] = await Promise.all([
-        loadPortfolioData(supabase, orgId),
+        loadPortfolioData(orgId),
         getCommercialKPIs(orgId, dateRange.startDate, dateRange.endDate),
         getCommercialRevenue(orgId, dateRange.startDate, dateRange.endDate)
       ])
@@ -60,7 +56,7 @@ export default function CommercialReportsOverview() {
     } finally {
       setLoading(false)
     }
-  }, [orgId, getToken, dateRange])
+  }, [orgId, dateRange])
 
   useEffect(() => {
     loadData()

@@ -37,7 +37,7 @@ export default function DashboardPage() {
       const token = await getToken({ template: 'supabase' })
       const supabase = getSupabaseBrowserClient(token ?? undefined)
       // Layering date filters on top of existing query logic
-      const portfolio = await loadPortfolioData(supabase as any, orgId!, dateRange.startDate, dateRange.endDate)
+      const portfolio = await loadPortfolioData(orgId!, dateRange.startDate, dateRange.endDate)
       
       const isCommercial = currentOrg?.property_type === 'commercial'
       const today = new Date()

@@ -1,10 +1,9 @@
-//src/app/(dashboard)/reports/mixed/page.tsx
+//src/app/(dashboard)/reports/residential/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { loadPortfolioData } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -59,7 +58,7 @@ function StatCard({ label, value, sub, color, icon: Icon, trend }: {
 }
 
 // ─── Report nav card ──────────────────────────────────────────────────────────
-function ReportCard({ title, sub, stat, statLabel, href, color, icon: Icon, router }: {
+function ReportCard({ title, stat, statLabel, href, color, icon: Icon, router }: {
   title: string; sub: string; stat: string; statLabel: string;
   href: string; color: string; icon: React.ComponentType<{ className?: string }>;
   router: ReturnType<typeof useRouter>
@@ -78,7 +77,6 @@ function ReportCard({ title, sub, stat, statLabel, href, color, icon: Icon, rout
         <Icon className={`h-4.5 w-4.5 ${c.text}`} />
       </div>
       <p className="text-sm font-bold text-gray-900 leading-tight">{title}</p>
-      <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">{sub}</p>
       <div className="flex items-end justify-between mt-4 pt-3.5 border-t border-gray-50">
         <div>
           <p className={`text-xl font-bold ${c.text}`}>{stat}</p>
@@ -93,12 +91,11 @@ function ReportCard({ title, sub, stat, statLabel, href, color, icon: Icon, rout
 export default function ResidentialReportsPage() {
   const { orgId } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
   const [data, setData] = useState<PortfolioData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (orgId) loadPortfolioData(supabase, orgId).then(d => { setData(d); setLoading(false) })
+    if (orgId) loadPortfolioData(orgId).then(d => { setData(d); setLoading(false) })
   }, [orgId])
 
   if (loading) return (
@@ -170,11 +167,6 @@ export default function ResidentialReportsPage() {
   }).sort((a, b) => b.monthly - a.monthly)
 
   const expiredLeases = activeLeases.filter(l => l.lease_end && differenceInDays(new Date(l.lease_end), now) < 0)
-  const expiringSoon  = activeLeases.filter(l => {
-    if (!l.lease_end) return false
-    const d = differenceInDays(new Date(l.lease_end), now)
-    return d >= 0 && d <= 30
-  })
   const unpaidThisMonth = activeLeases.filter(l =>
     !data.payments.some(p => p.lease_id === l.id && p.status === 'completed' && p.payment_date?.startsWith(thisMonth))
   )
@@ -240,14 +232,14 @@ export default function ResidentialReportsPage() {
 
       {/* ── 4 report nav cards ── */}
       <div className="px-6 grid grid-cols-4 gap-3 mb-5">
-        <ReportCard title="Revenue" sub="Collections, outstanding & trends" stat={`$${collectedThisMonth.toLocaleString()}`}
-          statLabel="collected this month" href="/reports/revenue" color="emerald" icon={DollarSign} router={router} />
-        <ReportCard title="Occupancy" sub="Vacancies, turnaround & health" stat={`${occupancyRate}%`}
-          statLabel="occupied" href="/reports/occupancy" color="blue" icon={Home} router={router} />
-        <ReportCard title="Tenants" sub="Payment habits & reliability" stat={`${data.tenants.filter(t => t.status === 'active').length}`}
-          statLabel="active tenants" href="/reports/tenants" color="violet" icon={Users} router={router} />
-        <ReportCard title="Lease Health" sub="Expirations, renewals & rent" stat={`${activeLeases.length}`}
-          statLabel="active leases" href="/reports/leases" color="amber" icon={FileText} router={router} />
+        <ReportCard title="Revenue" stat={`$${collectedThisMonth.toLocaleString()}`}
+          statLabel="collected this month" href="/reports/revenue" color="emerald" icon={DollarSign} router={router} sub="Collections, outstanding & trends" />
+        <ReportCard title="Occupancy" stat={`${occupancyRate}%`}
+          statLabel="occupied" href="/reports/occupancy" color="blue" icon={Home} router={router} sub="Vacancies, turnaround & health" />
+        <ReportCard title="Tenants" stat={`${data.tenants.filter((t: any) => t.status === 'active').length}`}
+          statLabel="active tenants" href="/reports/tenants" color="violet" icon={Users} router={router} sub="Payment habits & reliability" />
+        <ReportCard title="Lease Health" stat={`${activeLeases.length}`}
+          statLabel="active leases" href="/reports/leases" color="amber" icon={FileText} router={router} sub="Expirations, renewals & rent" />
       </div>
 
       {/* ── Revenue chart ── */}
@@ -387,7 +379,7 @@ export default function ResidentialReportsPage() {
             <div className="grid grid-cols-3 gap-3">
               {[
                 { label: 'Vacant Units', value: vacantUnits, color: 'text-amber-600', bg: 'bg-amber-50' },
-                { label: 'Maintenance', value: data.units.filter(u => u.status === 'maintenance').length, color: 'text-red-500', bg: 'bg-red-50' },
+                { label: 'Maintenance', value: data.units.filter((u: any) => u.status === 'maintenance').length, color: 'text-red-500', bg: 'bg-red-50' },
                 { label: 'Occupancy', value: `${occupancyRate}%`, color: occupancyRate >= 80 ? 'text-emerald-600' : 'text-amber-600', bg: occupancyRate >= 80 ? 'bg-emerald-50' : 'bg-amber-50' },
               ].map(k => (
                 <div key={k.label} className={`${k.bg} rounded-xl p-4 text-center`}>
@@ -403,5 +395,3 @@ export default function ResidentialReportsPage() {
     </div>
   )
 }
-
-

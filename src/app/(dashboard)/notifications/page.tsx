@@ -1,10 +1,10 @@
+// src/app/(dashboard)/notifications/page.tsx
 'use client'
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { loadPortfolioData } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
@@ -45,9 +45,7 @@ export default function NotificationsPage() {
   async function loadData() {
     setLoading(true)
     try {
-      const token = await getToken({ template: 'supabase' })
-      const supabase = getSupabaseBrowserClient(token ?? undefined)
-      const data = await loadPortfolioData(supabase as any, orgId!)
+      const data = await loadPortfolioData(orgId!)
       
       const generated: AppNotification[] = []
       const today = new Date()

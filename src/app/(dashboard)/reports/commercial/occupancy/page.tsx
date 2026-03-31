@@ -1,24 +1,23 @@
+//src/app/(dashboard)/reports/commercial/occupancy/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { loadPortfolioData } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, DollarSign, Layers, TrendingUp, AlertCircle } from 'lucide-react'
-import { format, subMonths, differenceInMonths } from 'date-fns'
+import { format, subMonths } from 'date-fns'
 import type { PortfolioData } from '@/types/reports'
 
 export default function CommercialRevenueReport() {
   const { orgId } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
   const [data, setData] = useState<PortfolioData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (orgId) loadPortfolioData(supabase, orgId).then(d => { setData(d); setLoading(false) })
+    if (orgId) loadPortfolioData(orgId).then(d => { setData(d); setLoading(false) })
   }, [orgId])
 
   if (loading) return (
@@ -41,8 +40,7 @@ export default function CommercialRevenueReport() {
   const collectedThisMonth = completed.filter(p => p.payment_date?.startsWith(thisMonth)).reduce((s, p) => s + Number(p.amount), 0)
   const outstanding = Math.max(0, totalRunRate - collectedThisMonth)
   const collectionRate = totalRunRate > 0 ? Math.round((collectedThisMonth / totalRunRate) * 100) : 0
-  const allTime = completed.reduce((s, p) => s + Number(p.amount), 0)
-
+  
   const months12 = Array.from({ length: 12 }, (_, i) => {
     const m = subMonths(now, 11 - i)
     const ms = format(m, 'yyyy-MM')
@@ -51,7 +49,6 @@ export default function CommercialRevenueReport() {
   })
   const maxVal = Math.max(...months12.map(m => m.val), 1)
 
-  // Lease-by-lease breakdown
   // Lease-by-lease breakdown
 const leaseBreakdown = activeLeases.map(l => {
   const tenant = data.tenants.find(t => t.id === l.tenant_id)
@@ -159,7 +156,7 @@ const leaseBreakdown = activeLeases.map(l => {
             <thead>
               <tr className="border-b border-white/[0.04]">
                 {['Tenant', 'Unit', 'Base Rent', 'NNN/CAM', 'Total Due', 'Paid', 'Owes'].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-5">{h}</th>
+                  <th key={h} className="px-4 py-2.5 text-left text-[9px] font-semibold tracking-[0.1em] text-gray-600 uppercase first:px-6">{h}</th>
                 ))}
                </tr>
             </thead>
@@ -167,7 +164,7 @@ const leaseBreakdown = activeLeases.map(l => {
               {leaseBreakdown.map(l => (
                 <tr key={l.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] cursor-pointer"
                   onClick={() => router.push(`/leases/${l.id}`)}>
-                  <td className="px-5 py-3 text-sm font-semibold text-gray-200">{l.tenant || '—'}</td>
+                  <td className="px-6 py-3 text-sm font-semibold text-gray-200">{l.tenant || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{l.unit} · {l.building}</td>
                   <td className="px-4 py-3 text-sm text-gray-300">${l.baseRent.toLocaleString()}</td>
                   <td className="px-4 py-3 text-sm text-indigo-400">{l.nnn > 0 ? `$${l.nnn.toLocaleString()}` : '—'}</td>

@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { loadPortfolioData } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KpiCard } from '@/components/ui/kpi-card'
@@ -14,7 +13,7 @@ import { format, subMonths } from 'date-fns'
 import type { PortfolioData } from '@/types/reports'
 
 export default function CommercialRevenueReport() {
-  const { orgId, getToken } = useAuth()
+  const { orgId } = useAuth()
   const router = useRouter()
   const [data, setData] = useState<PortfolioData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -24,9 +23,7 @@ export default function CommercialRevenueReport() {
       if (!orgId) return
       setLoading(true)
       try {
-        const token = await getToken({ template: 'supabase' })
-        const supabase = getSupabaseBrowserClient(token ?? undefined)
-        const d = await loadPortfolioData(supabase, orgId)
+        const d = await loadPortfolioData(orgId)
         setData(d)
       } catch (err) {
         console.error('Error loading commercial revenue data:', err)
@@ -35,7 +32,7 @@ export default function CommercialRevenueReport() {
       }
     }
     load()
-  }, [orgId, getToken])
+  }, [orgId])
 
   if (loading) return (
     <div className="min-h-screen bg-[#080a0f] p-6 space-y-4">

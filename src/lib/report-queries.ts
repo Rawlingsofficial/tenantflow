@@ -778,11 +778,12 @@ export async function getLeasesKPIs(
  * PORTFOLIO DATA (DASHBOARD)
  */
 export async function loadPortfolioData(
-  supabase: any,
   orgId: string,
   startDate?: string,
   endDate?: string
 ): Promise<any> {
+  const supabase = createServerClient()
+  
   // Step 1 — buildings for this org
   let buildingsQuery = supabase
     .from('buildings')
@@ -806,10 +807,10 @@ export async function loadPortfolioData(
     : { data: [] }
 
   if (buildingIds.length > 0 && startDate && endDate) {
-    unitsQuery = unitsQuery.gte('created_at', startDate).lte('created_at', endDate)
+    unitsQuery = (unitsQuery as any).gte('created_at', startDate).lte('created_at', endDate)
   }
 
-  const { data: units } = await unitsQuery
+  const { data: units } = await (unitsQuery as any)
 
   // Step 3 — leases for this org
   let leasesQuery = supabase
@@ -844,10 +845,10 @@ export async function loadPortfolioData(
     : { data: [] }
 
   if (leaseIds.length > 0 && startDate && endDate) {
-    paymentsQuery = paymentsQuery.gte('payment_date', startDate).lte('payment_date', endDate)
+    paymentsQuery = (paymentsQuery as any).gte('payment_date', startDate).lte('payment_date', endDate)
   }
 
-  const { data: payments } = await paymentsQuery
+  const { data: payments } = await (paymentsQuery as any)
 
   // Step 5 — tenants for this org
   const { data: tenants } = await supabase
@@ -856,7 +857,7 @@ export async function loadPortfolioData(
     .eq('organization_id', orgId)
 
   const buildingMap = Object.fromEntries((buildings ?? []).map((b: any) => [b.id, b]))
-  const enrichedUnits = (units ?? []).map((u: any) => ({
+  const enrichedUnits = ((units as any[]) ?? []).map((u: any) => ({
     ...u,
     buildings: buildingMap[u.building_id] ?? null,
   }))
@@ -869,6 +870,7 @@ export async function loadPortfolioData(
     tenants: (tenants ?? []) as any[],
   }
 }
+
 
 
 

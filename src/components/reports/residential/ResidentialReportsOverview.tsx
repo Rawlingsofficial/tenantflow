@@ -73,7 +73,7 @@ export default function ResidentialReportsOverview() {
       const supabase = getSupabaseBrowserClient(token ?? undefined)
       
       const [portfolio, kpiData, rev] = await Promise.all([
-        loadPortfolioData(supabase, orgId),
+        loadPortfolioData(orgId),
         getResidentialKPIs(orgId, dateRange.startDate, dateRange.endDate),
         getResidentialRevenue(orgId, dateRange.startDate, dateRange.endDate)
       ])

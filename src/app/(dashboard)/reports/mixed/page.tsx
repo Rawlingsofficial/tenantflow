@@ -4,7 +4,6 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
 import { loadPortfolioData } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, Building2, MapPin, AlertCircle } from 'lucide-react'
@@ -14,12 +13,11 @@ import type { PortfolioData } from '@/types/reports'
 export default function CommercialOccupancyReport() {
   const { orgId } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
   const [data, setData] = useState<PortfolioData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (orgId) loadPortfolioData(supabase, orgId).then(d => { setData(d); setLoading(false) })
+    if (orgId) loadPortfolioData(orgId).then(d => { setData(d); setLoading(false) })
   }, [orgId])
 
   if (loading) return (
