@@ -119,7 +119,7 @@ export default function CommercialPortfolioReport() {
                   const bOccGLA = bUnits.filter((u: any) => u.status === 'occupied').reduce((s: number, u: any) => s + Number(u.area_sqm || 0), 0)
                   const bRate = bGLA > 0 ? Math.round((bOccGLA / bGLA) * 100) : 0
                   
-                  const bLeases = activeLeases.filter((l: any) => bUnits.some(u => u.id === l.unit_id))
+                  const bLeases = activeLeases.filter((l: any) => bUnits.some((u: any) => u.id === l.unit_id))
                   const bBase = bLeases.reduce((s: number, l: any) => s + Number(l.rent_amount), 0)
                   const bNNN = bLeases.reduce((s: number, l: any) => s + Number(l.service_charge || 0), 0)
 
