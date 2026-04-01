@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,7 @@ interface Building {
 
 export function AddUnitDialog({ open, buildingId, buildingName, onClose, onSuccess }: AddUnitDialogProps) {
   const { orgId } = useAuth();
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
 
   const [buildings, setBuildings] = useState<Building[]>([]);
   const [selectedBuildingType, setSelectedBuildingType] = useState<string>("residential");

@@ -16,6 +16,7 @@ export const translations = {
       maintenance: 'Maintenance',
       notifications: 'Notifications',
       reports: 'Reports',
+      authentication: 'Authentication',
       settings: 'Settings',
     },
     groups: {

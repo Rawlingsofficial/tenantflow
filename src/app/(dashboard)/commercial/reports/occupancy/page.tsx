@@ -4,14 +4,14 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, Building2 } from 'lucide-react'
 
 export default function CommercialOccupancyReportPage() {
   const { orgId } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const [loading, setLoading] = useState(true)
   const [buildings, setBuildings] = useState<any[]>([])
   const [units, setUnits] = useState<any[]>([])

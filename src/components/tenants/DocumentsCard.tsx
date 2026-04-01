@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { Upload, FileText, Trash2, Loader2, Eye, Image, File } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import type { TenantDocument } from '@/types'
 
 interface Props {
@@ -24,7 +24,7 @@ function FileIcon({ url, type }: { url: string | null; type: string | null }) {
 }
 
 export default function DocumentsCard({ tenantId, documents, onUpdated }: Props) {
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [selectedType, setSelectedType] = useState('National ID')

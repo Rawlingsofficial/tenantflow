@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@/lib/supabase/client';
+import { useSupabaseWithAuth } from '@/lib/supabase/client';
 import { usePropertyType } from '@/hooks/usePropertyType';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,7 +21,7 @@ interface ListingFormProps { organizationId: string; }
 
 export default function ListingForm({ organizationId }: ListingFormProps) {
   const router = useRouter();
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
   const { propertyType } = usePropertyType();
   const isCommercial = propertyType === 'commercial';
 

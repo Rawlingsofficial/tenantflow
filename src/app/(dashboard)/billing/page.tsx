@@ -2,7 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs'
 import { useEffect, useState } from 'react'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import {
   Zap, Check, X, Building2, Users,
   FileText, CreditCard, BarChart3,
@@ -202,7 +202,7 @@ const FAQS = [
 
 export default function BillingPage() {
   const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const [org, setOrg] = useState<Organization | null>(null)
   const [stats, setStats] = useState({ units: 0, members: 0 })
   const [showXAF, setShowXAF] = useState(false)

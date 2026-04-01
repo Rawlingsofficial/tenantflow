@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ interface EditUnitDialogProps {
 }
 
 export function EditUnitDialog({ open, unit, onClose, onSuccess }: EditUnitDialogProps) {
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
   const [form, setForm] = useState({
     unit_code: unit.unit_code,
     unit_type: unit.unit_type || "flat",

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,6 +13,7 @@ import {
   DollarSign, AlertTriangle, CheckCircle2, Maximize2, Layers
 } from 'lucide-react'
 import { format, differenceInDays } from 'date-fns'
+import EditTenantDialog from '@/components/tenants/EditTenantDialog'
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
@@ -27,13 +28,14 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 export default function CompanyProfilePage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
 
   const [company, setCompany] = useState<any>(null)
   const [leases, setLeases] = useState<any[]>([])
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'overview' | 'leases' | 'invoices'>('overview')
+  const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => { if (id) load() }, [id])
 
@@ -112,10 +114,25 @@ export default function CompanyProfilePage() {
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="text-slate-800 font-semibold">{company.company_name}</span>
         </div>
-        <Button variant="outline" size="sm" className="rounded-xl gap-1.5 text-xs border-slate-200 text-slate-600">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setEditOpen(true)}
+          className="rounded-xl gap-1.5 text-xs border-slate-200 text-slate-600"
+        >
           <Edit className="h-3.5 w-3.5" /> Edit Company
         </Button>
       </motion.div>
+
+      {/* Edit Dialog */}
+      {company && (
+        <EditTenantDialog 
+          open={editOpen} 
+          onClose={() => setEditOpen(false)} 
+          onSaved={(updated) => { setCompany(updated); setEditOpen(false); }}
+          tenant={company}
+        />
+      )}
 
       {/* Hero card */}
       <motion.div

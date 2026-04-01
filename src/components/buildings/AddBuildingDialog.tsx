@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import {
   Dialog, DialogContent, DialogTitle,
 } from "@/components/ui/dialog";
@@ -26,7 +26,7 @@ interface AddBuildingDialogProps {
 
 export function AddBuildingDialog({ open, onClose, onSuccess }: AddBuildingDialogProps) {
   const { orgId } = useAuth();
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
   const { propertyType } = usePropertyType();
 
   const defaultBuildingType: "residential" | "commercial" =

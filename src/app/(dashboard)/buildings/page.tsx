@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import { AddBuildingDialog } from "@/components/buildings/AddBuildingDialog";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,7 @@ function SegmentBadge({ type }: { type: string }) {
 export default function BuildingsPage() {
   const { orgId, getToken } = useAuth();
   const { propertyType } = usePropertyType();
+  const supabase = useSupabaseWithAuth();
   const [buildings, setBuildings] = useState<BuildingWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -67,9 +68,6 @@ export default function BuildingsPage() {
     if (!orgId) return;
     setLoading(true);
     try {
-      const token = await getToken({ template: 'supabase' });
-      const supabase = createBrowserClient(token ?? undefined);
-      
       const { data, error } = await supabase
         .from("buildings")
         .select("id, name, address, status, photo_url, organization_id, building_type, region, division, city, units(id, status)")

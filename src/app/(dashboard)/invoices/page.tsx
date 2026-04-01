@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,6 +29,7 @@ export default function InvoicesPage() {
   const { orgId, getToken } = useAuth()
   const router = useRouter()
   const { propertyType } = usePropertyType()
+  const supabase = useSupabaseWithAuth()
 
   const [invoices, setInvoices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,8 +43,6 @@ export default function InvoicesPage() {
   async function handleRunBilling() {
     if (!orgId) return
     setRunningBilling(true)
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const promise = generateMonthlyInvoices(supabase, orgId)
     
     toast.promise(promise, {
@@ -64,8 +63,6 @@ export default function InvoicesPage() {
 
   async function load() {
     setLoading(true)
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data } = await (supabase as any)
       .from('invoices')
       .select(`*, leases(rent_amount, service_charge, tenant_id, unit_id,
@@ -82,8 +79,6 @@ export default function InvoicesPage() {
 
   async function quickUpdate(id: string, status: string, e: React.MouseEvent) {
     e.stopPropagation()
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
     await (supabase as any).from('invoices').update({
       status,
       ...(status === 'paid' ? { paid_date: new Date().toISOString().split('T')[0] } : {})

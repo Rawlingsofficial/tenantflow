@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Loader2
 } from 'lucide-react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +27,7 @@ import {
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useSupabaseWithAuth } from '@/lib/supabase/client';
 
 interface UnitOption {
   id: string;
@@ -45,7 +45,7 @@ interface ImageFile {
 
 export default function ListingsManager() {
   const { orgId } = useAuth();
-  const supabase = getSupabaseBrowserClient();
+  const supabase = useSupabaseWithAuth();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

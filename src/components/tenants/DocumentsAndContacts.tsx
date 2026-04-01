@@ -2,12 +2,17 @@
 
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, FileText, Trash2, Loader2, Eye, Image, File, Plus, Pencil, Phone, User } from 'lucide-react'
+import { 
+  Upload, FileText, Trash2, Loader2, Eye, Image, 
+  File, Plus, Pencil, Phone, User, ExternalLink,
+  PlusCircle, Shield, AlertCircle
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import type { TenantDocument, TenantEmergencyContact } from '@/types'
+import { cn } from '@/lib/utils'
 
 // ─── Documents Card ───────────────────────────────────────────
 
@@ -15,10 +20,10 @@ const DOC_TYPES = ['National ID','Passport','Driver License','Passport Photo','E
 const ACCEPTED = ['image/jpeg','image/jpg','image/png','image/webp','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'].join(',')
 
 function FileIcon({ url }: { url: string | null }) {
-  if (!url) return <File className="h-4 w-4 text-slate-400" />
-  if (/\.(jpg|jpeg|png|webp|gif)$/i.test(url)) return <Image className="h-4 w-4 text-teal-500" />
-  if (/\.pdf$/i.test(url)) return <FileText className="h-4 w-4 text-red-400" />
-  return <File className="h-4 w-4 text-slate-400" />
+  if (!url) return <File className="h-5 w-5 text-slate-400" />
+  if (/\.(jpg|jpeg|png|webp|gif)$/i.test(url)) return <Image className="h-5 w-5 text-teal-500" />
+  if (/\.pdf$/i.test(url)) return <FileText className="h-5 w-5 text-rose-500" />
+  return <File className="h-5 w-5 text-slate-400" />
 }
 
 interface DocsProps {
@@ -28,7 +33,7 @@ interface DocsProps {
 }
 
 export function DocumentsCard({ tenantId, documents, onUpdated }: DocsProps) {
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [selectedType, setSelectedType] = useState('National ID')
@@ -43,15 +48,17 @@ export function DocumentsCard({ tenantId, documents, onUpdated }: DocsProps) {
       const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const fileName = `${tenantId}/${Date.now()}_${cleanName}`
       const { error: uploadErr } = await supabase.storage.from('tenant-documents').upload(fileName, file, { cacheControl: '3600', upsert: false, contentType: file.type })
-      if (uploadErr) throw new Error(`Upload failed: ${uploadErr.message}`)
+      if (uploadErr) throw uploadErr
+      
       const { data: urlData } = supabase.storage.from('tenant-documents').getPublicUrl(fileName)
-      const { data: doc, error: docErr } = await supabase.from('tenant_documents')
+      const { data: doc, error: docErr } = await (supabase as any).from('tenant_documents')
         .insert({ tenant_id: tenantId, document_type: selectedType, file_url: urlData.publicUrl } as any)
-        .select().single() as { data: TenantDocument | null; error: any }
-      if (docErr || !doc) throw new Error(docErr?.message || 'Failed to save document record')
-      onUpdated([...documents, doc]); setError('')
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+        .select().single()
+      
+      if (docErr) throw docErr
+      onUpdated([...documents, doc as TenantDocument]); setError('')
+    } catch (err: any) {
+      setError(err.message || 'Upload failed')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -59,77 +66,90 @@ export function DocumentsCard({ tenantId, documents, onUpdated }: DocsProps) {
   }
 
   async function handleDelete(doc: TenantDocument) {
+    if (!confirm('Permanently delete this document?')) return
     try {
       if (doc.file_url) {
         const url = new URL(doc.file_url)
         const pathParts = url.pathname.split('/tenant-documents/')
         if (pathParts.length > 1) await supabase.storage.from('tenant-documents').remove([pathParts[1].split('?')[0]])
       }
-      const { error: dbErr } = await supabase.from('tenant_documents').delete().eq('id', doc.id)
-      if (dbErr) throw new Error(dbErr.message)
+      const { error: dbErr } = await (supabase as any).from('tenant_documents').delete().eq('id', doc.id)
+      if (dbErr) throw dbErr
       onUpdated(documents.filter((d) => d.id !== doc.id))
     } catch (err) { console.error('Delete failed:', err) }
   }
 
-  const isImage = (url: string) => /\.(jpg|jpeg|png|webp|gif)$/i.test(url)
-
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-      <div className="px-4 pt-4 pb-3 border-b border-slate-100">
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Documents</p>
+    <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden flex flex-col">
+      <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
+        <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+          <FileText className="h-4 w-4 text-teal-600" /> Vital Documents
+        </h3>
+        <Button 
+          size="sm" 
+          variant="outline" 
+          className="h-8 rounded-xl border-slate-200 font-bold text-slate-600 text-[10px] uppercase tracking-wider"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <Plus className="h-3 w-3 mr-1.5" />}
+          Add New
+        </Button>
+        <input ref={fileRef} type="file" className="hidden" accept={ACCEPTED} onChange={handleUpload} />
       </div>
-      <div className="px-4 py-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <select className="flex-1 h-9 px-3 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400 text-slate-700"
-            value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
+
+      <div className="p-6 flex-1 flex flex-col">
+        <div className="flex gap-2 mb-6">
+          <select 
+            className="flex-1 h-10 px-4 text-sm font-semibold border border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all text-slate-700"
+            value={selectedType} 
+            onChange={(e) => setSelectedType(e.target.value)}
+          >
             {DOC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
-          <Button size="sm" variant="outline" className="h-9 text-xs shrink-0 rounded-xl border-slate-200"
-            onClick={() => fileRef.current?.click()} disabled={uploading}>
-            {uploading
-              ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Uploading…</>
-              : <><Upload className="h-3 w-3 mr-1" />Upload</>}
-          </Button>
-          <input ref={fileRef} type="file" className="hidden" accept={ACCEPTED} onChange={handleUpload} />
         </div>
-        <p className="text-[10px] text-slate-400">JPG, PNG, PDF, DOC · Max 10MB</p>
 
-        {error && <p className="text-xs text-red-500 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">{error}</p>}
+        {error && (
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-100 rounded-2xl text-xs font-bold text-rose-600 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" /> {error}
+          </div>
+        )}
 
         {documents.length === 0 ? (
-          <div className="text-center py-6 border border-dashed border-slate-200 rounded-xl">
-            <FileText className="h-7 w-7 mx-auto mb-2 text-slate-300" />
-            <p className="text-xs text-slate-400">No documents uploaded yet</p>
-            <button className="text-xs text-teal-600 hover:text-teal-700 font-semibold mt-1" onClick={() => fileRef.current?.click()}>
-              Upload first document
-            </button>
+          <div className="flex-1 flex flex-col items-center justify-center py-10 border-2 border-dashed border-slate-100 rounded-[24px] bg-slate-50/30">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center mb-3">
+              <Upload className="h-6 w-6 text-slate-200" />
+            </div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No documents</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {documents.map((doc) => (
-              <motion.div key={doc.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-100 bg-slate-50/70 hover:bg-slate-100/60 transition-colors">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {doc.file_url && isImage(doc.file_url) ? (
-                    <img src={doc.file_url} alt={doc.document_type ?? 'document'} className="h-10 w-10 rounded-xl object-cover border border-slate-200 shrink-0" />
-                  ) : (
-                    <div className="h-10 w-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                      <FileIcon url={doc.file_url} />
-                    </div>
-                  )}
+              <motion.div 
+                key={doc.id} 
+                initial={{ opacity: 0, scale: 0.95 }} 
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-teal-200 transition-all group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-10 w-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                    <FileIcon url={doc.file_url} />
+                  </div>
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold text-slate-900">{doc.document_type}</p>
-                    <p className="text-xs text-slate-400 truncate max-w-[140px]">{doc.file_url?.split('/').pop()?.split('?')[0] ?? 'file'}</p>
+                    <p className="text-sm font-bold text-slate-900 leading-tight">{doc.document_type}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5 truncate">
+                      {doc.file_url?.split('/').pop()?.split('_').pop()?.split('?')[0] || 'View file'}
+                    </p>
                   </div>
                 </div>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   {doc.file_url && (
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-lg" onClick={() => window.open(doc.file_url!, '_blank')}>
-                      <Eye className="h-3.5 w-3.5 text-slate-400" />
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50" onClick={() => window.open(doc.file_url!, '_blank')}>
+                      <ExternalLink className="h-4 w-4" />
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-lg" onClick={() => handleDelete(doc)}>
-                    <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(doc)}>
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </motion.div>
@@ -152,7 +172,7 @@ interface ContactsProps {
 const emptyForm = { full_name: '', phone: '', relationship: '' }
 
 export function EmergencyContactsCard({ tenantId, contacts, onUpdated }: ContactsProps) {
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const [adding, setAdding] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -175,71 +195,81 @@ export function EmergencyContactsCard({ tenantId, contacts, onUpdated }: Contact
         const { data, error: err } = await (supabase as any)
           .from('tenant_emergency_contacts')
           .update({ full_name: form.full_name.trim(), phone: form.phone.trim() || null, relationship: form.relationship.trim() || null })
-          .eq('id', editId).select().single() as { data: TenantEmergencyContact | null; error: any }
-        if (err || !data) throw new Error(err?.message)
-        onUpdated(contacts.map((c) => c.id === editId ? data : c))
+          .eq('id', editId).select().single()
+        if (err) throw err
+        onUpdated(contacts.map((c) => c.id === editId ? data as TenantEmergencyContact : c))
       } else {
-        const { data, error: err } = await supabase
+        const { data, error: err } = await (supabase as any)
           .from('tenant_emergency_contacts')
           .insert({ tenant_id: tenantId, full_name: form.full_name.trim(), phone: form.phone.trim() || null, relationship: form.relationship.trim() || null } as any)
-          .select().single() as { data: TenantEmergencyContact | null; error: any }
-        if (err || !data) throw new Error(err?.message)
-        onUpdated([...contacts, data])
+          .select().single()
+        if (err) throw err
+        onUpdated([...contacts, data as TenantEmergencyContact])
       }
       setAdding(false); setEditId(null)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
+    } catch (err: any) {
+      setError(err.message || 'Failed to save')
     } finally { setLoading(false) }
   }
 
   async function handleDelete(contactId: string) {
-    await supabase.from('tenant_emergency_contacts').delete().eq('id', contactId)
+    if (!confirm('Delete this contact?')) return
+    await (supabase as any).from('tenant_emergency_contacts').delete().eq('id', contactId)
     onUpdated(contacts.filter((c) => c.id !== contactId))
   }
 
-  const inputClass = "h-8 text-xs rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-400/25 focus:border-teal-400"
+  const inputClass = "h-10 text-sm rounded-xl border-slate-200 focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 bg-white"
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-      <div className="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Emergency Contacts</p>
+    <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden">
+      <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
+        <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+          <Shield className="h-4 w-4 text-teal-600" /> Emergency Contacts
+        </h3>
         {!adding && (
-          <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl border-slate-200 gap-1" onClick={startAdd}>
-            <Plus className="h-3 w-3" /> Add
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="h-8 rounded-xl border-slate-200 font-bold text-slate-600 text-[10px] uppercase tracking-wider" 
+            onClick={startAdd}
+          >
+            <Plus className="h-3 w-3 mr-1.5" /> Add
           </Button>
         )}
       </div>
-      <div className="px-4 py-4 space-y-3">
+
+      <div className="p-6">
         <AnimatePresence>
           {adding && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-              className="overflow-hidden"
+              className="overflow-hidden mb-6"
             >
-              <div className="border border-teal-200 bg-teal-50/60 rounded-xl p-3 space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Full name *</Label>
-                    <Input placeholder="Jane Doe" className={inputClass} value={form.full_name} onChange={(e) => set('full_name', e.target.value)} />
+              <div className="p-5 rounded-[24px] bg-slate-50 border border-slate-100 space-y-4 shadow-inner">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Full Name *</Label>
+                    <Input placeholder="e.g. Jane Doe" className={inputClass} value={form.full_name} onChange={(e) => set('full_name', e.target.value)} />
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Phone</Label>
-                    <Input placeholder="+237 6XX XXX XXX" className={inputClass} value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Phone</Label>
+                    <Input placeholder="+1 (555) 000-0000" className={inputClass} value={form.phone} onChange={(e) => set('phone', e.target.value)} />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Relationship</Label>
-                  <Input placeholder="e.g. Spouse, Parent, Sibling" className={inputClass} value={form.relationship} onChange={(e) => set('relationship', e.target.value)} />
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Relationship</Label>
+                  <Input placeholder="e.g. Spouse, Parent, Lawyer" className={inputClass} value={form.relationship} onChange={(e) => set('relationship', e.target.value)} />
                 </div>
-                {error && <p className="text-xs text-red-500">{error}</p>}
-                <div className="flex gap-2">
-                  <Button size="sm" className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-sm" onClick={handleSave} disabled={loading}>
-                    {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : editId ? 'Save' : 'Add contact'}
+                
+                {error && <p className="text-xs font-bold text-rose-600">{error}</p>}
+                
+                <div className="flex gap-2 pt-2">
+                  <Button size="sm" className="h-9 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs px-5 shadow-sm" onClick={handleSave} disabled={loading}>
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : editId ? 'Update Contact' : 'Save Contact'}
                   </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs rounded-xl border-slate-200" onClick={() => { setAdding(false); setEditId(null) }}>Cancel</Button>
+                  <Button size="sm" variant="ghost" className="h-9 rounded-xl text-slate-500 font-bold text-xs px-4" onClick={() => { setAdding(false); setEditId(null) }}>Cancel</Button>
                 </div>
               </div>
             </motion.div>
@@ -247,35 +277,44 @@ export function EmergencyContactsCard({ tenantId, contacts, onUpdated }: Contact
         </AnimatePresence>
 
         {contacts.length === 0 && !adding ? (
-          <p className="text-xs text-slate-400 text-center py-4">No emergency contacts added</p>
+          <div className="py-10 text-center bg-slate-50/30 border-2 border-dashed border-slate-100 rounded-[24px]">
+            <Phone className="h-8 w-8 text-slate-200 mx-auto mb-2" />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No contacts added</p>
+          </div>
         ) : (
-          contacts.map((contact) => (
-            <motion.div key={contact.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-              className="flex items-start justify-between gap-2 p-3 rounded-xl border border-slate-100 bg-slate-50/70">
-              <div className="flex items-start gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#1B3B6F]/8 to-teal-500/8 border border-slate-200/60 flex items-center justify-center shrink-0">
-                  <User className="h-3.5 w-3.5 text-slate-400" />
+          <div className="space-y-3">
+            {contacts.map((contact) => (
+              <motion.div 
+                key={contact.id} 
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-start justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-teal-200 transition-all group"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                    <User className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-900 leading-tight">{contact.full_name}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-teal-600 mt-1">{contact.relationship || 'Contact'}</p>
+                    {contact.phone && (
+                      <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mt-1.5">
+                        <Phone className="h-3 w-3" /> {contact.phone}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">{contact.full_name}</p>
-                  {contact.relationship && <p className="text-xs text-teal-600 font-medium">{contact.relationship}</p>}
-                  {contact.phone && (
-                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                      <Phone className="h-3 w-3" /> {contact.phone}
-                    </p>
-                  )}
+                <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50" onClick={() => startEdit(contact)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(contact.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 rounded-lg" onClick={() => startEdit(contact)}>
-                  <Pencil className="h-3 w-3 text-slate-400" />
-                </Button>
-                <Button size="sm" variant="ghost" className="h-6 w-6 p-0 rounded-lg" onClick={() => handleDelete(contact.id)}>
-                  <Trash2 className="h-3 w-3 text-red-400" />
-                </Button>
-              </div>
-            </motion.div>
-          ))
+              </motion.div>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import TenantProfile from '@/components/tenants/TenantProfile'
 import EditTenantDialog from '@/components/tenants/EditTenantDialog'
@@ -13,14 +13,17 @@ import type {
   TenantEmergencyContact, TenantDocument
 } from '@/types'
 
-export default function TenantProfilePage() {
+export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { orgId, getToken } = useAuth()
+  const supabase = useSupabaseWithAuth()
 
-  const [tenant, setTenant] = useState<Tenant | null>(null)
+  const [tenant, setTenant] = useState<any>(null)
+
   const [leases, setLeases] = useState<LeaseWithDetails[]>([])
   const [contacts, setContacts] = useState<TenantEmergencyContact[]>([])
   const [documents, setDocuments] = useState<TenantDocument[]>([])
+  const [identifications, setIdentifications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [editDialog, setEditDialog] = useState(false)
@@ -32,13 +35,10 @@ export default function TenantProfilePage() {
 
   async function loadAll() {
     setLoading(true)
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
-
-    const [tenantRes, leasesRes, contactsRes, docsRes] = await Promise.all([
+    const [tenantRes, leasesRes, contactsRes, docsRes, idsRes] = await Promise.all([
       supabase
         .from('tenants')
-        .select('*')
+        .select('*, users(clerk_user_id)')
         .eq('id', id)
         .single() as any,
 
@@ -65,19 +65,23 @@ export default function TenantProfilePage() {
         .from('tenant_documents')
         .select('*')
         .eq('tenant_id', id),
+
+      supabase
+        .from('tenant_identifications')
+        .select('*')
+        .eq('tenant_id', id),
     ])
 
     setTenant(tenantRes.data ?? null)
     setLeases((leasesRes.data as LeaseWithDetails[]) ?? [])
     setContacts((contactsRes.data as TenantEmergencyContact[]) ?? [])
     setDocuments((docsRes.data as TenantDocument[]) ?? [])
+    setIdentifications(idsRes.data ?? [])
     setLoading(false)
   }
 
   async function handleArchive() {
   if (!tenant) return
-  const token = await getToken({ template: 'supabase' });
-  const supabase = getSupabaseBrowserClient(token ?? undefined);
   await (supabase as any)
     .from('tenants')
     .update({ status: 'inactive' })
@@ -115,6 +119,7 @@ export default function TenantProfilePage() {
         leases={leases}
         contacts={contacts}
         documents={documents}
+        identifications={identifications}
         onEdit={() => setEditDialog(true)}
         onArchive={handleArchive}
         onCreateLease={() => setLeaseDialog(true)}
@@ -126,8 +131,9 @@ export default function TenantProfilePage() {
       <EditTenantDialog
         open={editDialog}
         onClose={() => setEditDialog(false)}
-        onSaved={(updated) => setTenant(updated)}
+        onSaved={(updated) => { setTenant(updated); loadAll(); }}
         tenant={tenant}
+        identification={identifications[0]}
       />
 
       <AssignTenantDialog

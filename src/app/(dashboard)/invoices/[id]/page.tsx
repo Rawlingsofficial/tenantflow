@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, CheckCircle2, Send, Building2, Phone, Mail, Receipt } from 'lucide-react'
@@ -14,6 +14,7 @@ export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { getToken } = useAuth()
   const router = useRouter()
+  const supabase = useSupabaseWithAuth()
 
   const [invoice, setInvoice] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -22,8 +23,6 @@ export default function InvoiceDetailPage() {
 
   async function load() {
     setLoading(true)
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data } = await (supabase as any)
       .from('invoices')
       .select(`*, leases(*, tenants(*), units(*, buildings(*)))`)
@@ -33,8 +32,6 @@ export default function InvoiceDetailPage() {
   }
 
   async function updateStatus(status: string) {
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
     await (supabase as any).from('invoices').update({
       status,
       ...(status === 'paid' ? { paid_date: new Date().toISOString().split('T')[0] } : {})

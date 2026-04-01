@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { format, differenceInDays } from 'date-fns'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import type { LeaseWithDetails, RentPayment } from '@/types'
 
 interface LeaseWithPayments extends LeaseWithDetails {
@@ -37,6 +37,7 @@ const IC = "h-9 text-sm rounded-xl border-slate-200 focus:ring-2 focus:ring-teal
 export default function LeaseDetailDialog({ open, onClose, lease, organizationId, onUpdated }: Props) {
   const router = useRouter()
   const { getToken } = useAuth()
+  const supabase = useSupabaseWithAuth()
   const [action, setAction] = useState<Action>(null)
   const [tab, setTab]       = useState<Tab>('overview')
   const [loading, setLoading] = useState(false)
@@ -53,8 +54,6 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
     if (!lease) return
     setLoading(true); setError('')
     try {
-      const token = await getToken({ template: 'supabase' });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
       await supabase.from('leases').update(val({ status: 'terminated' })).eq('id', lease.id)
       await supabase.from('units').update(val({ status: 'vacant' })).eq('id', lease.unit_id)
       onUpdated(); handleClose()
@@ -64,8 +63,6 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
     if (!lease) return
     setLoading(true); setError('')
     try {
-      const token = await getToken({ template: 'supabase' });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
       await supabase.from('leases').update(val({ status: 'ended', lease_end: new Date().toISOString().split('T')[0] })).eq('id', lease.id)
       await supabase.from('units').update(val({ status: 'vacant' })).eq('id', lease.unit_id)
       onUpdated(); handleClose()
@@ -76,8 +73,6 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
     if (!extendForm.new_end_date) { setError('New end date is required'); return }
     setLoading(true); setError('')
     try {
-      const token = await getToken({ template: 'supabase' });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
       const rent = extendForm.no_rent_change ? lease.rent_amount : parseFloat(extendForm.rent_amount)
       await supabase.from('leases').update(val({ lease_end: extendForm.new_end_date, rent_amount: rent })).eq('id', lease.id)
       onUpdated(); handleClose()
@@ -88,8 +83,6 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
     if (!renewForm.rent_amount || !renewForm.lease_start) { setError('Rent amount and start date required'); return }
     setLoading(true); setError('')
     try {
-      const token = await getToken({ template: 'supabase' });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
       await supabase.from('leases').update(val({ status: 'ended' })).eq('id', lease.id)
       await supabase.from('leases').insert(val({
         organization_id: organizationId, tenant_id: lease.tenant_id, unit_id: lease.unit_id,
@@ -104,8 +97,6 @@ export default function LeaseDetailDialog({ open, onClose, lease, organizationId
     if (!payForm.amount || !payForm.payment_date) { setError('Amount and date required'); return }
     setLoading(true); setError('')
     try {
-      const token = await getToken({ template: 'supabase' });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
       await supabase.from('rent_payments').insert(val({
         lease_id: lease.id, amount: parseFloat(payForm.amount),
         payment_date: payForm.payment_date, method: payForm.method || null,

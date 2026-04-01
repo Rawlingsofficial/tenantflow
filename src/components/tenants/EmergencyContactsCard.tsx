@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import type { TenantEmergencyContact } from '@/types'
 
 interface Props {
@@ -18,7 +18,7 @@ interface Props {
 const emptyForm = { full_name: '', phone: '', relationship: '' }
 
 export default function EmergencyContactsCard({ tenantId, contacts, onUpdated }: Props) {
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const [adding, setAdding] = useState(false)
   const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)

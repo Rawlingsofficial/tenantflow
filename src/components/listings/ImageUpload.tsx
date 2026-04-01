@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { X, GripVertical, UploadCloud, Loader2, ImagePlus } from 'lucide-react';
-import { createBrowserClient } from '@/lib/supabase/client';
+import { useSupabaseWithAuth } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface ImageItem {
@@ -21,7 +21,7 @@ interface ImageUploadProps {
 export function ImageUpload({ value = [], onChange, maxImages = 10, organizationId }: ImageUploadProps) {
   const images = value || [];
   const [uploading, setUploading] = useState(false);
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (images.length + acceptedFiles.length > maxImages) {

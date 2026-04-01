@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, Building2, User, Phone, Mail, X, Briefcase, Hash, Receipt } from 'lucide-react'
 
 function dbVal<T>(v: T): never { return v as never }
@@ -38,8 +39,10 @@ function SectionHeader({ icon: Icon, label }: { icon: any; label: string }) {
 
 export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
   const { orgId, getToken } = useAuth()
+  const supabase = useSupabaseWithAuth()
 
   const [form, setForm] = useState({
+    user_id: '',
     company_name: '', company_reg_number: '', vat_number: '',
     industry: '', company_size: '', contact_person: '', contact_role: '',
     primary_phone: '', email: '', notes: '',
@@ -53,11 +56,26 @@ export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
     if (!form.company_name.trim()) { setError('Company name is required'); return }
     setSaving(true); setError('')
     try {
-      const token = await getToken({ template: 'supabase' })
-      const supabase = getSupabaseBrowserClient(token ?? undefined)
-      
+      let internalUserId = null;
+      if (form.user_id.trim()) {
+        const { data: userData, error: userError } = await (supabase as any)
+          .from('users')
+          .select('id')
+          .eq('clerk_user_id', form.user_id.trim())
+          .maybeSingle();
+        
+        if (userError) throw userError;
+        if (!userData) {
+          setError('Tenant App ID not found. Please make sure the company representative has signed up for the app.');
+          setSaving(false);
+          return;
+        }
+        internalUserId = (userData as any).id;
+      }
+
       const { error: e } = await supabase.from('tenants').insert(dbVal({
         organization_id: orgId!,
+        user_id: internalUserId,
         tenant_type: 'company',
         company_name: form.company_name.trim(),
         company_reg_number: form.company_reg_number || null,
@@ -75,7 +93,7 @@ export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
       }))
       if (e) throw new Error(e.message)
       onSaved()
-      setForm({ company_name: '', company_reg_number: '', vat_number: '', industry: '',
+      setForm({ user_id: '', company_name: '', company_reg_number: '', vat_number: '', industry: '',
         company_size: '', contact_person: '', contact_role: '', primary_phone: '', email: '', notes: '' })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -107,6 +125,16 @@ export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+          {/* System ID */}
+          <div>
+            <Label className="text-[11px] font-semibold text-teal-600 uppercase tracking-wider mb-1.5 block">
+              System ID (Tenant App ID) <span className="text-slate-400 font-normal lowercase tracking-normal">(optional)</span>
+            </Label>
+            <Input placeholder="Leave blank if representative hasn't registered yet..." value={form.user_id}
+              onChange={(e) => set('user_id', e.target.value)} className={`${inputClass} border-teal-100 bg-teal-50/30`} />
+            <p className="text-[10px] text-slate-400 mt-1">If left blank, it will auto-link later when they register with the same email.</p>
+          </div>
+
           {/* Company details */}
           <div>
             <SectionHeader icon={Building2} label="Company Details" />
@@ -141,17 +169,21 @@ export default function AddCompanyDialog({ open, onClose, onSaved }: Props) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Industry</Label>
-                  <select value={form.industry} onChange={e => set('industry', e.target.value)} className={selectClass}>
-                    <option value="">Select industry…</option>
-                    {INDUSTRIES.map(i => <option key={i}>{i}</option>)}
-                  </select>
+                  <Select value={form.industry} onValueChange={(v: string | null) => set('industry', v ?? '')}>
+                    <SelectTrigger className={inputClass}><SelectValue placeholder="Select industry…" /></SelectTrigger>
+                    <SelectContent>
+                      {INDUSTRIES.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Company Size</Label>
-                  <select value={form.company_size} onChange={e => set('company_size', e.target.value)} className={selectClass}>
-                    <option value="">Select size…</option>
-                    {SIZES.map(s => <option key={s}>{s} employees</option>)}
-                  </select>
+                  <Select value={form.company_size} onValueChange={(v: string | null) => set('company_size', v ?? '')}>
+                    <SelectTrigger className={inputClass}><SelectValue placeholder="Select size…" /></SelectTrigger>
+                    <SelectContent>
+                      {SIZES.map(s => <SelectItem key={s} value={s}>{s} employees</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

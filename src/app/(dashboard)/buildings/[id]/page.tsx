@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { AddUnitDialog } from "@/components/buildings/AddUnitDialog";
 import { UnitHistoryDialog } from "@/components/buildings/UnitHistoryDialog";
 import { EditBuildingDialog } from "@/components/buildings/EditBuildingDialog";
@@ -58,6 +58,7 @@ export default function BuildingDetailPage() {
   const router = useRouter();
   const { orgId, getToken } = useAuth();
   const { propertyType } = usePropertyType();
+  const supabase = useSupabaseWithAuth();
 
   const isCommercial = propertyType === "commercial";
 
@@ -76,9 +77,6 @@ export default function BuildingDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const token = await getToken({ template: 'supabase' });
-      const supabase = createBrowserClient(token ?? undefined);
-
       const { data: bData } = await supabase
         .from("buildings")
         .select("*")
@@ -98,7 +96,7 @@ export default function BuildingDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id, getToken]);
+  }, [id, supabase]);
 
   useEffect(() => {
     fetchData();

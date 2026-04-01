@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowLeft, TrendingUp, Receipt, CheckCircle2, AlertCircle } from 'lucide-react'
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
@@ -12,7 +12,7 @@ import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 export default function CommercialRevenueReportPage() {
   const { orgId } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const [loading, setLoading] = useState(true)
   const [invoices, setInvoices] = useState<any[]>([])
   const [leases, setLeases] = useState<any[]>([])

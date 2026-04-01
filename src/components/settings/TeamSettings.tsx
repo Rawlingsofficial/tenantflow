@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { useRole } from "@/hooks/useRole";
 import { hasPermission } from "@/lib/permissions";
 import { toast } from "sonner";
@@ -71,6 +71,7 @@ export default function TeamSettings() {
   const { orgId, getToken } = useAuth();
   const { user } = useUser();
   const { role: myRole } = useRole();
+  const supabase = useSupabaseWithAuth();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -92,9 +93,6 @@ export default function TeamSettings() {
     if (!orgId) return;
     setLoading(true);
     try {
-      const token = await getToken({ template: "supabase" });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
-
       const { data, error } = await (supabase as any)
         .from("organization_memberships")
         .select(`id, user_id, role, status, users ( full_name, email, phone )`)
@@ -109,7 +107,7 @@ export default function TeamSettings() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, getToken]);
+  }, [orgId, supabase]);
 
   useEffect(() => {
     fetchMembers();
@@ -132,9 +130,6 @@ export default function TeamSettings() {
 
   async function handleRoleChange(memberId: string, newRole: Role) {
     try {
-      const token = await getToken({ template: "supabase" });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
-
       const { error } = await (supabase as any)
         .from("organization_memberships")
         .update({ role: newRole })
@@ -151,9 +146,6 @@ export default function TeamSettings() {
   async function handleRemove(memberId: string) {
     if (!confirm("Are you sure you want to remove this member?")) return;
     try {
-      const token = await getToken({ template: "supabase" });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
-
       const { error } = await (supabase as any)
         .from("organization_memberships")
         .update({ status: "inactive" })

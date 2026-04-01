@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { useOrgStore, type OrgData } from "@/store/orgStore";
 import { useRole } from "@/hooks/useRole";
 import { hasPermission } from "@/lib/permissions";
@@ -46,6 +46,7 @@ const PROPERTY_TYPES: {
 
 export default function OrgSettings() {
   const { orgId, getToken } = useAuth();
+  const supabase = useSupabaseWithAuth();
   const { currentOrg, setCurrentOrg } = useOrgStore();
   const { role, loading: roleLoading } = useRole();
 
@@ -67,9 +68,6 @@ export default function OrgSettings() {
   async function fetchOrg() {
     setLoading(true);
     try {
-      const token = await getToken({ template: "supabase" });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
-
       const { data, error } = await (supabase as any)
         .from("organizations")
         .select("name, country, property_type")
@@ -93,9 +91,6 @@ export default function OrgSettings() {
     if (!orgId) return;
     setSaving(true);
     try {
-      const token = await getToken({ template: "supabase" });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
-
       const { error } = await (supabase as any)
         .from("organizations")
         .update({ name, country, property_type: propertyType })

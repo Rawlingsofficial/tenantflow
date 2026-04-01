@@ -15,7 +15,7 @@ import { useOrgStore } from '@/store/orgStore'
 import { usePropertyType } from '@/hooks/usePropertyType'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +45,7 @@ export default function TopNav() {
   const { currentOrg, userRole } = useOrgStore()
   const { propertyType } = usePropertyType()
   const { t, language, setLanguage } = useTranslation()
+  const supabase = useSupabaseWithAuth()
   
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -67,8 +68,6 @@ export default function TopNav() {
     if (!orgId) return
     const fetchUnread = async () => {
       try {
-        const token = await getToken({ template: 'supabase' })
-        const supabase = getSupabaseBrowserClient(token ?? undefined)
         // Just mock some unread notifications from DB if real events don't exist
         const { count, error } = await supabase
           .from('notifications')
@@ -89,7 +88,7 @@ export default function TopNav() {
     fetchUnread()
     const interval = setInterval(fetchUnread, 30000)
     return () => clearInterval(interval)
-  }, [orgId, getToken])
+  }, [orgId, supabase])
 
   if (!mounted) return null
 

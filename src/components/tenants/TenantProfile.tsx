@@ -8,19 +8,22 @@ import {
   Calendar, User, Archive, Plus, Pencil,
   AlertCircle, FileText, Camera, Loader2,
   Home, DollarSign, Clock, CheckCircle2, Key,
-  TrendingUp, Shield
+  TrendingUp, Shield, ArrowUpRight, Building2,
+  CreditCard, Layers, ArrowRight, Wallet
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { format, differenceInMonths, differenceInDays } from 'date-fns'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
-import type { Tenant, LeaseWithDetails, TenantEmergencyContact, TenantDocument } from '@/types'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
+import type { Tenant, LeaseWithDetails, TenantEmergencyContact, TenantDocument, TenantIdentification } from '@/types'
 import { DocumentsCard, EmergencyContactsCard } from './DocumentsAndContacts'
+import { cn } from '@/lib/utils'
 
 interface Props {
   tenant: Tenant
   leases: LeaseWithDetails[]
   contacts: TenantEmergencyContact[]
   documents: TenantDocument[]
+  identifications: TenantIdentification[]
   onEdit: () => void
   onArchive: () => void
   onCreateLease: () => void
@@ -30,49 +33,62 @@ interface Props {
 }
 
 const leaseStatusConfig: Record<string, { bg: string; text: string; dot: string }> = {
-  active:     { bg: 'bg-teal-50', text: 'text-teal-700', dot: 'bg-teal-500' },
+  active:     { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   ended:      { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400' },
-  terminated: { bg: 'bg-red-50', text: 'text-red-600', dot: 'bg-red-500' },
+  terminated: { bg: 'bg-rose-50', text: 'text-rose-600', dot: 'bg-rose-500' },
 }
 
-function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value: string | null | undefined }) {
-  if (!value) return null
+function ProfileStat({ label, value, icon: Icon, color }: { label: string; value: string | number; icon: any; color: string }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-slate-50 last:border-0">
-      <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-        <Icon className="h-3.5 w-3.5 text-slate-400" />
+    <div className="bg-white p-5 rounded-3xl border border-slate-200/60 shadow-sm flex items-center gap-4">
+      <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shrink-0", color)}>
+        <Icon className="h-5 w-5" />
       </div>
       <div>
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{label}</p>
-        <p className="text-sm text-slate-800 font-medium mt-0.5">{value}</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">{label}</p>
+        <p className="text-lg font-black text-slate-900 leading-none">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function InfoBlock({ icon: Icon, label, value }: { icon: any; label: string; value: string | null | undefined }) {
+  if (!value) return null
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0">
+        <Icon className="h-4 w-4 text-slate-400" />
+      </div>
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
+        <p className="text-sm font-semibold text-slate-700">{value}</p>
       </div>
     </div>
   )
 }
 
 export default function TenantProfile({
-  tenant, leases, contacts, documents,
+  tenant, leases, contacts, documents, identifications,
   onEdit, onArchive, onCreateLease,
   onContactsUpdated, onDocumentsUpdated, onTenantUpdated
 }: Props) {
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
   const photoRef = useRef<HTMLInputElement>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoError, setPhotoError] = useState('')
   const [photoUrl, setPhotoUrl] = useState<string | null>((tenant as any).photo_url ?? null)
 
-  const fullName = `${tenant.first_name ?? ''} ${tenant.last_name ?? ''}`.trim() || 'Unknown'
-  const initials = `${tenant.first_name?.[0] ?? ''}${tenant.last_name?.[0] ?? ''}`.toUpperCase()
+  const isCompany = tenant.tenant_type === 'company'
+  const fullName = isCompany 
+    ? (tenant.company_name || 'Unnamed Company')
+    : `${tenant.first_name ?? ''} ${tenant.last_name ?? ''}`.trim() || 'Unknown Tenant'
+  
+  const initials = isCompany 
+    ? fullName[0] 
+    : `${tenant.first_name?.[0] ?? ''}${tenant.last_name?.[0] ?? ''}`.toUpperCase()
+
   const activeLease = leases.find((l) => l.status === 'active')
-
-  const tenancyMonths = activeLease ? differenceInMonths(new Date(), new Date(activeLease.lease_start)) : null
-  const now = new Date()
-  const leaseEnd = activeLease?.lease_end ? new Date(activeLease.lease_end) : null
-  const daysUntilEnd = leaseEnd ? differenceInDays(leaseEnd, now) : null
-  const isOverdue = leaseEnd && leaseEnd < now
-  const isDueSoon = daysUntilEnd !== null && daysUntilEnd >= 0 && daysUntilEnd <= 30
-
   const totalPaid = leases.reduce((sum, l) => {
     return sum + ((l as any).rent_payments?.filter((p: any) => p.status === 'completed')
       ?.reduce((s: number, p: any) => s + Number(p.amount), 0) ?? 0)
@@ -88,334 +104,326 @@ export default function TenantProfile({
       const fileName = `${tenant.id}/avatar.${ext}`
       await supabase.storage.from('tenant-avatars').remove([fileName])
       const { error: uploadErr } = await supabase.storage.from('tenant-avatars').upload(fileName, file, { upsert: true, contentType: file.type })
-      if (uploadErr) throw new Error(uploadErr.message)
+      if (uploadErr) throw uploadErr
       const { data: urlData } = supabase.storage.from('tenant-avatars').getPublicUrl(fileName)
       const url = `${urlData.publicUrl}?t=${Date.now()}`
       setPhotoUrl(url)
       const { data: updated } = await (supabase as any).from('tenants').update({ photo_url: url }).eq('id', tenant.id).select().single()
       if (updated) onTenantUpdated(updated as Tenant)
-    } catch (err: unknown) {
-      setPhotoError(err instanceof Error ? err.message : 'Upload failed')
+    } catch (err: any) {
+      setPhotoError(err.message || 'Upload failed')
     } finally {
       setUploadingPhoto(false)
       if (photoRef.current) photoRef.current.value = ''
     }
   }
 
+  const primaryId = identifications?.[0]
+
   return (
-    <div className="min-h-screen bg-slate-50/70 pb-12">
-      {/* Back */}
-      <div className="px-6 pt-5 pb-4">
-        <button onClick={() => router.push('/tenants')}
-          className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition-colors">
-          <ArrowLeft className="h-4 w-4" /> Back to tenants
+    <div className="min-h-screen bg-slate-50/50 pb-20">
+      {/* Navigation & Actions Bar */}
+      <div className="px-6 py-6 flex items-center justify-between">
+        <button 
+          onClick={() => router.push('/tenants')}
+          className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-teal-600 transition-colors group"
+        >
+          <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center group-hover:border-teal-200 group-hover:bg-teal-50 transition-all">
+            <ArrowLeft className="h-4 w-4" />
+          </div>
+          Back to Directory
         </button>
+
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={onEdit} className="h-10 rounded-2xl border-slate-200 font-bold text-slate-600 px-5 hover:bg-white hover:border-teal-500 hover:text-teal-600 transition-all">
+            <Pencil className="h-4 w-4 mr-2" /> Edit Profile
+          </Button>
+          <Button onClick={onCreateLease} className="h-10 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl px-6 shadow-lg shadow-teal-600/20 active:scale-[0.98] transition-all">
+            <Plus className="h-4 w-4 mr-2" /> New Lease
+          </Button>
+          {tenant.status === 'active' && (
+            <Button variant="ghost" onClick={onArchive} className="h-10 rounded-2xl text-rose-500 hover:bg-rose-50 hover:text-rose-600 font-bold px-4 transition-all">
+              <Archive className="h-4 w-4 mr-2" /> Archive
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Hero card */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="px-6 mb-5"
-      >
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-          {/* Gradient top bar */}
-          <div className="h-1 w-full bg-gradient-to-r from-[#1B3B6F] via-teal-500 to-teal-400" />
-
-          <div className="p-6">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-5">
-                {/* Avatar */}
-                <div className="relative shrink-0">
-                  <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-100 shadow-sm">
-                    {photoUrl ? (
-                      <img src={photoUrl} alt={fullName} className="w-full h-full object-cover" onError={() => setPhotoUrl(null)} />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-[#1B3B6F] to-[#2a4f8f] flex items-center justify-center text-2xl font-bold text-[#14b8a6]">
-                        {initials || <User className="h-8 w-8" />}
-                      </div>
-                    )}
+      <div className="px-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Left Column: Profile Card & Quick Info */}
+        <div className="lg:col-span-1 space-y-6">
+          
+          {/* Main Identity Card */}
+          <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden p-8 text-center relative">
+            <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-teal-500/5 to-transparent pointer-events-none" />
+            
+            <div className="relative inline-block mb-6">
+              <div className="w-32 h-32 rounded-[40px] bg-gradient-to-br from-slate-100 to-slate-200 border-4 border-white shadow-xl overflow-hidden">
+                {photoUrl ? (
+                  <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-4xl font-black text-slate-300">
+                    {initials || '?'}
                   </div>
-                  <button onClick={() => photoRef.current?.click()} disabled={uploadingPhoto}
-                    className="absolute -bottom-1.5 -right-1.5 w-7 h-7 rounded-full bg-teal-600 hover:bg-teal-700 border-2 border-white flex items-center justify-center shadow-sm transition-colors">
-                    {uploadingPhoto ? <Loader2 className="h-3 w-3 text-white animate-spin" /> : <Camera className="h-3 w-3 text-white" />}
-                  </button>
-                  <input ref={photoRef} type="file" className="hidden" accept="image/jpeg,image/jpg,image/png,image/webp" onChange={handlePhotoUpload} />
+                )}
+              </div>
+              <button 
+                onClick={() => photoRef.current?.click()}
+                className="absolute -bottom-2 -right-2 w-10 h-10 rounded-2xl bg-white border border-slate-200 shadow-lg flex items-center justify-center text-teal-600 hover:scale-110 transition-transform active:scale-95"
+              >
+                {uploadingPhoto ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+              </button>
+              <input ref={photoRef} type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
+            </div>
+
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{fullName}</h2>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className={cn(
+                "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border",
+                tenant.status === 'active' ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-slate-100 text-slate-500 border-slate-200"
+              )}>
+                {tenant.status}
+              </span>
+              <span className="text-xs font-bold text-slate-400 px-3 py-1 bg-slate-50 rounded-full border border-slate-100">
+                {tenant.tenant_type}
+              </span>
+            </div>
+
+            <div className="mt-8 pt-8 border-t border-slate-100 grid grid-cols-1 gap-6 text-left">
+              <InfoBlock icon={Mail} label="Email Address" value={tenant.email} />
+              <InfoBlock icon={Phone} label="Primary Phone" value={tenant.primary_phone} />
+              <InfoBlock icon={MapPin} label="Region / Country" value={tenant.country} />
+              {isCompany ? (
+                <InfoBlock icon={Briefcase} label="Industry" value={tenant.industry} />
+              ) : (
+                <InfoBlock icon={Briefcase} label="Occupation" value={tenant.occupation} />
+              )}
+            </div>
+          </div>
+
+          {/* Emergency Contacts Section */}
+          <EmergencyContactsCard tenantId={tenant.id} contacts={contacts} onUpdated={onContactsUpdated} />
+        </div>
+
+        {/* Right Column: Dynamic Content & Leases */}
+        <div className="lg:col-span-2 space-y-6">
+          
+          {/* Top Stats Bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <ProfileStat label="Total Payments" value={`$${totalPaid.toLocaleString()}`} icon={CreditCard} color="bg-emerald-50 text-emerald-600" />
+            <ProfileStat 
+              label="Active Unit" 
+              value={activeLease ? (activeLease as any).units?.unit_code : 'None'} 
+              icon={Home} 
+              color="bg-teal-50 text-teal-600" 
+            />
+            <ProfileStat 
+              label="Documents" 
+              value={documents.length} 
+              icon={Layers} 
+              color="bg-indigo-50 text-indigo-600" 
+            />
+          </div>
+
+          {/* Active Lease Detail Card */}
+          {activeLease ? (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-[#1B3B6F] rounded-[32px] p-8 text-white relative overflow-hidden shadow-2xl shadow-slate-900/20"
+            >
+              <div className="absolute right-0 top-0 w-96 h-96 bg-white/5 rounded-full -mr-48 -mt-48 blur-3xl" />
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-10">
+                  <div className="flex gap-4 items-center">
+                    <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/10 shadow-inner">
+                      <Key className="h-7 w-7 text-[#14b8a6]" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-400 mb-1">Active Lease Agreement</p>
+                      <h3 className="text-2xl font-black tracking-tight">{(activeLease as any).units?.unit_code} • {(activeLease as any).units?.buildings?.name}</h3>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">Monthly Rent</p>
+                    <p className="text-3xl font-black text-teal-400">${Number(activeLease.rent_amount).toLocaleString()}</p>
+                  </div>
                 </div>
 
-                {/* Info */}
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <h1 className="text-xl font-bold text-slate-900">{fullName}</h1>
-                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full inline-flex items-center gap-1.5 ${
-                      tenant.status === 'active'
-                        ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                        : 'bg-slate-100 text-slate-500 border border-slate-200'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${tenant.status === 'active' ? 'bg-teal-500 animate-pulse' : 'bg-slate-400'}`} />
-                      {tenant.status}
-                    </span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Lease Start</p>
+                    <p className="text-sm font-bold">{format(new Date(activeLease.lease_start), 'MMM dd, yyyy')}</p>
                   </div>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    {tenant.occupation ?? 'No occupation listed'}
-                    {tenant.employer_name && ` · ${tenant.employer_name}`}
-                  </p>
-                  {photoError && <p className="text-xs text-red-500 mt-1">{photoError}</p>}
-
-                  {/* Quick pills */}
-                  <div className="flex items-center gap-2 mt-2.5 flex-wrap">
-                    {tenant.primary_phone && (
-                      <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
-                        <Phone className="h-3 w-3" /> {tenant.primary_phone}
-                      </span>
-                    )}
-                    {tenant.email && (
-                      <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
-                        <Mail className="h-3 w-3" /> {tenant.email}
-                      </span>
-                    )}
-                    {tenant.country && (
-                      <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
-                        <MapPin className="h-3 w-3" /> {tenant.country}
-                      </span>
-                    )}
-                    {activeLease && (
-                      <span className="flex items-center gap-1 text-xs text-teal-700 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
-                        <Home className="h-3 w-3" />
-                        {(activeLease as any).units?.unit_code} · {(activeLease as any).units?.buildings?.name}
-                      </span>
-                    )}
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Lease End</p>
+                    <p className="text-sm font-bold">
+                      {activeLease.lease_end ? format(new Date(activeLease.lease_end), 'MMM dd, yyyy') : 'Open Ended'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Payment Terms</p>
+                    <p className="text-sm font-bold">{activeLease.payment_terms || 30} Days Net</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-2">Service Charge</p>
+                    <p className="text-sm font-bold">${Number(activeLease.service_charge || 0).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
+            </motion.div>
+          ) : (
+            <div className="bg-white rounded-[32px] border border-dashed border-slate-300 p-12 text-center">
+              <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-4">
+                <FileText className="h-8 w-8 text-slate-300" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">No active lease found</h3>
+              <p className="text-slate-500 mb-6">This tenant is currently not assigned to any property.</p>
+              <Button onClick={onCreateLease} className="bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-2xl px-8 h-11 transition-all shadow-lg shadow-teal-600/20">
+                Create Lease Now
+              </Button>
+            </div>
+          )}
 
-              {/* Actions */}
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={onEdit} className="h-8 text-xs rounded-xl border-slate-200 gap-1.5">
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Button>
-                <Button size="sm" onClick={onCreateLease}
-                  className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs rounded-xl gap-1.5 shadow-sm">
-                  <Plus className="h-3.5 w-3.5" /> New Lease
-                </Button>
-                {tenant.status === 'active' && (
-                  <Button variant="outline" size="sm" onClick={onArchive}
-                    className="h-8 text-xs rounded-xl gap-1.5 border-red-200 text-red-600 hover:bg-red-50">
-                    <Archive className="h-3.5 w-3.5" /> Archive
-                  </Button>
+          {/* Secondary Info Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Background & Identification */}
+            <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden flex flex-col">
+              <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-teal-600" /> Documentation
+                </h3>
+              </div>
+              <div className="p-6 space-y-6 flex-1">
+                {primaryId ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{primaryId.id_type}</p>
+                      <p className="text-lg font-black text-slate-900">{primaryId.id_number}</p>
+                      <div className="flex gap-4 mt-3 pt-3 border-t border-slate-200/60">
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Issuing Country</p>
+                          <p className="text-xs font-bold text-slate-700">{primaryId.issuing_country || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Expiry Date</p>
+                          <p className="text-xs font-bold text-slate-700">
+                            {primaryId.expiry_date ? format(new Date(primaryId.expiry_date), 'MMM dd, yyyy') : 'No expiry'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">No identification documents linked.</p>
+                )}
+                
+                <div className="h-px bg-slate-50" />
+                
+                {!isCompany && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Marital Status</p>
+                      <p className="text-sm font-bold text-slate-700 capitalize">{tenant.marital_status || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Date of Birth</p>
+                      <p className="text-sm font-bold text-slate-700">
+                        {tenant.date_of_birth ? format(new Date(tenant.date_of_birth), 'MMM dd, yyyy') : '—'}
+                      </p>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Stats row */}
-            <div className="grid grid-cols-4 gap-3 mt-5 pt-5 border-t border-slate-100">
-              {[
-                { label: 'Monthly Rent', value: activeLease ? `$${Number(activeLease.rent_amount).toLocaleString()}` : '—', color: 'text-slate-800' },
-                { label: 'Tenancy', value: tenancyMonths !== null ? `${tenancyMonths}mo` : '—', color: 'text-slate-800' },
-                { label: 'Total Paid', value: totalPaid > 0 ? `$${totalPaid.toLocaleString()}` : '—', color: 'text-teal-600' },
-                {
-                  label: 'Lease Status',
-                  value: isOverdue ? 'Overdue' : isDueSoon ? `${daysUntilEnd}d left` : activeLease ? 'Active' : 'No lease',
-                  color: isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : activeLease ? 'text-teal-600' : 'text-slate-400'
-                },
-              ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-                  <p className={`text-lg font-bold mt-0.5 tabular-nums ${stat.color}`}>{stat.value}</p>
-                </div>
-              ))}
+            {/* Documents Card (File Storage) */}
+            <DocumentsCard tenantId={tenant.id} documents={documents} onUpdated={onDocumentsUpdated} />
+          </div>
+
+          {/* Internal Notes Card */}
+          <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-slate-50 flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Internal Management Notes</h3>
+            </div>
+            <div className="p-6">
+              {tenant.notes ? (
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{tenant.notes}</p>
+              ) : (
+                <p className="text-sm text-slate-400 italic">No management notes have been recorded for this tenant yet.</p>
+              )}
             </div>
           </div>
-        </div>
-      </motion.div>
 
-      {/* Active lease banner */}
-      {activeLease && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.35 }}
-          className="px-6 mb-5"
-        >
-          <div className={`rounded-2xl border p-4 flex items-center justify-between ${
-            isOverdue ? 'bg-red-50 border-red-200' :
-            isDueSoon ? 'bg-amber-50 border-amber-200' :
-            'bg-teal-50 border-teal-200'
-          }`}>
-            <div className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isOverdue ? 'bg-red-100' : isDueSoon ? 'bg-amber-100' : 'bg-teal-100'}`}>
-                <Key className={`h-4 w-4 ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-teal-600'}`} />
-              </div>
-              <div>
-                <p className={`text-sm font-semibold ${isOverdue ? 'text-red-700' : isDueSoon ? 'text-amber-700' : 'text-teal-700'}`}>
-                  {isOverdue ? 'Lease Overdue' : isDueSoon ? `Lease expires in ${daysUntilEnd} days` : 'Active Lease'}
-                </p>
-                <p className={`text-xs ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : 'text-teal-500'}`}>
-                  {(activeLease as any).units?.unit_code} · {(activeLease as any).units?.buildings?.name} ·{' '}
-                  ${Number(activeLease.rent_amount).toLocaleString()}/mo ·{' '}
-                  Started {format(new Date(activeLease.lease_start), 'MMM d, yyyy')}
-                  {activeLease.lease_end && ` · Ends ${format(new Date(activeLease.lease_end), 'MMM d, yyyy')}`}
-                </p>
-              </div>
+          {/* Full Lease History Table */}
+          <div className="bg-white rounded-[32px] border border-slate-200/60 shadow-sm overflow-hidden">
+            <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between">
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-400" /> Complete Lease History
+              </h3>
             </div>
-            <Button size="sm" onClick={onCreateLease} variant="outline"
-              className={`h-7 text-xs rounded-xl ${
-                isOverdue ? 'border-red-200 text-red-700 hover:bg-red-100' :
-                isDueSoon ? 'border-amber-200 text-amber-700 hover:bg-amber-100' :
-                'border-teal-200 text-teal-700 hover:bg-teal-100'
-              }`}>
-              Renew Lease
-            </Button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Info grid */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.35 }}
-        className="px-6 grid grid-cols-3 gap-4 mb-4"
-      >
-        {/* Contact */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 pt-4 pb-3 border-b border-slate-100">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact Info</p>
-          </div>
-          <div className="px-4 pb-4 pt-2">
-            <InfoRow icon={Phone} label="Primary Phone" value={tenant.primary_phone} />
-            <InfoRow icon={Phone} label="Secondary Phone" value={tenant.secondary_phone} />
-            <InfoRow icon={Mail} label="Email" value={tenant.email} />
-            <InfoRow icon={MapPin} label="Country" value={tenant.country} />
-            {!tenant.primary_phone && !tenant.email && !tenant.country && (
-              <p className="text-xs text-slate-400 py-2">No contact info added</p>
-            )}
-          </div>
-        </div>
-
-        {/* Personal */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 pt-4 pb-3 border-b border-slate-100">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Personal Info</p>
-          </div>
-          <div className="px-4 pb-4 pt-2">
-            <InfoRow icon={Calendar} label="Date of Birth" value={tenant.date_of_birth ? format(new Date(tenant.date_of_birth), 'dd MMM yyyy') : null} />
-            <InfoRow icon={User} label="Marital Status" value={tenant.marital_status} />
-            <InfoRow icon={Briefcase} label="Occupation" value={tenant.occupation} />
-            <InfoRow icon={Briefcase} label="Employment Type" value={tenant.employment_type} />
-            <InfoRow icon={Briefcase} label="Employer" value={tenant.employer_name} />
-            <InfoRow icon={MapPin} label="Work Address" value={tenant.work_address} />
-            {!tenant.date_of_birth && !tenant.marital_status && !tenant.employer_name && (
-              <p className="text-xs text-slate-400 py-2">No personal info added</p>
-            )}
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-4 pt-4 pb-3 border-b border-slate-100 flex items-center gap-1.5">
-            <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Internal Notes</p>
-          </div>
-          <div className="px-4 pb-4 pt-3">
-            {tenant.notes ? (
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{tenant.notes}</p>
+            
+            {leases.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 italic">No historical records available.</div>
             ) : (
-              <p className="text-xs text-slate-400 italic">No internal notes. Edit tenant to add notes.</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 bg-slate-50/30">
+                      <th className="px-8 py-4">Unit</th>
+                      <th className="px-6 py-4">Period</th>
+                      <th className="px-6 py-4">Monthly Rent</th>
+                      <th className="px-6 py-4 text-center">Status</th>
+                      <th className="px-8 py-4 text-right"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {leases.map((l) => {
+                      const cfg = leaseStatusConfig[l.status] || leaseStatusConfig.ended
+                      return (
+                        <tr key={l.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-8 py-4">
+                            <p className="text-sm font-black text-slate-900 font-mono">{(l as any).units?.unit_code || '—'}</p>
+                            <p className="text-[11px] text-slate-400 font-bold uppercase">{(l as any).units?.buildings?.name}</p>
+                          </td>
+                          <td className="px-6 py-4 text-sm font-bold text-slate-600">
+                            {format(new Date(l.lease_start), 'MMM yyyy')} — {l.lease_end ? format(new Date(l.lease_end), 'MMM yyyy') : 'Present'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-black text-slate-900">${Number(l.rent_amount).toLocaleString()}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex justify-center">
+                              <span className={cn("inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border", cfg.bg, cfg.text)}>
+                                <div className={cn("w-1.5 h-1.5 rounded-full", cfg.dot)} />
+                                {l.status}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-4 text-right">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-8 w-8 p-0 rounded-lg text-slate-300 hover:text-teal-600 hover:bg-teal-50"
+                              onClick={() => router.push(`/leases/${l.id}`)}
+                            >
+                              <ArrowRight className="h-4 w-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
-      </motion.div>
-
-      {/* Documents + Emergency contacts */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.35 }}
-        className="px-6 grid grid-cols-2 gap-4 mb-4"
-      >
-        <DocumentsCard tenantId={tenant.id} documents={documents} onUpdated={onDocumentsUpdated} />
-        <EmergencyContactsCard tenantId={tenant.id} contacts={contacts} onUpdated={onContactsUpdated} />
-      </motion.div>
-
-      {/* Lease history */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25, duration: 0.35 }}
-        className="px-6"
-      >
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <div className="flex items-center gap-1.5">
-              <FileText className="h-3.5 w-3.5 text-slate-400" />
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Lease History</p>
-            </div>
-            <Button size="sm" onClick={onCreateLease}
-              className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white rounded-xl gap-1 shadow-sm">
-              <Plus className="h-3 w-3" /> New Lease
-            </Button>
-          </div>
-
-          {leases.length === 0 ? (
-            <div className="text-center py-10 text-slate-400">
-              <FileText className="h-8 w-8 mx-auto mb-2 opacity-20" />
-              <p className="text-sm font-medium text-slate-500">No leases found</p>
-              <Button size="sm" variant="outline" className="mt-3 text-xs rounded-xl border-slate-200" onClick={onCreateLease}>
-                Create first lease
-              </Button>
-            </div>
-          ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/60">
-                  <th className="px-5 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Unit</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Building</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Start</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">End</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Rent/mo</th>
-                  <th className="px-4 py-3 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leases.map((lease, i) => {
-                  const cfg = leaseStatusConfig[lease.status] ?? leaseStatusConfig.ended
-                  return (
-                    <motion.tr
-                      key={lease.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.3 + i * 0.04 }}
-                      className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors"
-                    >
-                      <td className="px-5 py-3">
-                        <span className="font-mono font-semibold text-slate-800">{(lease as any).units?.unit_code ?? '—'}</span>
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">{(lease as any).units?.buildings?.name ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-500">{format(new Date(lease.lease_start), 'dd MMM yyyy')}</td>
-                      <td className="px-4 py-3">
-                        {lease.lease_end
-                          ? <span className="text-slate-500">{format(new Date(lease.lease_end), 'dd MMM yyyy')}</span>
-                          : <span className="text-teal-600 font-medium text-[10px]">Open-ended</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-semibold text-slate-800 tabular-nums">${Number(lease.rent_amount).toLocaleString()}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                          {lease.status}
-                        </span>
-                      </td>
-                    </motion.tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

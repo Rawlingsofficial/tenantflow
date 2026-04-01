@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { X, User, Clock, DollarSign, Phone, CalendarRange } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
@@ -50,7 +50,7 @@ function StatusPill({ status }: { status: string }) {
 }
 
 export function UnitHistoryDialog({ open, unit, buildingName, onClose }: UnitHistoryDialogProps) {
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
   const [leases, setLeases] = useState<LeaseRecord[]>([]);
   const [loading, setLoading] = useState(true);
 

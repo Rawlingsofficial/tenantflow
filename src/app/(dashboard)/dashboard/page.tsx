@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { loadPortfolioData } from '@/lib/report-queries'
 import { useOrgStore } from '@/store/orgStore'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,6 +19,7 @@ import { DateRangeState } from '@/types/reports'
 export default function DashboardPage() {
   const { orgId, getToken } = useAuth()
   const { currentOrg } = useOrgStore()
+  const supabase = useSupabaseWithAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<any>(null)
 
@@ -34,8 +35,6 @@ export default function DashboardPage() {
 
     setLoading(true)
     try {
-      const token = await getToken({ template: 'supabase' })
-      const supabase = getSupabaseBrowserClient(token ?? undefined)
       // Layering date filters on top of existing query logic
       const portfolio = await loadPortfolioData(orgId!, dateRange.startDate, dateRange.endDate)
       

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { User, Mail, Phone as PhoneIcon, Shield, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 export default function AccountSettings() {
   const { user, isLoaded } = useUser();
   const { openUserProfile } = useClerk();
-  const supabase = getSupabaseBrowserClient();
+  const supabase = useSupabaseWithAuth();
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");

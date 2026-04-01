@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { loadPortfolioData, getResidentialKPIs, getResidentialRevenue } from '@/lib/report-queries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { KpiCard } from '@/components/ui/kpi-card'
@@ -53,8 +53,9 @@ function ReportNavCard({
 }
 
 export default function ResidentialReportsOverview() {
-  const { orgId, getToken } = useAuth()
+  const { orgId } = useAuth()
   const router = useRouter()
+  const supabase = useSupabaseWithAuth()
   const [data, setData] = useState<PortfolioData | null>(null)
   const [kpis, setKpis] = useState<ResidentialKPIs | null>(null)
   const [revenueData, setRevenueData] = useState<{ current: RevenueResidentialData[] } | null>(null)
@@ -69,9 +70,6 @@ export default function ResidentialReportsOverview() {
     if (!orgId) return
     setLoading(true)
     try {
-      const token = await getToken({ template: 'supabase' })
-      const supabase = getSupabaseBrowserClient(token ?? undefined)
-      
       const [portfolio, kpiData, rev] = await Promise.all([
         loadPortfolioData(orgId),
         getResidentialKPIs(orgId, dateRange.startDate, dateRange.endDate),
@@ -86,7 +84,7 @@ export default function ResidentialReportsOverview() {
     } finally {
       setLoading(false)
     }
-  }, [orgId, getToken, dateRange])
+  }, [orgId, dateRange])
 
   useEffect(() => {
     loadData()

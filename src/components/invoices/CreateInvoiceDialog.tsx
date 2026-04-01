@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@clerk/nextjs'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,7 +22,7 @@ interface Props {
 
 export default function CreateInvoiceDialog({ open, onClose, onSaved, preselectedLeaseId }: Props) {
   const { orgId } = useAuth()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
 
   const [leases, setLeases] = useState<any[]>([])
   const [selectedLeaseId, setSelectedLeaseId] = useState(preselectedLeaseId ?? '')

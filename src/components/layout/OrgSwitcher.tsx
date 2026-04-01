@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { getSupabaseBrowserClient } from '@/lib/supabase/client';
+import { useSupabaseWithAuth } from '@/lib/supabase/client';
 import { useOrgStore } from '@/store/orgStore';
 import { ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 export function OrgSwitcher() {
   const { getToken, userId } = useAuth();
   const { currentOrg, setCurrentOrg, setUserRole } = useOrgStore();
+  const supabase = useSupabaseWithAuth();
   const [orgs, setOrgs] = useState<Array<{ id: string; name: string; property_type: string | null }>>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -17,9 +18,6 @@ export function OrgSwitcher() {
   useEffect(() => {
     const fetchOrgs = async () => {
       if (!userId) return;
-      const token = await getToken({ template: 'supabase' });
-      if (!token) return;
-      const supabase = getSupabaseBrowserClient(token);
 
       const { data: userData, error: userError } = (await supabase
         .from('users')
@@ -72,7 +70,7 @@ export function OrgSwitcher() {
     };
 
     fetchOrgs();
-  }, [getToken, currentOrg, setCurrentOrg, setUserRole]);
+  }, [userId, currentOrg, setCurrentOrg, setUserRole, supabase]);
 
   const handleSelect = (org: typeof orgs[0]) => {
     // 🔥 FIX 3: Cast to 'any' to bypass strict Zustand store types

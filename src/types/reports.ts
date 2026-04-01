@@ -46,6 +46,9 @@ export interface OccupancyData {
   lease_start: string | null
   lease_end: string | null
   lease_status: string | null
+  unit_purpose?: string | null
+  unit_type?: string | null
+  default_rent?: number | null
 }
 
 export interface RevenueResidentialData {
@@ -55,6 +58,7 @@ export interface RevenueResidentialData {
   method: string | null
   rent_amount: number
   organization_id: string
+  lease_id?: string
 }
 
 export interface RevenueCommercialData {
@@ -66,6 +70,7 @@ export interface RevenueCommercialData {
   status: string
   escalation_rate: number | null
   organization_id: string
+  lease_id?: string
 }
 
 export interface LeaseReportData extends Lease {
@@ -76,6 +81,7 @@ export interface LeaseReportData extends Lease {
   unit_code: string
   area_sqm: number | null
   building_name: string
+  service_charge: number | null
 }
 
 export interface MaintenanceReportData extends MaintenanceRequest {

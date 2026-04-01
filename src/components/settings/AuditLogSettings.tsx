@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { Section, SettingsSkeleton } from "./AccountSettings";
 import { Activity, User, Clock, Search, Filter } from "lucide-react";
 import { format } from "date-fns";
@@ -17,6 +17,7 @@ type AuditLogWithUser = AuditLog & {
 
 export default function AuditLogSettings() {
   const { orgId, getToken } = useAuth();
+  const supabase = useSupabaseWithAuth();
 
   const [logs, setLogs] = useState<AuditLogWithUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,9 +27,6 @@ export default function AuditLogSettings() {
     if (!orgId) return;
     setLoading(true);
     try {
-      const token = await getToken({ template: "supabase" });
-      const supabase = getSupabaseBrowserClient(token ?? undefined);
-
       const { data, error } = await (supabase as any)
         .from("audit_logs")
         .select("*, users ( full_name, email )")
@@ -43,7 +41,7 @@ export default function AuditLogSettings() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, getToken]);
+  }, [orgId, supabase]);
 
   useEffect(() => {
     fetchLogs();

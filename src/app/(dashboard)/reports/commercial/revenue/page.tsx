@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -61,6 +61,7 @@ function PortfolioTag({ buildingType }: { buildingType?: string | null }) {
 export default function PaymentsPage() {
   const { orgId, getToken } = useAuth()
   const router = useRouter()
+  const supabase = useSupabaseWithAuth()
 
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,14 +74,13 @@ export default function PaymentsPage() {
 
   async function load() {
     setLoading(true)
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data: leaseRows } = await supabase
       .from('leases')
       .select(`id, rent_amount,
         tenants(first_name, last_name, photo_url, primary_phone, tenant_type, company_name),
         units(unit_code, buildings(name, building_type))`)
       .eq('organization_id', orgId!)
+
 
     if (!leaseRows || leaseRows.length === 0) { setPayments([]); setLoading(false); return }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSupabaseWithAuth } from "@/lib/supabase/client";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ interface EditBuildingDialogProps {
 }
 
 export function EditBuildingDialog({ open, building, onClose, onSuccess }: EditBuildingDialogProps) {
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
   const [form, setForm] = useState({
     name: building.name,
     address: building.address || "",

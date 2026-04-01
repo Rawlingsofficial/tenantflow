@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@/lib/supabase/client';
+import { useSupabaseWithAuth } from '@/lib/supabase/client';
 import { usePropertyType } from '@/hooks/usePropertyType';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,7 @@ interface EditListingFormProps {
 
 export default function EditListingForm({ listing, organizationId }: EditListingFormProps) {
   const router = useRouter();
-  const supabase = createBrowserClient();
+  const supabase = useSupabaseWithAuth();
   const { propertyType } = usePropertyType();
   const isCommercial = propertyType === 'commercial';
 

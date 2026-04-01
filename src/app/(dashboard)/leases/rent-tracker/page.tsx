@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -23,6 +23,7 @@ export default function RentTrackerPage() {
   const { orgId, getToken } = useAuth()
   const router    = useRouter()
   const { propertyType } = usePropertyType() // renamed from 'type'
+  const supabase = useSupabaseWithAuth()
 
   const isCommercial = propertyType === 'commercial'
 
@@ -37,8 +38,6 @@ export default function RentTrackerPage() {
 
   async function load() {
     setLoading(true)
-    const token = await getToken({ template: 'supabase' });
-    const supabase = getSupabaseBrowserClient(token ?? undefined);
     const { data } = await supabase
       .from('leases')
       .select(`*, tenants(id, first_name, last_name, primary_phone, photo_url, tenant_type, company_name),

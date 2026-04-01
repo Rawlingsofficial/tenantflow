@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { getSupabaseBrowserClient } from '@/lib/supabase/client'
+import { useSupabaseWithAuth } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -20,7 +20,7 @@ type Tab = 'all' | 'active' | 'inactive'
 export default function TenantsPage() {
   const { orgId } = useAuth()
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
+  const supabase = useSupabaseWithAuth()
 
   const [tenants, setTenants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,15 +32,21 @@ export default function TenantsPage() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('tenants')
-      .select(`*, leases(id, status, rent_amount, service_charge,
-        units(unit_code, unit_purpose, area_sqm, floor_number, buildings(name)))`)
-      .eq('organization_id', orgId!)
-      .order('first_name', { ascending: true })
+    try {
+      const { data, error: err } = await supabase
+        .from('tenants')
+        .select(`*, leases(id, status, rent_amount, service_charge,
+          units(unit_code, unit_purpose, area_sqm, floor_number, buildings(name)))`)
+        .eq('organization_id', orgId!)
+        .order('first_name', { ascending: true })
 
-    setTenants(data ?? [])
-    setLoading(false)
+      if (err) throw err
+      setTenants(data ?? [])
+    } catch (err: any) {
+      console.error('Error loading tenants:', err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filtered = tenants.filter(t => {
